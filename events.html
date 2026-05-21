@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Events — Ecotopia</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/auth.js"></script>
+<script>try { AuthManager.requireAuth(); } catch(e) { throw e; }</script>
+<script src="assets/data.js"></script>
+<script src="assets/nav.js"></script>
+<style>
+  :root {
+    --forest: #1B4332; --forest-mid: #2D6A4F; --forest-light: #52B788;
+    --sage: #D8F3DC; --sage-dim: #B7E4C7; --earth: #8B5E3C;
+    --earth-light: #C68642; --gold: #F4A261; --cream: #F9F6F0;
+    --cream-dim: #E8E0D5; --text: #1C1C1C; --text-dim: #5A5A5A;
+    --border: rgba(45,106,79,0.2);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--text); }
+  .page { padding: 28px 32px; max-width: 800px; }
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+  h1 { font-family: 'Fraunces', serif; font-size: 1.9rem; color: var(--forest); }
+  .btn { padding: 10px 18px; border-radius: 8px; border: none; font-size: 0.875rem;
+    font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif;
+    text-decoration: none; display: inline-flex; gap: 6px; align-items: center;
+    transition: background 0.15s; }
+  .btn-primary { background: var(--forest); color: #fff; }
+  .btn-primary:hover { background: var(--forest-mid); }
+
+  /* Event cards */
+  .event-list { display: flex; flex-direction: column; gap: 14px; }
+  .event-card {
+    background: #fff; border-radius: 14px; border: 1px solid var(--border);
+    padding: 20px 22px; display: flex; gap: 20px; align-items: flex-start;
+  }
+  .event-date-block {
+    background: var(--forest); color: #fff; border-radius: 10px;
+    padding: 10px 14px; text-align: center; min-width: 56px; flex-shrink: 0;
+  }
+  .event-month { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.8; }
+  .event-day { font-family: 'Fraunces', serif; font-size: 1.8rem; font-weight: 700; line-height: 1; }
+  .event-info { flex: 1; }
+  .event-title { font-family: 'Fraunces', serif; font-size: 1.1rem; color: var(--forest);
+    margin-bottom: 4px; }
+  .event-type-pill { padding: 2px 8px; border-radius: 20px; font-size: 0.72rem; font-weight: 600;
+    margin-bottom: 6px; display: inline-block; }
+  .type-workday { background: #d1fae5; color: #065f46; }
+  .type-plant_sale { background: #fef3c7; color: #92400e; }
+  .type-workshop { background: #dbeafe; color: #1e40af; }
+  .type-other { background: var(--cream-dim); color: var(--text-dim); }
+  .event-location { font-size: 0.85rem; color: var(--text-dim); margin-bottom: 6px; }
+  .event-desc { font-size: 0.85rem; color: var(--text-dim); line-height: 1.5; margin-bottom: 10px; }
+  .event-meta { display: flex; align-items: center; gap: 12px; }
+  .signup-count { font-size: 0.82rem; color: var(--forest-mid); font-weight: 600; }
+  .signup-names { font-size: 0.78rem; color: var(--text-dim); }
+  .btn-signup { padding: 6px 14px; border-radius: 6px; background: var(--sage);
+    color: var(--forest); border: none; font-size: 0.8rem; font-weight: 600;
+    cursor: pointer; font-family: 'DM Sans', sans-serif; transition: background 0.15s; }
+  .btn-signup:hover { background: var(--sage-dim); }
+
+  .past-header { font-size: 0.85rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--text-dim); margin: 24px 0 12px; }
+
+  /* New event form */
+  .inline-form {
+    background: #fff; border-radius: 14px; border: 1px solid var(--border);
+    padding: 24px; margin-bottom: 24px; display: none;
+  }
+  .inline-form.open { display: block; }
+  .inline-form h3 { font-family: 'Fraunces', serif; color: var(--forest); margin-bottom: 16px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .form-group { margin-bottom: 14px; }
+  .form-group label { display: block; font-size: 0.78rem; font-weight: 600;
+    color: var(--text-dim); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .form-group input, .form-group select, .form-group textarea {
+    width: 100%; padding: 9px 11px; border-radius: 7px;
+    border: 1.5px solid var(--border); font-size: 0.875rem; font-family: 'DM Sans', sans-serif; }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+    outline: none; border-color: var(--forest-light); }
+  .form-actions { display: flex; gap: 10px; }
+  .btn-cancel { background: var(--cream-dim); color: var(--text); padding: 10px 18px;
+    border-radius: 8px; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+  .success-msg { background: #d1fae5; border: 1px solid #6ee7b7; color: #065f46;
+    padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; display: none; font-size: 0.875rem; }
+  .success-msg.visible { display: block; }
+
+  @media (max-width: 600px) {
+    .page { padding: 20px 16px; }
+    .event-card { flex-direction: column; gap: 12px; }
+    .form-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="page-header">
+    <h1>Events</h1>
+    <button class="btn btn-primary" onclick="toggleForm()">+ New Event</button>
+  </div>
+
+  <!-- Inline form -->
+  <div class="inline-form" id="newEventForm">
+    <h3>New Event</h3>
+    <div class="success-msg" id="eventSuccess">Event created!</div>
+    <form id="eventFormEl" novalidate>
+      <div class="form-row">
+        <div class="form-group"><label>Title *</label>
+          <input type="text" id="ev_title" placeholder="Event name" required></div>
+        <div class="form-group"><label>Date *</label>
+          <input type="date" id="ev_date" required></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Garden / Location</label>
+          <select id="ev_garden"></select></div>
+        <div class="form-group"><label>Type</label>
+          <select id="ev_type">
+            <option value="workday">Volunteer Workday</option>
+            <option value="plant_sale">Plant Sale</option>
+            <option value="workshop">Workshop</option>
+            <option value="other">Other</option>
+          </select></div>
+      </div>
+      <div class="form-group"><label>Description</label>
+        <textarea id="ev_desc" rows="2" placeholder="Event details…"></textarea></div>
+      <div class="form-actions">
+        <button type="button" class="btn-cancel" onclick="toggleForm()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Create Event</button>
+      </div>
+    </form>
+  </div>
+
+  <div id="eventList"></div>
+</div>
+
+<script>
+Nav.render();
+
+// Populate garden dropdown
+const gardens = DataStore.getGardens();
+const gardenSel = document.getElementById('ev_garden');
+gardenSel.innerHTML = `<option value="">None / other</option>` +
+  gardens.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
+
+function renderEvents() {
+  const events = DataStore.getEvents().sort((a, b) => a.date.localeCompare(b.date));
+  const today = new Date().toISOString().slice(0, 10);
+  const upcoming = events.filter(e => e.date >= today);
+  const past = events.filter(e => e.date < today);
+  const el = document.getElementById('eventList');
+
+  function typeLabel(t) {
+    const m = { workday: 'Workday', plant_sale: 'Plant Sale', workshop: 'Workshop', other: 'Event' };
+    return m[t] || 'Event';
+  }
+
+  function cardHtml(ev) {
+    const d = new Date(ev.date + 'T12:00:00');
+    const month = d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+    const day = d.getDate();
+    const garden = ev.gardenId ? DataStore.getGarden(ev.gardenId) : null;
+    const loc = ev.gardenName || (garden ? garden.name : '') || 'Location TBD';
+    const signups = ev.signups || [];
+    return `
+      <div class="event-card">
+        <div class="event-date-block">
+          <div class="event-month">${month}</div>
+          <div class="event-day">${day}</div>
+        </div>
+        <div class="event-info">
+          <div class="event-title">${ev.title}</div>
+          <span class="event-type-pill type-${ev.type}">${typeLabel(ev.type)}</span>
+          <div class="event-location">📍 ${loc}</div>
+          ${ev.description ? `<div class="event-desc">${ev.description}</div>` : ''}
+          <div class="event-meta">
+            <span class="signup-count">🤝 ${signups.length} signed up</span>
+            ${signups.length > 0 ? `<span class="signup-names">${signups.slice(0,3).join(', ')}${signups.length > 3 ? ` +${signups.length-3}` : ''}</span>` : ''}
+            ${ev.openSignup ? `<button class="btn-signup" onclick="quickSignup('${ev.id}')">Sign up</button>` : ''}
+          </div>
+        </div>
+      </div>`;
+  }
+
+  let html = '';
+  if (upcoming.length === 0) {
+    html += '<p style="color:var(--text-dim);font-size:0.875rem;">No upcoming events.</p>';
+  } else {
+    html += `<div class="event-list">${upcoming.map(cardHtml).join('')}</div>`;
+  }
+  if (past.length > 0) {
+    html += `<div class="past-header">Past Events</div>
+      <div class="event-list" style="opacity:0.7">${past.map(cardHtml).join('')}</div>`;
+  }
+  el.innerHTML = html;
+}
+
+renderEvents();
+
+function toggleForm() {
+  document.getElementById('newEventForm').classList.toggle('open');
+  document.getElementById('ev_date').value = new Date().toISOString().slice(0, 10);
+}
+
+document.getElementById('eventFormEl').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const title = document.getElementById('ev_title').value.trim();
+  const date = document.getElementById('ev_date').value;
+  if (!title || !date) return;
+  const gardenId = document.getElementById('ev_garden').value;
+  const garden = gardenId ? DataStore.getGarden(gardenId) : null;
+  DataStore.addEvent({
+    title, date, gardenId: gardenId || null,
+    gardenName: garden ? garden.name : '',
+    type: document.getElementById('ev_type').value,
+    description: document.getElementById('ev_desc').value.trim(),
+    openSignup: true, signups: []
+  });
+  document.getElementById('eventSuccess').classList.add('visible');
+  renderEvents();
+  setTimeout(() => {
+    document.getElementById('newEventForm').classList.remove('open');
+    document.getElementById('eventFormEl').reset();
+    document.getElementById('eventSuccess').classList.remove('visible');
+  }, 1200);
+});
+
+function quickSignup(eventId) {
+  const name = prompt('Enter your name to sign up:');
+  if (!name || !name.trim()) return;
+  DataStore.signupForEvent(eventId, name.trim());
+  renderEvents();
+}
+</script>
+</body>
+</html>

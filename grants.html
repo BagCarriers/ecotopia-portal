@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grants — Ecotopia</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/auth.js"></script>
+<script>try { AuthManager.requireAuth(); } catch(e) { throw e; }</script>
+<script src="assets/data.js"></script>
+<script src="assets/nav.js"></script>
+<style>
+  :root {
+    --forest: #1B4332; --forest-mid: #2D6A4F; --forest-light: #52B788;
+    --sage: #D8F3DC; --sage-dim: #B7E4C7; --earth: #8B5E3C;
+    --earth-light: #C68642; --gold: #F4A261; --cream: #F9F6F0;
+    --cream-dim: #E8E0D5; --text: #1C1C1C; --text-dim: #5A5A5A;
+    --border: rgba(45,106,79,0.2);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--text); }
+  .page { padding: 28px 32px; max-width: 900px; }
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+  h1 { font-family: 'Fraunces', serif; font-size: 1.9rem; color: var(--forest); }
+  .btn { padding: 10px 18px; border-radius: 8px; border: none; font-size: 0.875rem;
+    font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif;
+    text-decoration: none; display: inline-flex; gap: 6px; align-items: center;
+    transition: background 0.15s; }
+  .btn-primary { background: var(--forest); color: #fff; }
+  .btn-primary:hover { background: var(--forest-mid); }
+  .btn-sm { padding: 7px 14px; font-size: 0.8rem; }
+  .btn-outline { background: #fff; color: var(--forest); border: 1.5px solid var(--forest-light); }
+  .btn-outline:hover { background: var(--sage); }
+
+  /* Stepper */
+  .status-stepper { display: flex; gap: 0; margin-bottom: 28px;
+    background: #fff; border-radius: 10px; border: 1px solid var(--border); overflow: hidden; }
+  .step { padding: 8px 14px; font-size: 0.78rem; font-weight: 600; color: var(--text-dim);
+    border-right: 1px solid var(--border); flex: 1; text-align: center; }
+  .step:last-child { border-right: none; }
+  .step.done { background: var(--sage); color: var(--forest); }
+  .step.current { background: var(--forest); color: #fff; }
+
+  /* Grant cards */
+  .grant-list { display: flex; flex-direction: column; gap: 16px; }
+  .grant-card { background: #fff; border-radius: 14px; border: 1px solid var(--border); padding: 22px; }
+  .grant-card-top { display: flex; align-items: flex-start; justify-content: space-between;
+    gap: 12px; margin-bottom: 14px; }
+  .grant-funder { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--text-dim); font-weight: 700; margin-bottom: 3px; }
+  .grant-program { font-family: 'Fraunces', serif; font-size: 1.2rem; color: var(--forest); }
+  .grant-amount { font-family: 'Fraunces', serif; font-size: 1.5rem; color: var(--forest);
+    font-weight: 700; white-space: nowrap; }
+  .grant-body { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+  .grant-info-item .label { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--text-dim); font-weight: 700; margin-bottom: 3px; }
+  .grant-info-item .val { font-size: 0.875rem; font-weight: 500; }
+  .grant-notes { font-size: 0.875rem; color: var(--text-dim); line-height: 1.5;
+    padding-top: 12px; border-top: 1px solid var(--border); }
+  .grant-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
+  .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 700; }
+  .badge-applied { background: #dbeafe; color: #1e40af; }
+  .badge-under_review { background: #fef3c7; color: #92400e; }
+  .badge-approved { background: #d1fae5; color: #065f46; }
+  .badge-active { background: var(--sage); color: var(--forest); border: 1px solid var(--forest-light); }
+  .badge-complete { background: var(--cream-dim); color: var(--text-dim); }
+
+  /* Inline form */
+  .inline-form { background: #fff; border-radius: 14px; border: 1px solid var(--border);
+    padding: 24px; margin-bottom: 24px; display: none; }
+  .inline-form.open { display: block; }
+  .inline-form h3 { font-family: 'Fraunces', serif; color: var(--forest); margin-bottom: 16px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .form-group { margin-bottom: 14px; }
+  .form-group label { display: block; font-size: 0.78rem; font-weight: 600;
+    color: var(--text-dim); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .form-group input, .form-group select, .form-group textarea {
+    width: 100%; padding: 9px 11px; border-radius: 7px;
+    border: 1.5px solid var(--border); font-size: 0.875rem; font-family: 'DM Sans', sans-serif; }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+    outline: none; border-color: var(--forest-light); }
+  .form-actions { display: flex; gap: 10px; }
+  .btn-cancel { background: var(--cream-dim); color: var(--text); padding: 10px 18px;
+    border-radius: 8px; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+  .success-msg { background: #d1fae5; border: 1px solid #6ee7b7; color: #065f46;
+    padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; display: none; font-size: 0.875rem; }
+  .success-msg.visible { display: block; }
+
+  @media (max-width: 600px) {
+    .page { padding: 20px 16px; }
+    .grant-body { grid-template-columns: 1fr; }
+    .form-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="page-header">
+    <h1>Grants</h1>
+    <button class="btn btn-primary" onclick="toggleForm()">+ New Grant</button>
+  </div>
+
+  <!-- Inline Add Form -->
+  <div class="inline-form" id="grantForm">
+    <h3>New Grant</h3>
+    <div class="success-msg" id="grantSuccess">Grant added!</div>
+    <form id="grantFormEl" novalidate>
+      <div class="form-row">
+        <div class="form-group"><label>Funder *</label>
+          <input type="text" id="gr_funder" placeholder="e.g. DCNR" required></div>
+        <div class="form-group"><label>Program *</label>
+          <input type="text" id="gr_program" placeholder="Program name" required></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Amount ($)</label>
+          <input type="number" id="gr_amount" placeholder="0" min="0"></div>
+        <div class="form-group"><label>Status</label>
+          <select id="gr_status">
+            <option value="applied">Applied</option>
+            <option value="under_review">Under Review</option>
+            <option value="approved">Approved</option>
+            <option value="active">Active</option>
+            <option value="complete">Complete</option>
+          </select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Linked Job</label>
+          <select id="gr_job"><option value="">None</option></select></div>
+        <div class="form-group"><label>Deadline</label>
+          <input type="date" id="gr_deadline"></div>
+      </div>
+      <div class="form-group"><label>Notes</label>
+        <textarea id="gr_notes" rows="2" placeholder="Application notes, requirements…"></textarea></div>
+      <div class="form-actions">
+        <button type="button" class="btn-cancel" onclick="toggleForm()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Grant</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="grant-list" id="grantList"></div>
+</div>
+
+<script>
+Nav.render();
+
+const STATUSES = ['applied', 'under_review', 'approved', 'active', 'complete'];
+const STATUS_LABELS = {
+  applied: 'Applied', under_review: 'Under Review', approved: 'Approved',
+  active: 'Active', complete: 'Complete'
+};
+
+// Populate jobs dropdown
+const jobs = DataStore.getJobs();
+document.getElementById('gr_job').innerHTML =
+  '<option value="">None</option>' +
+  jobs.map(j => `<option value="${j.id}">${j.clientName} — ${j.title}</option>`).join('');
+
+function renderGrants() {
+  const grants = DataStore.getGrants();
+  const el = document.getElementById('grantList');
+  if (grants.length === 0) {
+    el.innerHTML = '<p style="color:var(--text-dim)">No grants tracked yet.</p>';
+    return;
+  }
+  el.innerHTML = grants.map(g => {
+    const idx = STATUSES.indexOf(g.status);
+    const job = g.jobId ? DataStore.getJob(g.jobId) : null;
+    return `
+      <div class="grant-card">
+        <div class="grant-card-top">
+          <div>
+            <div class="grant-funder">${g.funder}</div>
+            <div class="grant-program">${g.program}</div>
+          </div>
+          <div class="grant-amount">$${(g.amount || 0).toLocaleString()}</div>
+        </div>
+
+        <!-- Stepper -->
+        <div class="status-stepper">
+          ${STATUSES.map((s, i) => `
+            <div class="step ${i < idx ? 'done' : i === idx ? 'current' : ''}"
+                 onclick="advanceGrant('${g.id}', '${s}')">${STATUS_LABELS[s]}</div>`).join('')}
+        </div>
+
+        <div class="grant-body">
+          <div class="grant-info-item">
+            <div class="label">Status</div>
+            <div class="val"><span class="status-badge badge-${g.status}">${STATUS_LABELS[g.status]}</span></div>
+          </div>
+          ${job ? `<div class="grant-info-item">
+            <div class="label">Linked Job</div>
+            <div class="val"><a href="job-detail.html?id=${job.id}" style="color:var(--forest-mid)">${job.clientName} — ${job.title}</a></div>
+          </div>` : ''}
+          ${g.deadline ? `<div class="grant-info-item">
+            <div class="label">Deadline</div>
+            <div class="val">${DataStore.formatDate(g.deadline + 'T00:00:00')}</div>
+          </div>` : ''}
+          ${g.appliedDate ? `<div class="grant-info-item">
+            <div class="label">Applied</div>
+            <div class="val">${DataStore.formatDate(g.appliedDate + 'T00:00:00')}</div>
+          </div>` : ''}
+        </div>
+
+        ${g.notes ? `<div class="grant-notes">${g.notes}</div>` : ''}
+
+        <div class="grant-actions">
+          ${idx < STATUSES.length - 1 ? `
+            <button class="btn btn-primary btn-sm" onclick="advanceGrant('${g.id}', '${STATUSES[idx + 1]}')">
+              Move to ${STATUS_LABELS[STATUSES[idx + 1]]}
+            </button>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function advanceGrant(id, newStatus) {
+  DataStore.updateGrant(id, { status: newStatus });
+  renderGrants();
+}
+
+renderGrants();
+
+function toggleForm() {
+  document.getElementById('grantForm').classList.toggle('open');
+}
+document.getElementById('grantFormEl').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const funder = document.getElementById('gr_funder').value.trim();
+  const program = document.getElementById('gr_program').value.trim();
+  if (!funder || !program) return;
+  const jobId = document.getElementById('gr_job').value;
+  const job = jobId ? DataStore.getJob(jobId) : null;
+  DataStore.addGrant({
+    funder, program,
+    amount: parseFloat(document.getElementById('gr_amount').value) || 0,
+    status: document.getElementById('gr_status').value,
+    jobId: jobId || null,
+    jobTitle: job ? `${job.clientName} — ${job.title}` : '',
+    deadline: document.getElementById('gr_deadline').value || null,
+    appliedDate: new Date().toISOString().slice(0, 10),
+    notes: document.getElementById('gr_notes').value.trim()
+  });
+  document.getElementById('grantSuccess').classList.add('visible');
+  renderGrants();
+  setTimeout(() => {
+    document.getElementById('grantForm').classList.remove('open');
+    document.getElementById('grantFormEl').reset();
+    document.getElementById('grantSuccess').classList.remove('visible');
+  }, 1200);
+});
+</script>
+</body>
+</html>

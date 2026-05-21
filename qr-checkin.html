@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Check In — Ecotopia</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/data.js"></script>
+<style>
+  :root {
+    --forest: #1B4332; --forest-mid: #2D6A4F; --forest-light: #52B788;
+    --sage: #D8F3DC; --sage-dim: #B7E4C7; --earth: #8B5E3C;
+    --earth-light: #C68642; --gold: #F4A261; --cream: #F9F6F0;
+    --cream-dim: #E8E0D5; --text: #1C1C1C; --text-dim: #5A5A5A;
+    --border: rgba(45,106,79,0.2);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--text);
+    min-height: 100%; display: flex; flex-direction: column; align-items: center;
+  }
+  .container { width: 100%; max-width: 480px; padding: 28px 20px; }
+
+  .logo { font-family: 'Fraunces', serif; font-size: 1.3rem; color: var(--forest);
+    font-weight: 700; text-align: center; margin-bottom: 24px; }
+  .garden-header {
+    background: linear-gradient(135deg, var(--forest), var(--forest-mid));
+    color: #fff; border-radius: 16px; padding: 24px; text-align: center; margin-bottom: 28px;
+  }
+  .garden-header h1 { font-family: 'Fraunces', serif; font-size: 1.5rem; margin-bottom: 6px; }
+  .garden-header .date { font-size: 0.9rem; opacity: 0.8; }
+
+  /* Path selection */
+  .path-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; }
+  .path-card {
+    background: #fff; border-radius: 14px; border: 2px solid var(--border);
+    padding: 20px 16px; text-align: center; cursor: pointer; transition: all 0.15s;
+  }
+  .path-card:hover { border-color: var(--forest-light); background: var(--sage); }
+  .path-card.selected { border-color: var(--forest); background: var(--sage); }
+  .path-icon { font-size: 2rem; margin-bottom: 8px; }
+  .path-title { font-weight: 700; font-size: 0.95rem; color: var(--forest); }
+  .path-sub { font-size: 0.78rem; color: var(--text-dim); margin-top: 4px; }
+
+  /* Panels */
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .panel-title { font-family: 'Fraunces', serif; font-size: 1.2rem; color: var(--forest);
+    margin-bottom: 16px; }
+  .form-group { margin-bottom: 16px; }
+  .form-group label { display: block; font-size: 0.82rem; font-weight: 700;
+    color: var(--text-dim); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .form-group input {
+    width: 100%; padding: 14px; border-radius: 10px; border: 2px solid var(--border);
+    font-size: 1rem; font-family: 'DM Sans', sans-serif; color: var(--text);
+    -webkit-appearance: none;
+  }
+  .form-group input:focus { outline: none; border-color: var(--forest-light); }
+
+  /* Walk-in task cards */
+  .walkin-grid { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+  .walkin-item {
+    background: #fff; border-radius: 12px; border: 2px solid var(--border);
+    padding: 16px; cursor: pointer; display: flex; gap: 12px; align-items: center;
+    transition: all 0.15s;
+  }
+  .walkin-item:hover { border-color: var(--forest-light); background: var(--sage); }
+  .walkin-item.selected { border-color: var(--forest); background: var(--sage); }
+  .walkin-icon { font-size: 1.4rem; }
+  .walkin-title { font-weight: 600; font-size: 0.95rem; }
+  .walkin-time { font-size: 0.8rem; color: var(--text-dim); }
+
+  /* Task confirmation card */
+  .task-confirm-card {
+    background: var(--sage); border-radius: 12px; padding: 16px;
+    margin-bottom: 20px;
+  }
+  .task-confirm-title { font-weight: 700; color: var(--forest); font-size: 1rem; }
+  .task-confirm-sub { font-size: 0.85rem; color: var(--forest-mid); margin-top: 4px; }
+
+  /* Buttons */
+  .btn-big {
+    width: 100%; padding: 16px; border-radius: 12px; border: none;
+    font-size: 1.05rem; font-weight: 700; cursor: pointer; font-family: 'DM Sans', sans-serif;
+    transition: background 0.15s; margin-bottom: 10px; display: block;
+  }
+  .btn-green { background: var(--forest); color: #fff; }
+  .btn-green:hover { background: var(--forest-mid); }
+  .btn-outline { background: #fff; color: var(--forest); border: 2px solid var(--forest-light); }
+  .btn-outline:hover { background: var(--sage); }
+  .btn-done { background: var(--gold); color: var(--text); }
+
+  /* Success screen */
+  .success-screen { text-align: center; padding: 40px 20px; }
+  .success-icon { font-size: 4rem; margin-bottom: 16px; }
+  .success-title { font-family: 'Fraunces', serif; font-size: 1.8rem; color: var(--forest);
+    margin-bottom: 8px; }
+  .success-sub { color: var(--text-dim); font-size: 0.9rem; line-height: 1.6; }
+  .success-links { margin-top: 28px; }
+  .success-link { display: block; background: var(--sage); color: var(--forest);
+    padding: 14px; border-radius: 10px; text-decoration: none; font-weight: 600;
+    margin-bottom: 10px; text-align: center; font-size: 0.9rem; }
+
+  .not-found { text-align: center; padding: 60px 20px; }
+  .not-found h2 { font-family: 'Fraunces', serif; color: var(--forest); margin-bottom: 10px; }
+  .not-found p { color: var(--text-dim); }
+
+  /* Board link */
+  .board-cta {
+    background: var(--cream-dim); border-radius: 12px; padding: 16px;
+    text-align: center; margin-top: 24px;
+  }
+  .board-cta a { color: var(--forest-mid); font-weight: 600; text-decoration: none; }
+  .board-cta a:hover { text-decoration: underline; }
+  .board-cta p { font-size: 0.85rem; color: var(--text-dim); margin-bottom: 4px; }
+
+  @media (max-width: 400px) {
+    .path-cards { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="logo">🌿 Ecotopia Earthcare</div>
+  <div id="pageContent"></div>
+</div>
+
+<script>
+const params = new URLSearchParams(window.location.search);
+const gardenToken = params.get('garden');
+const garden = gardenToken ? DataStore.getGardenByToken(gardenToken) : null;
+
+const el = document.getElementById('pageContent');
+const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+let selectedPath = null;
+let selectedTask = null;
+let checkInStartTime = null;
+
+if (!garden) {
+  el.innerHTML = `
+    <div class="not-found">
+      <h2>Garden not found</h2>
+      <p>This QR code may be outdated. Please ask a staff member for help.</p>
+    </div>`;
+} else {
+  renderMain();
+}
+
+function renderMain() {
+  el.innerHTML = `
+    <div class="garden-header">
+      <h1>${garden.name}</h1>
+      <div class="date">${todayStr}</div>
+    </div>
+
+    <!-- Path selection -->
+    <div class="path-cards">
+      <div class="path-card" id="pathA" onclick="selectPath('A')">
+        <div class="path-icon">📋</div>
+        <div class="path-title">I have a scheduled task</div>
+        <div class="path-sub">Check in for your regular commitment</div>
+      </div>
+      <div class="path-card" id="pathB" onclick="selectPath('B')">
+        <div class="path-icon">🌱</div>
+        <div class="path-title">I want to help right now</div>
+        <div class="path-sub">Pick a walk-in task</div>
+      </div>
+    </div>
+
+    <!-- Path A: Scheduled task -->
+    <div class="panel" id="panelA">
+      <div class="panel-title">Check in for your task</div>
+      <div class="form-group">
+        <label>Your phone number</label>
+        <input type="tel" id="phoneInput" placeholder="(814) 555-0000"
+               oninput="lookupPhone(this.value)">
+      </div>
+      <div id="taskLookupResult"></div>
+      <button class="btn-big btn-green" id="pathABtn" onclick="checkInScheduled()" style="display:none">
+        ✓ Check In
+      </button>
+    </div>
+
+    <!-- Path B: Walk-in -->
+    <div class="panel" id="panelB">
+      <div class="panel-title">Pick a task to help with</div>
+      <div class="walkin-grid" id="walkinGrid"></div>
+      <div id="walkinForm" style="display:none">
+        <div class="form-group">
+          <label>Your name</label>
+          <input type="text" id="wi_name" placeholder="First & last name">
+        </div>
+        <div class="form-group">
+          <label>Your phone (optional)</label>
+          <input type="tel" id="wi_phone" placeholder="(814) 555-0000">
+        </div>
+        <button class="btn-big btn-green" onclick="checkInWalkin()">✓ Start Task</button>
+        <button class="btn-big btn-outline" onclick="cancelWalkin()">Back</button>
+      </div>
+    </div>
+
+    <!-- Active task in progress (Path B) -->
+    <div class="panel" id="panelActive">
+      <div class="task-confirm-card">
+        <div class="task-confirm-title" id="activeTaskTitle"></div>
+        <div class="task-confirm-sub" id="activeTaskSub"></div>
+      </div>
+      <p style="text-align:center;color:var(--text-dim);font-size:0.9rem;margin-bottom:20px">
+        Timer started. When you're done, tap below.
+      </p>
+      <button class="btn-big btn-done" onclick="finishWalkin()">✅ I'm finished!</button>
+    </div>
+
+    <div class="board-cta">
+      <p>Want to take on a regular responsibility?</p>
+      <a href="volunteer-board.html">View open tasks →</a>
+    </div>
+  `;
+
+  // Populate walk-in tasks
+  const walkins = DataStore.getWalkinsByGarden(garden.id);
+  const walkinIcons = { 'Trash pickup': '🗑', 'Plant inspection + notes': '🔍',
+    'Pull weeds anywhere': '🌿', 'Water if dry': '💧', 'Harvest ripe fruit/veg': '🍎' };
+  document.getElementById('walkinGrid').innerHTML = walkins.map(w => `
+    <div class="walkin-item" id="wi_${w.id}" onclick="selectWalkin('${w.id}', '${w.title}', ${w.estMinutes})">
+      <span class="walkin-icon">${walkinIcons[w.title] || '🌱'}</span>
+      <div>
+        <div class="walkin-title">${w.title}</div>
+        <div class="walkin-time">~${w.estMinutes} min</div>
+      </div>
+    </div>`).join('');
+}
+
+function selectPath(p) {
+  selectedPath = p;
+  document.getElementById('pathA').classList.toggle('selected', p === 'A');
+  document.getElementById('pathB').classList.toggle('selected', p === 'B');
+  document.getElementById('panelA').classList.toggle('active', p === 'A');
+  document.getElementById('panelB').classList.toggle('active', p === 'B');
+}
+
+// ── Path A: Scheduled ────────────────────────────────────────────────────
+function lookupPhone(phone) {
+  const cleaned = phone.replace(/\D/g, '');
+  const resultEl = document.getElementById('taskLookupResult');
+  const btn = document.getElementById('pathABtn');
+
+  if (cleaned.length < 10) {
+    resultEl.innerHTML = '';
+    btn.style.display = 'none';
+    return;
+  }
+
+  const vols = DataStore.getVolunteers();
+  const vol = vols.find(v => v.phone && v.phone.replace(/\D/g, '') === cleaned);
+
+  if (!vol) {
+    resultEl.innerHTML = `<p style="color:var(--text-dim);font-size:0.875rem;margin-bottom:12px">
+      No record found for this number. Try the walk-in option instead.</p>`;
+    btn.style.display = 'none';
+    return;
+  }
+
+  const tasks = DataStore.getTasksByVolunteer(vol.id).filter(t => t.gardenId === garden.id);
+  if (tasks.length === 0) {
+    resultEl.innerHTML = `<p style="color:var(--text-dim);font-size:0.875rem;margin-bottom:12px">
+      Hi ${vol.name}! No tasks assigned at this garden. Pick a walk-in task instead.</p>`;
+    btn.style.display = 'none';
+    return;
+  }
+
+  const task = tasks[0];
+  selectedTask = { ...task, volunteerName: vol.name, volunteerId: vol.id };
+  resultEl.innerHTML = `
+    <div class="task-confirm-card">
+      <div class="task-confirm-title">Hi ${vol.name}! 👋</div>
+      <div class="task-confirm-sub">Your task: <strong>${task.title}</strong></div>
+      <div style="font-size:0.8rem;color:var(--forest-mid);margin-top:4px">~${task.estMinutes >= 60 ? (task.estMinutes/60).toFixed(1)+'h' : task.estMinutes+'min'}</div>
+    </div>`;
+  btn.style.display = 'block';
+}
+
+function checkInScheduled() {
+  if (!selectedTask) return;
+  DataStore.addCheckin({
+    gardenId: garden.id, gardenName: garden.name,
+    volunteerId: selectedTask.volunteerId, volunteerName: selectedTask.volunteerName,
+    taskId: selectedTask.id, taskTitle: selectedTask.title,
+    hoursLogged: Math.round(selectedTask.estMinutes / 60 * 4) / 4,
+    checkInTime: new Date().toISOString(), checkOutTime: new Date().toISOString(),
+    type: 'scheduled', notes: ''
+  });
+  DataStore.updateTask(selectedTask.id, { lastCompleted: new Date().toISOString(),
+    nextDue: new Date(Date.now() + selectedTask.cadenceDays * 86400000).toISOString() });
+  showSuccess(selectedTask.volunteerName, selectedTask.title);
+}
+
+// ── Path B: Walk-in ─────────────────────────────────────────────────────
+function selectWalkin(id, title, estMins) {
+  document.querySelectorAll('.walkin-item').forEach(el => el.classList.remove('selected'));
+  document.getElementById('wi_' + id).classList.add('selected');
+  selectedTask = { id, title, estMinutes: estMins, type: 'walkin' };
+  document.getElementById('walkinGrid').style.display = 'none';
+  document.getElementById('walkinForm').style.display = 'block';
+}
+
+function cancelWalkin() {
+  selectedTask = null;
+  document.getElementById('walkinGrid').style.display = 'flex';
+  document.getElementById('walkinForm').style.display = 'none';
+  document.querySelectorAll('.walkin-item').forEach(el => el.classList.remove('selected'));
+}
+
+function checkInWalkin() {
+  const name = document.getElementById('wi_name').value.trim();
+  if (!name) {
+    document.getElementById('wi_name').focus();
+    return;
+  }
+  checkInStartTime = new Date();
+  selectedTask.volunteerName = name;
+  selectedTask.volunteerPhone = document.getElementById('wi_phone').value.trim();
+
+  document.getElementById('panelB').classList.remove('active');
+  document.getElementById('panelActive').classList.add('active');
+  document.getElementById('activeTaskTitle').textContent = `${name} — ${selectedTask.title}`;
+  document.getElementById('activeTaskSub').textContent = `Started at ${checkInStartTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} · ${garden.name}`;
+}
+
+function finishWalkin() {
+  const elapsed = checkInStartTime ? (Date.now() - checkInStartTime.getTime()) / 3600000 : (selectedTask.estMinutes / 60);
+  const hours = Math.max(0.25, Math.round(elapsed * 4) / 4);
+
+  // Try to match to a volunteer by phone
+  const phone = selectedTask.volunteerPhone ? selectedTask.volunteerPhone.replace(/\D/g, '') : '';
+  const matchedVol = phone ? DataStore.getVolunteers().find(v => v.phone && v.phone.replace(/\D/g, '') === phone) : null;
+
+  DataStore.addCheckin({
+    gardenId: garden.id, gardenName: garden.name,
+    volunteerId: matchedVol ? matchedVol.id : null,
+    volunteerName: selectedTask.volunteerName,
+    taskId: null, taskTitle: selectedTask.title,
+    hoursLogged: hours,
+    checkInTime: checkInStartTime ? checkInStartTime.toISOString() : new Date().toISOString(),
+    checkOutTime: new Date().toISOString(),
+    type: 'walkin', notes: ''
+  });
+  showSuccess(selectedTask.volunteerName, selectedTask.title, hours);
+}
+
+function showSuccess(name, task, hours) {
+  const hoursText = hours ? `You logged ${hours.toFixed(2).replace(/\.?0+$/, '')} hour${hours !== 1 ? 's' : ''}.` : '';
+  el.innerHTML = `
+    <div class="success-screen">
+      <div class="success-icon">🌿</div>
+      <div class="success-title">Thank you, ${name}!</div>
+      <div class="success-sub">
+        Checked in for: <strong>${task}</strong> at ${garden.name}.<br>
+        ${hoursText}<br><br>
+        Your contribution helps this community space thrive.
+      </div>
+      <div class="success-links">
+        <a href="volunteer-board.html" class="success-link">📋 See open responsibilities →</a>
+        <a href="qr-checkin.html?garden=${gardenToken}" class="success-link">↩ New check-in</a>
+      </div>
+    </div>`;
+}
+</script>
+</body>
+</html>

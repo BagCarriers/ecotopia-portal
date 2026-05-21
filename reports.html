@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reports — Ecotopia</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/auth.js"></script>
+<script>try { AuthManager.requireAuth(); } catch(e) { throw e; }</script>
+<script src="assets/data.js"></script>
+<script src="assets/nav.js"></script>
+<style>
+  :root {
+    --forest: #1B4332; --forest-mid: #2D6A4F; --forest-light: #52B788;
+    --sage: #D8F3DC; --sage-dim: #B7E4C7; --earth: #8B5E3C;
+    --earth-light: #C68642; --gold: #F4A261; --cream: #F9F6F0;
+    --cream-dim: #E8E0D5; --text: #1C1C1C; --text-dim: #5A5A5A;
+    --border: rgba(45,106,79,0.2);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--text); }
+  .page { padding: 28px 32px; max-width: 1000px; }
+  .page-header { display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
+  h1 { font-family: 'Fraunces', serif; font-size: 1.9rem; color: var(--forest); }
+  .btn { padding: 10px 18px; border-radius: 8px; border: none; font-size: 0.875rem;
+    font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif;
+    text-decoration: none; display: inline-flex; gap: 6px; align-items: center;
+    transition: background 0.15s; }
+  .btn-primary { background: var(--forest); color: #fff; }
+  .btn-primary:hover { background: var(--forest-mid); }
+  .btn-outline { background: #fff; color: var(--forest); border: 1.5px solid var(--forest-light); }
+  .btn-outline:hover { background: var(--sage); }
+
+  /* Filters */
+  .filters {
+    background: #fff; border-radius: 12px; border: 1px solid var(--border);
+    padding: 18px 20px; margin-bottom: 24px; display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end;
+  }
+  .filter-group { display: flex; flex-direction: column; gap: 5px; }
+  .filter-group label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.05em; color: var(--text-dim); }
+  .filter-group input, .filter-group select {
+    padding: 8px 10px; border-radius: 7px; border: 1.5px solid var(--border);
+    font-size: 0.875rem; font-family: 'DM Sans', sans-serif; min-width: 140px;
+  }
+  .filter-group input:focus, .filter-group select:focus { outline: none; border-color: var(--forest-light); }
+
+  /* Stats */
+  .stats-row { display: flex; gap: 14px; margin-bottom: 24px; flex-wrap: wrap; }
+  .stat-box { background: #fff; border-radius: 10px; border: 1px solid var(--border);
+    padding: 14px 18px; flex: 1; min-width: 130px; }
+  .stat-box .label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--text-dim); font-weight: 700; margin-bottom: 4px; }
+  .stat-box .value { font-family: 'Fraunces', serif; font-size: 1.6rem; color: var(--forest); }
+
+  /* Table */
+  .rep-table { width: 100%; border-collapse: collapse; background: #fff;
+    border-radius: 14px; overflow: hidden; border: 1px solid var(--border); }
+  .rep-table th { padding: 11px 14px; text-align: left; font-size: 0.75rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim);
+    background: var(--cream-dim); border-bottom: 1px solid var(--border); }
+  .rep-table td { padding: 11px 14px; border-bottom: 1px solid var(--border); font-size: 0.875rem; }
+  .rep-table tr:last-child td { border-bottom: none; }
+  .type-badge { padding: 2px 8px; border-radius: 20px; font-size: 0.7rem; font-weight: 600; }
+  .type-scheduled { background: var(--sage); color: var(--forest); }
+  .type-walkin { background: #dbeafe; color: #1e40af; }
+  .type-manual { background: var(--cream-dim); color: var(--text-dim); }
+
+  /* Export buttons row */
+  .export-row { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+
+  /* Print styles */
+  @media print {
+    #eco-sidebar, #eco-bottomnav, #eco-more-drawer,
+    .filters, .export-row, .page-header .btn { display: none !important; }
+    #eco-main { margin-left: 0 !important; }
+    body { background: #fff; }
+    .page { padding: 10px; max-width: 100%; }
+    h1 { font-size: 1.4rem; }
+    .stats-row { flex-wrap: nowrap; }
+    .stat-box { border: 1px solid #ccc; }
+  }
+
+  @media (max-width: 700px) {
+    .page { padding: 20px 16px; }
+    .rep-table { font-size: 0.8rem; }
+    .rep-table th, .rep-table td { padding: 8px 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="page-header">
+    <h1>Volunteer Hours Report</h1>
+  </div>
+
+  <!-- Filters -->
+  <div class="filters">
+    <div class="filter-group">
+      <label>From</label>
+      <input type="date" id="f_from">
+    </div>
+    <div class="filter-group">
+      <label>To</label>
+      <input type="date" id="f_to">
+    </div>
+    <div class="filter-group">
+      <label>Volunteer</label>
+      <select id="f_vol"><option value="">All Volunteers</option></select>
+    </div>
+    <div class="filter-group">
+      <label>Garden</label>
+      <select id="f_garden"><option value="">All Gardens</option></select>
+    </div>
+    <button class="btn btn-primary" onclick="applyFilters()">Apply</button>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-row" id="statsRow"></div>
+
+  <!-- Export -->
+  <div class="export-row">
+    <button class="btn btn-outline" onclick="exportCSV()">⬇ Export CSV</button>
+    <button class="btn btn-outline" onclick="window.print()">🖨 Export PDF</button>
+  </div>
+
+  <!-- Table -->
+  <table class="rep-table">
+    <thead><tr>
+      <th>Volunteer</th><th>Garden</th><th>Task</th><th>Date</th><th>Hours</th><th>Type</th>
+    </tr></thead>
+    <tbody id="repBody"></tbody>
+  </table>
+</div>
+
+<script>
+Nav.render();
+
+// Set default date range (last 30 days)
+const todayStr = new Date().toISOString().slice(0, 10);
+const thirtyAgo = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+document.getElementById('f_from').value = thirtyAgo;
+document.getElementById('f_to').value = todayStr;
+
+// Populate dropdowns
+const vols = DataStore.getVolunteers();
+const gardens = DataStore.getGardens();
+document.getElementById('f_vol').innerHTML =
+  '<option value="">All Volunteers</option>' +
+  vols.map(v => `<option value="${v.id}">${v.name}</option>`).join('');
+document.getElementById('f_garden').innerHTML =
+  '<option value="">All Gardens</option>' +
+  gardens.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
+
+let filteredCheckins = [];
+
+function applyFilters() {
+  const from = document.getElementById('f_from').value;
+  const to = document.getElementById('f_to').value;
+  const volId = document.getElementById('f_vol').value;
+  const gardenId = document.getElementById('f_garden').value;
+
+  const all = DataStore.getCheckins().sort((a, b) => new Date(b.checkInTime) - new Date(a.checkInTime));
+  filteredCheckins = all.filter(ci => {
+    const d = ci.checkInTime.slice(0, 10);
+    if (from && d < from) return false;
+    if (to && d > to) return false;
+    if (volId && ci.volunteerId !== volId) return false;
+    if (gardenId && ci.gardenId !== gardenId) return false;
+    return true;
+  });
+
+  // Stats
+  const totalHours = filteredCheckins.reduce((s, c) => s + (c.hoursLogged || 0), 0);
+  const uniqueVols = new Set(filteredCheckins.map(c => c.volunteerId)).size;
+  const uniqueGardens = new Set(filteredCheckins.map(c => c.gardenId)).size;
+  document.getElementById('statsRow').innerHTML = `
+    <div class="stat-box"><div class="label">Total Hours</div><div class="value">${totalHours.toFixed(1)}</div></div>
+    <div class="stat-box"><div class="label">Volunteers</div><div class="value">${uniqueVols}</div></div>
+    <div class="stat-box"><div class="label">Gardens</div><div class="value">${uniqueGardens}</div></div>
+    <div class="stat-box"><div class="label">Check-ins</div><div class="value">${filteredCheckins.length}</div></div>
+  `;
+
+  // Table
+  document.getElementById('repBody').innerHTML = filteredCheckins.length === 0
+    ? '<tr><td colspan="6" style="text-align:center;color:var(--text-dim);padding:20px">No records found for this period.</td></tr>'
+    : filteredCheckins.map(ci => `
+      <tr>
+        <td>${ci.volunteerName}</td>
+        <td>${ci.gardenName}</td>
+        <td>${ci.taskTitle}</td>
+        <td>${DataStore.formatDate(ci.checkInTime)}</td>
+        <td>${ci.hoursLogged}</td>
+        <td><span class="type-badge type-${ci.type || 'manual'}">${ci.type || 'manual'}</span></td>
+      </tr>`).join('');
+}
+
+function exportCSV() {
+  if (filteredCheckins.length === 0) {
+    alert('No data to export. Apply filters first.');
+    return;
+  }
+  const headers = ['Volunteer', 'Garden', 'Task', 'Date', 'Hours', 'Type', 'Notes'];
+  const rows = filteredCheckins.map(ci => [
+    `"${ci.volunteerName}"`,
+    `"${ci.gardenName}"`,
+    `"${ci.taskTitle}"`,
+    ci.checkInTime.slice(0, 10),
+    ci.hoursLogged,
+    ci.type || 'manual',
+    `"${ci.notes || ''}"`
+  ].join(','));
+  const csv = [headers.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `ecotopia-hours-${document.getElementById('f_from').value}-to-${document.getElementById('f_to').value}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Auto-apply on load
+applyFilters();
+</script>
+</body>
+</html>

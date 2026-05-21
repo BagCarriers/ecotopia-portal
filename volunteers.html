@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Volunteers — Ecotopia</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/auth.js"></script>
+<script>try { AuthManager.requireAuth(); } catch(e) { throw e; }</script>
+<script src="assets/data.js"></script>
+<script src="assets/nav.js"></script>
+<style>
+  :root {
+    --forest: #1B4332; --forest-mid: #2D6A4F; --forest-light: #52B788;
+    --sage: #D8F3DC; --sage-dim: #B7E4C7; --earth: #8B5E3C;
+    --earth-light: #C68642; --gold: #F4A261; --cream: #F9F6F0;
+    --cream-dim: #E8E0D5; --text: #1C1C1C; --text-dim: #5A5A5A;
+    --border: rgba(45,106,79,0.2);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--text); }
+  .page { padding: 28px 32px; max-width: 1000px; }
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+  h1 { font-family: 'Fraunces', serif; font-size: 1.9rem; color: var(--forest); }
+  .btn { padding: 10px 18px; border-radius: 8px; border: none; font-size: 0.875rem;
+    font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif;
+    text-decoration: none; display: inline-flex; gap: 6px; align-items: center;
+    transition: background 0.15s; }
+  .btn-primary { background: var(--forest); color: #fff; }
+  .btn-primary:hover { background: var(--forest-mid); }
+
+  /* Table */
+  .vol-table { width: 100%; border-collapse: collapse; background: #fff;
+    border-radius: 14px; overflow: hidden; border: 1px solid var(--border); }
+  .vol-table th {
+    padding: 12px 16px; text-align: left; font-size: 0.75rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim);
+    background: var(--cream-dim); border-bottom: 1px solid var(--border);
+  }
+  .vol-table td { padding: 13px 16px; border-bottom: 1px solid var(--border); font-size: 0.875rem; }
+  .vol-table tr:last-child td { border-bottom: none; }
+  .vol-table tbody tr { cursor: pointer; transition: background 0.1s; }
+  .vol-table tbody tr:hover td { background: var(--cream); }
+
+  .vol-name { font-weight: 600; color: var(--forest); }
+  .skill-pill { background: var(--sage); color: var(--forest-mid); padding: 2px 7px;
+    border-radius: 20px; font-size: 0.7rem; font-weight: 600; margin-right: 3px; display: inline-block; }
+  .status-active { color: var(--forest-light); font-weight: 600; }
+  .status-inactive { color: var(--text-dim); }
+
+  /* Modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+    z-index: 500; align-items: center; justify-content: center; padding: 20px; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: #fff; border-radius: 16px; padding: 28px;
+    width: 100%; max-width: 460px; max-height: 90vh; overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.25); }
+  .modal h2 { font-family: 'Fraunces', serif; color: var(--forest); margin-bottom: 20px; }
+  .form-group { margin-bottom: 16px; }
+  .form-group label { display: block; font-size: 0.82rem; font-weight: 600;
+    color: var(--text-dim); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .form-group input, .form-group textarea {
+    width: 100%; padding: 10px 12px; border-radius: 7px;
+    border: 1.5px solid var(--border); font-size: 0.9rem; font-family: 'DM Sans', sans-serif;
+    color: var(--text);
+  }
+  .form-group input:focus, .form-group textarea:focus { outline: none; border-color: var(--forest-light); }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+  .btn-cancel { background: var(--cream-dim); color: var(--text); padding: 10px 18px;
+    border-radius: 8px; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+  .success-msg { background: #d1fae5; border: 1px solid #6ee7b7; color: #065f46;
+    padding: 12px; border-radius: 8px; margin-bottom: 16px; display: none; font-size: 0.875rem; }
+  .success-msg.visible { display: block; }
+
+  /* Log hours modal */
+  .log-hours-btn {
+    background: var(--cream-dim); color: var(--forest); border: 1.5px solid var(--forest-light);
+    padding: 9px 16px; border-radius: 8px; cursor: pointer; font-size: 0.875rem;
+    font-weight: 600; font-family: 'DM Sans', sans-serif;
+  }
+  .log-hours-btn:hover { background: var(--sage); }
+
+  @media (max-width: 700px) {
+    .page { padding: 20px 16px; }
+    .vol-table { font-size: 0.8rem; }
+    .vol-table th, .vol-table td { padding: 10px 10px; }
+    .skill-pill { display: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="page-header">
+    <h1>Volunteers</h1>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      <button class="log-hours-btn" onclick="openLogHours()">📋 Log Hours</button>
+      <button class="btn btn-primary" onclick="openAddVol()">+ Add Volunteer</button>
+    </div>
+  </div>
+  <table class="vol-table" id="volTable">
+    <thead><tr>
+      <th>Name</th><th>Skills</th><th>Active Tasks</th>
+      <th>Hours (30d)</th><th>Last Active</th><th>Status</th>
+    </tr></thead>
+    <tbody id="volBody"></tbody>
+  </table>
+</div>
+
+<!-- Add Volunteer Modal -->
+<div class="modal-overlay" id="addVolModal">
+  <div class="modal">
+    <h2>Add Volunteer</h2>
+    <div class="success-msg" id="volSuccess">Volunteer added!</div>
+    <form id="addVolForm" novalidate>
+      <div class="form-group"><label>Name *</label>
+        <input type="text" id="av_name" placeholder="Full name" required></div>
+      <div class="form-group"><label>Phone</label>
+        <input type="tel" id="av_phone" placeholder="(814) 555-0000"></div>
+      <div class="form-group"><label>Email</label>
+        <input type="email" id="av_email" placeholder="email@example.com"></div>
+      <div class="form-group"><label>Skills (comma separated)</label>
+        <input type="text" id="av_skills" placeholder="planting, watering, weeding"></div>
+      <div class="form-group"><label>Availability</label>
+        <input type="text" id="av_avail" placeholder="Weekends only"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" onclick="closeAddVol()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Add Volunteer</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Log Hours Modal -->
+<div class="modal-overlay" id="logHoursModal">
+  <div class="modal">
+    <h2>Log Volunteer Hours</h2>
+    <div class="success-msg" id="hoursSuccess">Hours logged!</div>
+    <form id="logHoursForm" novalidate>
+      <div class="form-group"><label>Volunteer *</label>
+        <select id="lh_vol" required></select></div>
+      <div class="form-group"><label>Garden *</label>
+        <select id="lh_garden" required></select></div>
+      <div class="form-group"><label>Task</label>
+        <input type="text" id="lh_task" placeholder="Task description"></div>
+      <div class="form-group"><label>Hours *</label>
+        <input type="number" id="lh_hours" step="0.25" min="0.25" placeholder="1.5" required></div>
+      <div class="form-group"><label>Date</label>
+        <input type="date" id="lh_date"></div>
+      <div class="form-group"><label>Notes</label>
+        <textarea id="lh_notes" rows="2" placeholder="Optional notes…"></textarea></div>
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" onclick="closeLogHours()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Log Hours</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+Nav.render();
+
+function renderTable() {
+  const vols = DataStore.getVolunteers();
+  const tbody = document.getElementById('volBody');
+  tbody.innerHTML = vols.map(v => {
+    const tasks = DataStore.getTasksByVolunteer(v.id);
+    const hours = DataStore.getHoursLast30(v.id);
+    const checkins = DataStore.getCheckinsByVolunteer(v.id);
+    const lastCi = checkins.sort((a, b) => new Date(b.checkInTime) - new Date(a.checkInTime))[0];
+    const lastActive = lastCi ? DataStore.formatDate(lastCi.checkInTime) : 'Never';
+    const skillPills = (v.skills || []).map(s =>
+      `<span class="skill-pill">${s}</span>`).join('');
+    return `
+      <tr onclick="window.location='volunteer-detail.html?id=${v.id}'">
+        <td><span class="vol-name">${v.name}</span></td>
+        <td>${skillPills || '<span style="color:var(--text-dim)">—</span>'}</td>
+        <td>${tasks.length}</td>
+        <td>${hours.toFixed(1)}</td>
+        <td>${lastActive}</td>
+        <td><span class="${v.status === 'active' ? 'status-active' : 'status-inactive'}">
+          ${v.status === 'active' ? '● Active' : '○ Inactive'}</span></td>
+      </tr>`;
+  }).join('');
+}
+
+renderTable();
+
+function openAddVol() { document.getElementById('addVolModal').classList.add('open'); }
+function closeAddVol() {
+  document.getElementById('addVolModal').classList.remove('open');
+  document.getElementById('addVolForm').reset();
+  document.getElementById('volSuccess').classList.remove('visible');
+}
+document.getElementById('addVolModal').addEventListener('click', function(e) {
+  if (e.target === this) closeAddVol();
+});
+document.getElementById('addVolForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const name = document.getElementById('av_name').value.trim();
+  if (!name) return;
+  const skills = document.getElementById('av_skills').value.split(',').map(s => s.trim()).filter(Boolean);
+  DataStore.addVolunteer({
+    name, skills,
+    phone: document.getElementById('av_phone').value.trim(),
+    email: document.getElementById('av_email').value.trim(),
+    availability: document.getElementById('av_avail').value.trim(),
+    status: 'active', joinedAt: new Date().toISOString()
+  });
+  document.getElementById('volSuccess').classList.add('visible');
+  renderTable();
+  setTimeout(closeAddVol, 1000);
+});
+
+function openLogHours() {
+  const vols = DataStore.getVolunteers();
+  const gardens = DataStore.getGardens();
+  document.getElementById('lh_vol').innerHTML = vols.map(v =>
+    `<option value="${v.id}">${v.name}</option>`).join('');
+  document.getElementById('lh_garden').innerHTML = gardens.map(g =>
+    `<option value="${g.id}">${g.name}</option>`).join('');
+  document.getElementById('lh_date').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('logHoursModal').classList.add('open');
+}
+function closeLogHours() {
+  document.getElementById('logHoursModal').classList.remove('open');
+  document.getElementById('logHoursForm').reset();
+  document.getElementById('hoursSuccess').classList.remove('visible');
+}
+document.getElementById('logHoursModal').addEventListener('click', function(e) {
+  if (e.target === this) closeLogHours();
+});
+document.getElementById('logHoursForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const volId = document.getElementById('lh_vol').value;
+  const gId = document.getElementById('lh_garden').value;
+  const vol = DataStore.getVolunteer(volId);
+  const garden = DataStore.getGarden(gId);
+  const hours = parseFloat(document.getElementById('lh_hours').value) || 0;
+  const date = document.getElementById('lh_date').value || new Date().toISOString().slice(0, 10);
+  if (!volId || !gId || hours <= 0) return;
+  DataStore.addCheckin({
+    gardenId: gId, gardenName: garden.name,
+    volunteerId: volId, volunteerName: vol.name,
+    taskId: null, taskTitle: document.getElementById('lh_task').value.trim() || 'Manual entry',
+    hoursLogged: hours,
+    checkInTime: date + 'T12:00:00Z', checkOutTime: date + 'T12:00:00Z',
+    type: 'manual', notes: document.getElementById('lh_notes').value.trim()
+  });
+  document.getElementById('hoursSuccess').classList.add('visible');
+  renderTable();
+  setTimeout(closeLogHours, 1000);
+});
+</script>
+</body>
+</html>

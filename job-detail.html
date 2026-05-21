@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Job Detail — Ecotopia</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/auth.js"></script>
+<script>try { AuthManager.requireAuth(); } catch(e) { throw e; }</script>
+<script src="assets/data.js"></script>
+<script src="assets/nav.js"></script>
+<style>
+  :root {
+    --forest: #1B4332; --forest-mid: #2D6A4F; --forest-light: #52B788;
+    --sage: #D8F3DC; --sage-dim: #B7E4C7; --earth: #8B5E3C;
+    --earth-light: #C68642; --gold: #F4A261; --cream: #F9F6F0;
+    --cream-dim: #E8E0D5; --text: #1C1C1C; --text-dim: #5A5A5A;
+    --border: rgba(45,106,79,0.2);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--text); }
+  .page { padding: 28px 32px; max-width: 900px; }
+  .back-link { display: inline-flex; align-items: center; gap: 6px; color: var(--forest-mid);
+    text-decoration: none; font-size: 0.875rem; margin-bottom: 20px; }
+  .back-link:hover { text-decoration: underline; }
+  h1 { font-family: 'Fraunces', serif; font-size: 1.8rem; color: var(--forest); margin-bottom: 4px; }
+  .sub { color: var(--text-dim); font-size: 0.9rem; margin-bottom: 24px; }
+
+  /* Status stepper */
+  .stepper { display: flex; align-items: center; gap: 0; margin-bottom: 28px;
+    background: #fff; border-radius: 10px; border: 1px solid var(--border); overflow: hidden; }
+  .step { flex: 1; text-align: center; padding: 10px 8px; font-size: 0.78rem; font-weight: 600;
+    color: var(--text-dim); border-right: 1px solid var(--border); cursor: pointer;
+    transition: background 0.15s; }
+  .step:last-child { border-right: none; }
+  .step.done { background: var(--sage); color: var(--forest); }
+  .step.current { background: var(--forest); color: #fff; }
+  .step:hover:not(.current) { background: var(--cream-dim); }
+
+  /* Grid layout */
+  .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+  .card { background: #fff; border-radius: 12px; border: 1px solid var(--border); padding: 20px; }
+  .card h2 { font-family: 'Fraunces', serif; font-size: 1rem; color: var(--forest);
+    margin-bottom: 14px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+  .info-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.875rem; }
+  .info-label { color: var(--text-dim); }
+  .info-value { font-weight: 500; text-align: right; }
+  .info-value a { color: var(--forest-mid); }
+
+  .grant-box {
+    background: #fef9ee; border: 1px solid #f6d860; border-radius: 10px;
+    padding: 16px; margin-bottom: 20px;
+  }
+  .grant-box h3 { font-size: 0.875rem; font-weight: 700; color: #92400e; margin-bottom: 8px; }
+  .grant-box .info-row { margin-bottom: 4px; }
+
+  /* Activity log */
+  .activity-log .log-entry {
+    display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border);
+  }
+  .activity-log .log-entry:last-child { border-bottom: none; }
+  .log-dot { width: 8px; height: 8px; background: var(--forest-light); border-radius: 50;
+    margin-top: 5px; flex-shrink: 0; border-radius: 50%; }
+  .log-ts { font-size: 0.75rem; color: var(--text-dim); white-space: nowrap; }
+  .log-note { font-size: 0.875rem; }
+
+  .add-note { display: flex; gap: 10px; margin-top: 14px; }
+  .add-note input {
+    flex: 1; padding: 9px 12px; border-radius: 7px; border: 1.5px solid var(--border);
+    font-size: 0.875rem; font-family: 'DM Sans', sans-serif;
+  }
+  .add-note input:focus { outline: none; border-color: var(--forest-light); }
+
+  /* Buttons */
+  .btn { padding: 10px 18px; border-radius: 8px; border: none; font-size: 0.875rem;
+    font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif;
+    text-decoration: none; display: inline-flex; gap: 6px; align-items: center;
+    transition: background 0.15s; }
+  .btn-primary { background: var(--forest); color: #fff; }
+  .btn-primary:hover { background: var(--forest-mid); }
+  .btn-outline { background: #fff; color: var(--forest); border: 1.5px solid var(--forest-light); }
+  .btn-outline:hover { background: var(--sage); }
+  .btn-sm { padding: 7px 14px; font-size: 0.8rem; }
+
+  .actions-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
+
+  /* Status pill */
+  .status-pill { padding: 4px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 600;
+    display: inline-flex; align-items: center; gap: 4px; }
+  .pill-inquiry { background: var(--cream-dim); color: var(--text-dim); }
+  .pill-site_visit { background: #dbeafe; color: #1e40af; }
+  .pill-proposal { background: #fef3c7; color: #92400e; }
+  .pill-active { background: #d1fae5; color: #065f46; }
+  .pill-complete { background: #d1fae5; color: #065f46; }
+
+  /* Invoice modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+    z-index: 500; align-items: center; justify-content: center; padding: 20px; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: #fff; border-radius: 16px; padding: 28px;
+    width: 100%; max-width: 420px; box-shadow: 0 20px 60px rgba(0,0,0,0.25); }
+  .modal h2 { font-family: 'Fraunces', serif; color: var(--forest); margin-bottom: 16px; }
+  .modal p { font-size: 0.9rem; color: var(--text-dim); margin-bottom: 20px; line-height: 1.5; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+  .btn-cancel { background: var(--cream-dim); color: var(--text); padding: 10px 18px;
+    border-radius: 8px; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+
+  @media (max-width: 768px) {
+    .page { padding: 20px 16px; }
+    .detail-grid { grid-template-columns: 1fr; }
+    .stepper { flex-wrap: wrap; }
+    .step { flex: 0 0 auto; border-right: none; border-bottom: 1px solid var(--border); }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <a href="jobs.html" class="back-link">← Back to Jobs</a>
+  <div id="jobContent"></div>
+</div>
+
+<!-- Invoice Modal -->
+<div class="modal-overlay" id="invoiceModal">
+  <div class="modal">
+    <h2>Create Invoice</h2>
+    <p>This will create a draft invoice for this job. You can then review and send it from the Invoices page.</p>
+    <div id="invoiceFormArea"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeInvoiceModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="createInvoice()">Create Invoice</button>
+    </div>
+  </div>
+</div>
+
+<script>
+Nav.render();
+
+const params = new URLSearchParams(window.location.search);
+const jobId = params.get('id');
+let job = jobId ? DataStore.getJob(jobId) : null;
+
+const STATUS_ORDER = ['inquiry', 'site_visit', 'proposal', 'active', 'complete'];
+const STATUS_LABELS = {
+  inquiry: 'Inquiry', site_visit: 'Site Visit', proposal: 'Proposal',
+  active: 'Active', complete: 'Complete'
+};
+
+function render() {
+  const el = document.getElementById('jobContent');
+  if (!job) {
+    el.innerHTML = '<p style="color:var(--text-dim)">Job not found. <a href="jobs.html">Back to jobs</a></p>';
+    return;
+  }
+  document.title = `${job.title} — Ecotopia`;
+  const currentIdx = STATUS_ORDER.indexOf(job.status);
+  const client = job.clientId ? DataStore.getClient(job.clientId) : null;
+  const nextStatus = STATUS_ORDER[currentIdx + 1];
+
+  el.innerHTML = `
+    <h1>${job.title}</h1>
+    <p class="sub">${job.clientName}${job.address ? ' · ' + job.address : ''}</p>
+
+    <!-- Status Stepper -->
+    <div class="stepper">
+      ${STATUS_ORDER.map((s, i) => `
+        <div class="step ${i < currentIdx ? 'done' : i === currentIdx ? 'current' : ''}"
+             onclick="moveToStatus('${s}')">${STATUS_LABELS[s]}</div>`).join('')}
+    </div>
+
+    <!-- Actions -->
+    <div class="actions-row">
+      ${nextStatus ? `<button class="btn btn-primary" onclick="moveToStatus('${nextStatus}')">Move to ${STATUS_LABELS[nextStatus]}</button>` : ''}
+      <button class="btn btn-outline" onclick="openInvoiceModal()">💵 Create Invoice</button>
+    </div>
+
+    ${job.grantFunded ? `
+    <div class="grant-box">
+      <h3>🏛 Grant Funded</h3>
+      <div class="info-row"><span class="info-label">Program</span><span class="info-value">${job.grantName}</span></div>
+      <div class="info-row"><span class="info-label">Amount</span><span class="info-value">$${job.grantAmount?.toLocaleString()}</span></div>
+    </div>` : ''}
+
+    <div class="detail-grid">
+      <!-- Client Info -->
+      <div class="card">
+        <h2>Client</h2>
+        <div class="info-row"><span class="info-label">Name</span><span class="info-value">${job.clientName}</span></div>
+        ${client ? `
+        <div class="info-row"><span class="info-label">Phone</span><span class="info-value"><a href="tel:${client.phone}">${client.phone}</a></span></div>
+        <div class="info-row"><span class="info-label">Email</span><span class="info-value"><a href="mailto:${client.email}">${client.email}</a></span></div>
+        <div class="info-row"><span class="info-label">Address</span><span class="info-value">${client.address}</span></div>
+        ` : '<div class="info-row"><span class="info-label">No client record linked</span></div>'}
+      </div>
+
+      <!-- Job Details -->
+      <div class="card">
+        <h2>Job Details</h2>
+        <div class="info-row"><span class="info-label">Type</span><span class="info-value">${job.type?.replace(/_/g,' ')}</span></div>
+        <div class="info-row"><span class="info-label">Status</span><span class="info-value"><span class="status-pill pill-${job.status}">${STATUS_LABELS[job.status]}</span></span></div>
+        ${job.sqft ? `<div class="info-row"><span class="info-label">Size</span><span class="info-value">${job.sqft}</span></div>` : ''}
+        ${job.price ? `<div class="info-row"><span class="info-label">Price</span><span class="info-value">$${job.price.toLocaleString()}</span></div>` : ''}
+        <div class="info-row"><span class="info-label">Created</span><span class="info-value">${DataStore.formatDate(job.createdAt)}</span></div>
+        ${job.notes ? `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:0.875rem;color:var(--text-dim);line-height:1.5;">${job.notes}</div>` : ''}
+      </div>
+    </div>
+
+    <!-- Activity Log -->
+    <div class="card">
+      <h2>Activity Log</h2>
+      <div class="activity-log" id="activityLog">
+        ${(job.activityLog || []).length === 0
+          ? '<p style="color:var(--text-dim);font-size:0.875rem;">No activity yet.</p>'
+          : [...(job.activityLog || [])].reverse().map(entry => `
+            <div class="log-entry">
+              <div class="log-dot"></div>
+              <div style="flex:1">
+                <div class="log-ts">${DataStore.formatDate(entry.ts)} · ${DataStore.formatTime(entry.ts)}</div>
+                <div class="log-note">${entry.note}</div>
+              </div>
+            </div>`).join('')}
+      </div>
+      <div class="add-note">
+        <input type="text" id="noteInput" placeholder="Add a note…">
+        <button class="btn btn-primary btn-sm" onclick="addNote()">Add</button>
+      </div>
+    </div>
+  `;
+}
+
+function moveToStatus(newStatus) {
+  if (!job) return;
+  DataStore.updateJob(job.id, { status: newStatus });
+  DataStore.addJobNote(job.id, `Status changed to: ${STATUS_LABELS[newStatus]}`);
+  job = DataStore.getJob(job.id);
+  render();
+}
+
+function addNote() {
+  const input = document.getElementById('noteInput');
+  const note = input.value.trim();
+  if (!note || !job) return;
+  DataStore.addJobNote(job.id, note);
+  job = DataStore.getJob(job.id);
+  input.value = '';
+  render();
+}
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && document.activeElement.id === 'noteInput') addNote();
+});
+
+function openInvoiceModal() {
+  const el = document.getElementById('invoiceFormArea');
+  el.innerHTML = `
+    <div style="font-size:0.875rem;margin-bottom:12px;">
+      <strong>Job:</strong> ${job?.title}<br>
+      <strong>Client:</strong> ${job?.clientName}<br>
+    </div>
+    <div style="margin-bottom:12px;">
+      <label style="font-size:0.82rem;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:5px;">Amount ($)</label>
+      <input type="number" id="inv_amount" value="${job?.price || ''}" placeholder="0.00"
+        style="width:100%;padding:9px 12px;border-radius:7px;border:1.5px solid var(--border);font-size:0.9rem;font-family:'DM Sans',sans-serif;">
+    </div>
+    <div>
+      <label style="font-size:0.82rem;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:5px;">Due Date</label>
+      <input type="date" id="inv_due"
+        style="width:100%;padding:9px 12px;border-radius:7px;border:1.5px solid var(--border);font-size:0.9rem;font-family:'DM Sans',sans-serif;">
+    </div>
+  `;
+  document.getElementById('invoiceModal').classList.add('open');
+}
+function closeInvoiceModal() {
+  document.getElementById('invoiceModal').classList.remove('open');
+}
+function createInvoice() {
+  const amount = parseFloat(document.getElementById('inv_amount').value) || 0;
+  const dueDate = document.getElementById('inv_due').value;
+  DataStore.addInvoice({
+    clientId: job.clientId,
+    clientName: job.clientName,
+    jobId: job.id,
+    jobTitle: job.title,
+    amount,
+    status: 'draft',
+    dueDate: dueDate || null,
+    issuedDate: null,
+    paidDate: null
+  });
+  closeInvoiceModal();
+  alert('Invoice created as draft. View it in Invoices.');
+}
+
+render();
+</script>
+</body>
+</html>

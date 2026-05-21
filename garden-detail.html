@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Garden Detail — Ecotopia</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/auth.js"></script>
+<script>try { AuthManager.requireAuth(); } catch(e) { throw e; }</script>
+<script src="assets/data.js"></script>
+<script src="assets/nav.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  :root {
+    --forest: #1B4332; --forest-mid: #2D6A4F; --forest-light: #52B788;
+    --sage: #D8F3DC; --sage-dim: #B7E4C7; --earth: #8B5E3C;
+    --earth-light: #C68642; --gold: #F4A261; --cream: #F9F6F0;
+    --cream-dim: #E8E0D5; --text: #1C1C1C; --text-dim: #5A5A5A;
+    --border: rgba(45,106,79,0.2);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--text); }
+  .page { padding: 28px 32px; max-width: 1000px; }
+  .back-link { display: inline-flex; align-items: center; gap: 6px; color: var(--forest-mid);
+    text-decoration: none; font-size: 0.875rem; margin-bottom: 20px; }
+  .back-link:hover { text-decoration: underline; }
+
+  /* Header */
+  .garden-header {
+    background: linear-gradient(135deg, var(--forest) 0%, var(--forest-mid) 100%);
+    border-radius: 14px; padding: 24px 28px; color: #fff; margin-bottom: 24px;
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
+  }
+  .garden-header h1 { font-family: 'Fraunces', serif; font-size: 1.8rem; margin-bottom: 4px; }
+  .garden-meta { opacity: 0.8; font-size: 0.875rem; }
+  .btn-qr {
+    background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3);
+    color: #fff; padding: 10px 16px; border-radius: 8px; cursor: pointer;
+    font-size: 0.85rem; font-weight: 600; white-space: nowrap;
+    font-family: 'DM Sans', sans-serif; transition: background 0.15s;
+  }
+  .btn-qr:hover { background: rgba(255,255,255,0.25); }
+
+  .section { margin-bottom: 28px; }
+  .section-header { display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 14px; }
+  .section-header h2 { font-family: 'Fraunces', serif; font-size: 1.15rem; color: var(--forest); }
+  .btn-sm {
+    padding: 7px 14px; border-radius: 7px; border: none; font-size: 0.8rem;
+    font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif;
+    background: var(--forest); color: #fff; text-decoration: none; display: inline-block;
+    transition: background 0.15s;
+  }
+  .btn-sm:hover { background: var(--forest-mid); }
+  .btn-outline-sm {
+    background: #fff; color: var(--forest); border: 1.5px solid var(--forest-light);
+  }
+  .btn-outline-sm:hover { background: var(--sage); }
+
+  /* Task table */
+  .task-table { width: 100%; border-collapse: collapse; background: #fff;
+    border-radius: 12px; overflow: hidden; border: 1px solid var(--border); }
+  .task-table th {
+    padding: 10px 14px; text-align: left; font-size: 0.75rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim);
+    background: var(--cream-dim); border-bottom: 1px solid var(--border);
+  }
+  .task-table td { padding: 11px 14px; font-size: 0.875rem; border-bottom: 1px solid var(--border); }
+  .task-table tr:last-child td { border-bottom: none; }
+  .task-table tr:hover td { background: var(--cream); }
+
+  .owner-pill { padding: 3px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; white-space: nowrap; }
+  .owner-vol { background: #d1fae5; color: #065f46; }
+  .owner-jordan { background: #fef3c7; color: #92400e; }
+  .owner-open { background: #fee2e2; color: #dc2626; }
+
+  .due-text { font-size: 0.78rem; font-weight: 600; }
+  .due-red { color: #dc2626; }
+  .due-amber { color: #d97706; }
+  .due-green { color: var(--forest-mid); }
+
+  /* Check-in table */
+  .ci-table { width: 100%; border-collapse: collapse; background: #fff;
+    border-radius: 12px; overflow: hidden; border: 1px solid var(--border); }
+  .ci-table th { padding: 9px 14px; text-align: left; font-size: 0.75rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim);
+    background: var(--cream-dim); border-bottom: 1px solid var(--border); }
+  .ci-table td { padding: 10px 14px; font-size: 0.85rem; border-bottom: 1px solid var(--border); }
+  .ci-table tr:last-child td { border-bottom: none; }
+
+  /* Walk-in tasks */
+  .walkin-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+  .walkin-card {
+    background: #fff; border-radius: 10px; border: 1px solid var(--border);
+    padding: 14px; display: flex; align-items: center; gap: 12px;
+  }
+  .walkin-toggle {
+    width: 36px; height: 20px; background: var(--cream-dim); border-radius: 20px;
+    position: relative; cursor: pointer; flex-shrink: 0; transition: background 0.2s;
+    border: none; padding: 0;
+  }
+  .walkin-toggle.on { background: var(--forest-light); }
+  .walkin-toggle::after {
+    content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px;
+    background: #fff; border-radius: 50%; transition: left 0.2s;
+  }
+  .walkin-toggle.on::after { left: 18px; }
+  .walkin-info .walkin-title { font-size: 0.875rem; font-weight: 500; }
+  .walkin-info .walkin-time { font-size: 0.75rem; color: var(--text-dim); }
+
+  /* Observations */
+  .obs-list { display: flex; flex-direction: column; gap: 10px; }
+  .obs-item {
+    background: #fff; border-radius: 10px; border: 1px solid var(--border);
+    padding: 14px; display: flex; gap: 12px; align-items: flex-start;
+  }
+  .obs-item.flagged { border-color: #fca5a5; background: #fff5f5; }
+  .obs-meta { font-size: 0.78rem; color: var(--text-dim); }
+  .obs-note { font-size: 0.875rem; margin-top: 4px; }
+  .flag-badge { background: #fee2e2; color: #dc2626; padding: 2px 8px;
+    border-radius: 20px; font-size: 0.72rem; font-weight: 600; }
+  .clear-badge { background: var(--sage); color: var(--forest-mid); padding: 2px 8px;
+    border-radius: 20px; font-size: 0.72rem; font-weight: 600; }
+
+  /* QR Modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+    z-index: 500; align-items: center; justify-content: center; padding: 20px; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: #fff; border-radius: 16px; padding: 28px;
+    width: 100%; max-width: 380px; text-align: center; box-shadow: 0 20px 60px rgba(0,0,0,0.25); }
+  .modal h2 { font-family: 'Fraunces', serif; color: var(--forest); margin-bottom: 6px; }
+  .modal p { font-size: 0.85rem; color: var(--text-dim); margin-bottom: 20px; }
+  #qrcode { display: flex; justify-content: center; margin-bottom: 16px; }
+  .qr-url { font-size: 0.75rem; color: var(--text-dim); word-break: break-all;
+    background: var(--cream-dim); padding: 8px; border-radius: 6px; margin-bottom: 16px; }
+  .modal-actions { display: flex; gap: 10px; justify-content: center; }
+  .btn { padding: 10px 18px; border-radius: 8px; border: none; font-size: 0.875rem;
+    font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif;
+    display: inline-flex; gap: 6px; align-items: center; transition: background 0.15s; }
+  .btn-primary { background: var(--forest); color: #fff; }
+  .btn-primary:hover { background: var(--forest-mid); }
+  .btn-cancel { background: var(--cream-dim); color: var(--text); }
+
+  /* Add Task Form */
+  .add-task-form { background: #fff; border-radius: 12px; border: 1px solid var(--border);
+    padding: 20px; margin-top: 14px; display: none; }
+  .add-task-form.open { display: block; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .form-group { margin-bottom: 12px; }
+  .form-group label { display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-dim);
+    margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .form-group input, .form-group select { width: 100%; padding: 8px 10px; border-radius: 6px;
+    border: 1.5px solid var(--border); font-size: 0.875rem; font-family: 'DM Sans', sans-serif; }
+  .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--forest-light); }
+  .form-actions { display: flex; gap: 10px; }
+
+  @media (max-width: 768px) {
+    .page { padding: 20px 16px; }
+    .garden-header { flex-direction: column; }
+    .task-table { font-size: 0.8rem; }
+    .task-table th, .task-table td { padding: 8px 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <a href="gardens.html" class="back-link">← Back to Gardens</a>
+  <div id="pageContent"></div>
+</div>
+
+<!-- QR Modal -->
+<div class="modal-overlay" id="qrModal">
+  <div class="modal">
+    <h2>Check-In QR Code</h2>
+    <p id="qrGardenName"></p>
+    <div id="qrcode"></div>
+    <div class="qr-url" id="qrUrl"></div>
+    <div class="modal-actions">
+      <button class="btn-cancel btn" onclick="closeQR()">Close</button>
+      <button class="btn btn-primary" onclick="printQR()">🖨 Print</button>
+    </div>
+  </div>
+</div>
+
+<script>
+Nav.render();
+
+const params = new URLSearchParams(window.location.search);
+const gardenId = params.get('id');
+let garden = gardenId ? DataStore.getGarden(gardenId) : null;
+let qrInstance = null;
+
+function dueCls(d) { return d === null ? 'green' : d <= 0 ? 'due-red' : d <= 3 ? 'due-amber' : 'due-green'; }
+function dueLabel(d) {
+  if (d === null) return '—';
+  if (d < 0) return `${Math.abs(d)}d overdue`;
+  if (d === 0) return 'Today';
+  return `In ${d}d`;
+}
+
+function renderPage() {
+  const el = document.getElementById('pageContent');
+  if (!garden) {
+    el.innerHTML = '<p>Garden not found. <a href="gardens.html">Back to gardens</a></p>';
+    return;
+  }
+  document.title = `${garden.name} — Ecotopia`;
+  const tasks = DataStore.getTasksByGarden(garden.id);
+  const checkins = DataStore.getCheckinsByGarden(garden.id)
+    .sort((a, b) => new Date(b.checkInTime) - new Date(a.checkInTime))
+    .slice(0, 10);
+  const walkins = DataStore.getWalkinsByGarden(garden.id);
+  const observations = DataStore.getObservationsByGarden(garden.id)
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  // allWalkins rendered inline below via DataStore.getWalkins()
+
+  el.innerHTML = `
+    <!-- Header -->
+    <div class="garden-header">
+      <div>
+        <h1>${garden.name}</h1>
+        <div class="garden-meta">📍 ${garden.address} · ${garden.sqft.toLocaleString()} sqft</div>
+      </div>
+      <button class="btn-qr" onclick="openQR()">📱 QR Check-in</button>
+    </div>
+
+    <!-- Tasks -->
+    <div class="section">
+      <div class="section-header">
+        <h2>Maintenance Tasks</h2>
+        <button class="btn-sm btn-outline-sm" onclick="toggleAddTask()">+ Add Task</button>
+      </div>
+      <div class="add-task-form" id="addTaskForm">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Task Title *</label>
+            <input type="text" id="at_title" placeholder="e.g. Water seedlings">
+          </div>
+          <div class="form-group">
+            <label>Est. Minutes</label>
+            <input type="number" id="at_mins" placeholder="30" min="5">
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Cadence (days)</label>
+            <input type="number" id="at_cadence" placeholder="7" min="1">
+          </div>
+          <div class="form-group">
+            <label>Skill Level</label>
+            <select id="at_skill">
+              <option value="none">None</option>
+              <option value="basic">Basic</option>
+              <option value="experienced">Experienced</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Owner</label>
+          <select id="at_owner">
+            <option value="open">Open</option>
+            <option value="jordan">Jordan</option>
+          </select>
+        </div>
+        <div class="form-actions">
+          <button class="btn-sm btn-outline-sm" onclick="toggleAddTask()">Cancel</button>
+          <button class="btn-sm" onclick="addTask()">Add Task</button>
+        </div>
+      </div>
+      ${tasks.length === 0
+        ? '<p style="color:var(--text-dim);font-size:0.875rem;">No tasks yet.</p>'
+        : `<table class="task-table">
+          <thead><tr>
+            <th>Task</th><th>Cadence</th><th>Est.</th><th>Owner</th><th>Next Due</th><th>Skill</th>
+          </tr></thead>
+          <tbody>${tasks.map(t => {
+            const d = DataStore.daysUntil(t.nextDue);
+            const ownerCls = t.owner === 'volunteer' ? 'owner-vol' : t.owner === 'jordan' ? 'owner-jordan' : 'owner-open';
+            const ownerLabel = t.owner === 'volunteer' ? t.volunteerName : t.owner === 'jordan' ? 'Jordan' : 'Open';
+            const cadenceLabel = t.cadenceDays <= 3 ? `${t.cadenceDays}x/wk` : t.cadenceDays <= 7 ? 'Weekly' :
+              t.cadenceDays <= 14 ? 'Biweekly' : t.cadenceDays <= 30 ? 'Monthly' : `Every ${t.cadenceDays}d`;
+            return `<tr>
+              <td>${t.title}</td>
+              <td>${cadenceLabel}</td>
+              <td>${t.estMinutes >= 60 ? (t.estMinutes/60).toFixed(1)+'h' : t.estMinutes+'min'}</td>
+              <td><span class="owner-pill ${ownerCls}">${ownerLabel}</span></td>
+              <td><span class="due-text ${dueCls(d)}">${dueLabel(d)}</span></td>
+              <td>${t.skillLevel === 'none' ? '' : t.skillLevel}</td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table>`}
+    </div>
+
+    <!-- Recent Check-ins -->
+    <div class="section">
+      <div class="section-header"><h2>Recent Check-ins</h2></div>
+      ${checkins.length === 0
+        ? '<p style="color:var(--text-dim);font-size:0.875rem;">No check-ins yet.</p>'
+        : `<table class="ci-table">
+          <thead><tr><th>Volunteer</th><th>Task</th><th>Date</th><th>Hours</th><th>Notes</th></tr></thead>
+          <tbody>${checkins.map(ci => `
+            <tr>
+              <td>${ci.volunteerName}</td>
+              <td>${ci.taskTitle}</td>
+              <td>${DataStore.formatDate(ci.checkInTime)}</td>
+              <td>${ci.hoursLogged}</td>
+              <td style="color:var(--text-dim)">${ci.notes || '—'}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>`}
+    </div>
+
+    <!-- Walk-in Tasks -->
+    <div class="section">
+      <div class="section-header"><h2>Walk-In Tasks</h2><span style="font-size:0.8rem;color:var(--text-dim)">Toggle on/off for QR page</span></div>
+      <div class="walkin-grid" id="walkinGrid">
+        ${DataStore.getWalkins().filter(w => w.gardenId === garden.id).map(w => `
+          <div class="walkin-card">
+            <button class="walkin-toggle ${w.active ? 'on' : ''}" onclick="toggleWalkin('${w.id}', this)" aria-label="Toggle"></button>
+            <div class="walkin-info">
+              <div class="walkin-title">${w.title}</div>
+              <div class="walkin-time">~${w.estMinutes} min</div>
+            </div>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <!-- Observations -->
+    <div class="section">
+      <div class="section-header">
+        <h2>Plant Observations</h2>
+        <span style="font-size:0.8rem;color:var(--text-dim)">Submitted by volunteers</span>
+      </div>
+      ${observations.length === 0
+        ? '<p style="color:var(--text-dim);font-size:0.875rem;">No observations submitted.</p>'
+        : `<div class="obs-list">${observations.map(o => `
+          <div class="obs-item ${o.flagged ? 'flagged' : ''}">
+            <div style="flex:1">
+              <div class="obs-meta">${o.submittedBy} · ${DataStore.formatDate(o.createdAt)}</div>
+              <div class="obs-note">${o.note}</div>
+            </div>
+            ${o.flagged ? '<span class="flag-badge">⚑ Flagged</span>' : '<span class="clear-badge">✓ Clear</span>'}
+          </div>`).join('')}</div>`}
+    </div>
+  `;
+}
+
+function toggleAddTask() {
+  document.getElementById('addTaskForm').classList.toggle('open');
+}
+
+function addTask() {
+  const title = document.getElementById('at_title').value.trim();
+  if (!title) return;
+  const cadence = parseInt(document.getElementById('at_cadence').value) || 7;
+  const nextDue = new Date(Date.now() + cadence * 86400000).toISOString();
+  DataStore.addTask({
+    gardenId: garden.id,
+    title,
+    cadenceDays: cadence,
+    estMinutes: parseInt(document.getElementById('at_mins').value) || 30,
+    skillLevel: document.getElementById('at_skill').value,
+    owner: document.getElementById('at_owner').value,
+    volunteerId: null, volunteerName: null,
+    active: true, nextDue,
+    lastCompleted: null
+  });
+  garden = DataStore.getGarden(garden.id);
+  renderPage();
+  document.getElementById('addTaskForm').classList.remove('open');
+}
+
+function toggleWalkin(id, btn) {
+  const w = DataStore.getWalkins().find(w => w.id === id);
+  if (!w) return;
+  DataStore.updateWalkin(id, { active: !w.active });
+  btn.classList.toggle('on');
+}
+
+function openQR() {
+  const checkinUrl = window.location.origin + window.location.pathname.replace('garden-detail.html', '') + 'qr-checkin.html?garden=' + garden.qrToken;
+  document.getElementById('qrGardenName').textContent = garden.name;
+  document.getElementById('qrUrl').textContent = checkinUrl;
+  const qrEl = document.getElementById('qrcode');
+  qrEl.innerHTML = '';
+  qrInstance = new QRCode(qrEl, {
+    text: checkinUrl, width: 200, height: 200,
+    colorDark: '#1B4332', colorLight: '#ffffff',
+    correctLevel: QRCode.CorrectLevel.H
+  });
+  document.getElementById('qrModal').classList.add('open');
+}
+function closeQR() {
+  document.getElementById('qrModal').classList.remove('open');
+  document.getElementById('qrcode').innerHTML = '';
+}
+function printQR() {
+  window.print();
+}
+
+renderPage();
+</script>
+</body>
+</html>

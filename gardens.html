@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gardens — Ecotopia</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/auth.js"></script>
+<script>try { AuthManager.requireAuth(); } catch(e) { throw e; }</script>
+<script src="assets/data.js"></script>
+<script src="assets/nav.js"></script>
+<style>
+  :root {
+    --forest: #1B4332; --forest-mid: #2D6A4F; --forest-light: #52B788;
+    --sage: #D8F3DC; --sage-dim: #B7E4C7; --earth: #8B5E3C;
+    --earth-light: #C68642; --gold: #F4A261; --cream: #F9F6F0;
+    --cream-dim: #E8E0D5; --text: #1C1C1C; --text-dim: #5A5A5A;
+    --border: rgba(45,106,79,0.2);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--text); }
+  .page { padding: 28px 32px; max-width: 1100px; }
+  h1 { font-family: 'Fraunces', serif; font-size: 1.9rem; color: var(--forest); margin-bottom: 24px; }
+
+  .garden-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
+  .garden-card {
+    background: #fff; border-radius: 14px; border: 1px solid var(--border);
+    overflow: hidden; text-decoration: none; color: var(--text);
+    transition: box-shadow 0.15s, transform 0.1s; display: block;
+  }
+  .garden-card:hover { box-shadow: 0 6px 24px rgba(27,67,50,0.13); transform: translateY(-2px); }
+
+  .garden-card-top {
+    background: linear-gradient(135deg, var(--forest) 0%, var(--forest-mid) 100%);
+    padding: 20px; color: #fff;
+  }
+  .garden-name { font-family: 'Fraunces', serif; font-size: 1.2rem; margin-bottom: 4px; }
+  .garden-addr { font-size: 0.82rem; opacity: 0.8; }
+  .garden-sqft { font-size: 0.82rem; opacity: 0.8; }
+
+  .garden-card-body { padding: 18px 20px; }
+
+  /* Coverage bar */
+  .coverage-label { font-size: 0.78rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.05em; color: var(--text-dim); margin-bottom: 8px; }
+  .coverage-bar {
+    height: 10px; background: var(--cream-dim); border-radius: 20px;
+    overflow: hidden; display: flex; margin-bottom: 8px;
+  }
+  .coverage-seg { height: 100%; transition: width 0.3s; }
+  .seg-vol { background: var(--forest-light); }
+  .seg-jordan { background: var(--gold); }
+  .seg-open { background: #f87171; }
+
+  .coverage-legend { display: flex; gap: 12px; font-size: 0.75rem; color: var(--text-dim); flex-wrap: wrap; }
+  .leg-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+  .leg-vol .leg-dot { background: var(--forest-light); }
+  .leg-jordan .leg-dot { background: var(--gold); }
+  .leg-open .leg-dot { background: #f87171; }
+
+  .garden-next { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--border);
+    font-size: 0.82rem; color: var(--text-dim); display: flex; align-items: center; gap: 6px; }
+  .due-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .due-dot.red { background: #ef4444; }
+  .due-dot.amber { background: #f59e0b; }
+  .due-dot.green { background: var(--forest-light); }
+
+  @media (max-width: 600px) { .page { padding: 20px 16px; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Gardens</h1>
+  <div class="garden-grid" id="gardenGrid"></div>
+</div>
+
+<script>
+Nav.render();
+
+function renderGardens() {
+  const gardens = DataStore.getGardens();
+  const el = document.getElementById('gardenGrid');
+
+  el.innerHTML = gardens.map(g => {
+    const tasks = DataStore.getTasksByGarden(g.id);
+    const total = tasks.length;
+    const volCount = tasks.filter(t => t.owner === 'volunteer').length;
+    const jordanCount = tasks.filter(t => t.owner === 'jordan').length;
+    const openCount = tasks.filter(t => t.owner === 'open').length;
+
+    const volPct = total ? Math.round(volCount / total * 100) : 0;
+    const jordanPct = total ? Math.round(jordanCount / total * 100) : 0;
+    const openPct = total ? 100 - volPct - jordanPct : 0;
+
+    // Find soonest due task
+    const sortedTasks = [...tasks].sort((a, b) => new Date(a.nextDue) - new Date(b.nextDue));
+    const soonest = sortedTasks[0];
+    let dueCls = 'green', dueText = 'All tasks scheduled';
+    if (soonest) {
+      const d = DataStore.daysUntil(soonest.nextDue);
+      dueCls = d <= 0 ? 'red' : d <= 3 ? 'amber' : 'green';
+      dueText = d <= 0
+        ? `${soonest.title} overdue`
+        : d === 0 ? `${soonest.title} due today`
+        : `${soonest.title} in ${d}d`;
+    }
+
+    return `
+      <a href="garden-detail.html?id=${g.id}" class="garden-card">
+        <div class="garden-card-top">
+          <div class="garden-name">${g.name}</div>
+          <div class="garden-addr">📍 ${g.address}</div>
+          <div class="garden-sqft">${g.sqft.toLocaleString()} sqft</div>
+        </div>
+        <div class="garden-card-body">
+          <div class="coverage-label">Task Coverage (${total} tasks)</div>
+          <div class="coverage-bar">
+            <div class="coverage-seg seg-vol" style="width:${volPct}%"></div>
+            <div class="coverage-seg seg-jordan" style="width:${jordanPct}%"></div>
+            <div class="coverage-seg seg-open" style="width:${openPct}%"></div>
+          </div>
+          <div class="coverage-legend">
+            <span class="leg-vol"><span class="leg-dot"></span>Volunteer ${volPct}%</span>
+            <span class="leg-jordan"><span class="leg-dot"></span>Jordan ${jordanPct}%</span>
+            <span class="leg-open"><span class="leg-dot"></span>Open ${openPct}%</span>
+          </div>
+          <div class="garden-next">
+            <div class="due-dot ${dueCls}"></div>
+            ${dueText}
+          </div>
+        </div>
+      </a>`;
+  }).join('');
+}
+
+renderGardens();
+</script>
+</body>
+</html>

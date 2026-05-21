@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calendar — Ecotopia</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/auth.js"></script>
+<script>try { AuthManager.requireAuth(); } catch(e) { throw e; }</script>
+<script src="assets/data.js"></script>
+<script src="assets/nav.js"></script>
+<style>
+  :root {
+    --forest: #1B4332; --forest-mid: #2D6A4F; --forest-light: #52B788;
+    --sage: #D8F3DC; --sage-dim: #B7E4C7; --earth: #8B5E3C;
+    --earth-light: #C68642; --gold: #F4A261; --cream: #F9F6F0;
+    --cream-dim: #E8E0D5; --text: #1C1C1C; --text-dim: #5A5A5A;
+    --border: rgba(45,106,79,0.2);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--text); }
+  .page { padding: 28px 32px; max-width: 1000px; }
+  h1 { font-family: 'Fraunces', serif; font-size: 1.9rem; color: var(--forest); }
+
+  /* Controls */
+  .cal-controls {
+    display: flex; align-items: center; gap: 12px; margin: 20px 0;
+  }
+  .cal-title { font-family: 'Fraunces', serif; font-size: 1.3rem; color: var(--forest);
+    min-width: 180px; text-align: center; }
+  .btn-nav { background: #fff; border: 1.5px solid var(--border); border-radius: 8px;
+    padding: 8px 14px; cursor: pointer; font-size: 1rem; color: var(--forest);
+    transition: background 0.15s; }
+  .btn-nav:hover { background: var(--sage); }
+  .btn-today { background: var(--forest); color: #fff; border: none; border-radius: 8px;
+    padding: 8px 14px; cursor: pointer; font-size: 0.875rem; font-weight: 600;
+    font-family: 'DM Sans', sans-serif; }
+
+  /* Legend */
+  .cal-legend { display: flex; gap: 16px; margin-bottom: 16px; font-size: 0.8rem; flex-wrap: wrap; }
+  .leg-item { display: flex; align-items: center; gap: 5px; }
+  .leg-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .leg-task { background: var(--forest-light); }
+  .leg-event { background: #60a5fa; }
+  .leg-job { background: #fb923c; }
+
+  /* Calendar grid */
+  .cal-grid { background: #fff; border-radius: 14px; border: 1px solid var(--border); overflow: hidden; }
+  .cal-head { display: grid; grid-template-columns: repeat(7, 1fr); }
+  .cal-head-cell { padding: 10px 8px; text-align: center; font-size: 0.75rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim);
+    background: var(--cream-dim); border-bottom: 1px solid var(--border); }
+  .cal-body { display: grid; grid-template-columns: repeat(7, 1fr); }
+  .cal-cell {
+    min-height: 90px; padding: 6px; border-right: 1px solid var(--border);
+    border-bottom: 1px solid var(--border); cursor: pointer; transition: background 0.1s;
+    vertical-align: top;
+  }
+  .cal-cell:nth-child(7n) { border-right: none; }
+  .cal-cell:hover { background: var(--cream); }
+  .cal-cell.other-month { opacity: 0.35; }
+  .cal-cell.today { background: #f0fdf4; }
+  .cal-cell.today .cell-day { background: var(--forest); color: #fff; border-radius: 50%;
+    width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; }
+  .cal-cell.selected { background: var(--sage); }
+  .cell-day { font-size: 0.82rem; font-weight: 600; margin-bottom: 4px; color: var(--text); width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; }
+  .cal-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin: 1px; }
+  .dot-task { background: var(--forest-light); }
+  .dot-event { background: #60a5fa; }
+  .dot-job { background: #fb923c; }
+  .cal-dots { display: flex; flex-wrap: wrap; margin-top: 2px; }
+
+  /* Day panel */
+  .day-panel {
+    background: #fff; border-radius: 14px; border: 1px solid var(--border);
+    padding: 20px; margin-top: 20px; display: none;
+  }
+  .day-panel.open { display: block; }
+  .day-panel h3 { font-family: 'Fraunces', serif; color: var(--forest); margin-bottom: 14px; }
+  .day-item {
+    display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border);
+    align-items: flex-start;
+  }
+  .day-item:last-child { border-bottom: none; }
+  .day-type-dot { width: 10px; height: 10px; border-radius: 50%; margin-top: 5px; flex-shrink: 0; }
+  .day-item-title { font-size: 0.875rem; font-weight: 500; }
+  .day-item-sub { font-size: 0.78rem; color: var(--text-dim); }
+
+  /* Mobile week view */
+  .week-view { display: none; }
+  .week-row { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 16px; }
+  .week-day {
+    flex: 0 0 80px; background: #fff; border-radius: 10px; border: 1px solid var(--border);
+    padding: 10px 8px; text-align: center; cursor: pointer; min-height: 80px;
+  }
+  .week-day.today { background: #f0fdf4; border-color: var(--forest-light); }
+  .week-day.selected { background: var(--sage); }
+  .week-day-name { font-size: 0.7rem; text-transform: uppercase; color: var(--text-dim); letter-spacing: 0.06em; }
+  .week-day-num { font-family: 'Fraunces', serif; font-size: 1.4rem; font-weight: 600; color: var(--forest); }
+  .week-day-dots { display: flex; justify-content: center; gap: 2px; margin-top: 4px; }
+
+  @media (max-width: 768px) {
+    .page { padding: 20px 16px; }
+    .cal-grid { display: none; }
+    .week-view { display: block; }
+    .cal-cell { min-height: 60px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <h1>Calendar</h1>
+  <div class="cal-controls">
+    <button class="btn-nav" onclick="prevMonth()">‹</button>
+    <span class="cal-title" id="calTitle"></span>
+    <button class="btn-nav" onclick="nextMonth()">›</button>
+    <button class="btn-today" onclick="goToday()">Today</button>
+  </div>
+  <div class="cal-legend">
+    <div class="leg-item"><div class="leg-dot leg-task"></div> Maintenance Due</div>
+    <div class="leg-item"><div class="leg-dot leg-event"></div> Event</div>
+    <div class="leg-item"><div class="leg-dot leg-job"></div> Job Scheduled</div>
+  </div>
+
+  <!-- Month view -->
+  <div class="cal-grid" id="calGrid"></div>
+
+  <!-- Mobile week view -->
+  <div class="week-view" id="weekView"></div>
+
+  <!-- Selected day panel -->
+  <div class="day-panel" id="dayPanel">
+    <h3 id="dayPanelTitle"></h3>
+    <div id="dayPanelContent"></div>
+  </div>
+</div>
+
+<script>
+Nav.render();
+
+let currentYear, currentMonth;
+let selectedDate = null;
+
+const today = new Date();
+currentYear = today.getFullYear();
+currentMonth = today.getMonth();
+
+// Build a map of dates to items
+function buildDateMap(year, month) {
+  const map = {};
+
+  function addItem(dateStr, item) {
+    if (!map[dateStr]) map[dateStr] = [];
+    map[dateStr].push(item);
+  }
+
+  // Events
+  DataStore.getEvents().forEach(ev => {
+    addItem(ev.date, { type: 'event', label: ev.title, sub: ev.gardenName || '' });
+  });
+
+  // Tasks — mark next due dates
+  DataStore.getTasks().forEach(t => {
+    if (!t.nextDue) return;
+    const d = t.nextDue.slice(0, 10);
+    const g = DataStore.getGarden(t.gardenId);
+    addItem(d, { type: 'task', label: t.title, sub: g ? g.name : '' });
+  });
+
+  // Jobs — show active jobs roughly
+  DataStore.getJobs().filter(j => j.status === 'active').forEach(j => {
+    const d = new Date(year, month, 15).toISOString().slice(0, 10);
+    addItem(d, { type: 'job', label: j.title, sub: j.clientName });
+  });
+
+  return map;
+}
+
+function renderMonth() {
+  const dateMap = buildDateMap(currentYear, currentMonth);
+  const monthLabel = new Date(currentYear, currentMonth, 1)
+    .toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  document.getElementById('calTitle').textContent = monthLabel;
+
+  const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+  const daysInPrev = new Date(currentYear, currentMonth, 0).getDate();
+  const todayStr = today.toISOString().slice(0, 10);
+
+  const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  let html = `<div class="cal-head">${DAYS.map(d => `<div class="cal-head-cell">${d}</div>`).join('')}</div>
+  <div class="cal-body">`;
+
+  // Prev month trailing days
+  for (let i = firstDay - 1; i >= 0; i--) {
+    const day = daysInPrev - i;
+    const dateStr = `${currentYear}-${String(currentMonth).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const items = dateMap[dateStr] || [];
+    html += cellHtml(day, dateStr, true, items, todayStr);
+  }
+  // Current month days
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${currentYear}-${String(currentMonth + 1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const items = dateMap[dateStr] || [];
+    html += cellHtml(d, dateStr, false, items, todayStr);
+  }
+  // Next month filler
+  const totalCells = Math.ceil((firstDay + daysInMonth) / 7) * 7;
+  for (let d = 1; d <= totalCells - firstDay - daysInMonth; d++) {
+    const nextMonth = currentMonth + 2 > 12 ? 1 : currentMonth + 2;
+    const nextYear = currentMonth + 2 > 12 ? currentYear + 1 : currentYear;
+    const dateStr = `${nextYear}-${String(nextMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const items = dateMap[dateStr] || [];
+    html += cellHtml(d, dateStr, true, items, todayStr);
+  }
+  html += '</div>';
+
+  document.getElementById('calGrid').innerHTML = html;
+}
+
+function cellHtml(day, dateStr, otherMonth, items, todayStr) {
+  const isToday = dateStr === todayStr;
+  const isSelected = dateStr === selectedDate;
+  const cls = [
+    'cal-cell',
+    otherMonth ? 'other-month' : '',
+    isToday ? 'today' : '',
+    isSelected ? 'selected' : ''
+  ].filter(Boolean).join(' ');
+
+  const dots = items.map(it => `<span class="cal-dot dot-${it.type}"></span>`).join('');
+  return `
+    <div class="${cls}" onclick="selectDate('${dateStr}')">
+      <div class="cell-day">${day}</div>
+      <div class="cal-dots">${dots}</div>
+    </div>`;
+}
+
+function renderWeekView() {
+  const dateMap = buildDateMap(currentYear, currentMonth);
+  const todayStr = today.toISOString().slice(0, 10);
+  const startOfWeek = new Date(today);
+  startOfWeek.setDate(today.getDate() - today.getDay());
+
+  let html = '<div class="week-row">';
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(startOfWeek);
+    d.setDate(startOfWeek.getDate() + i);
+    const dateStr = d.toISOString().slice(0, 10);
+    const items = dateMap[dateStr] || [];
+    const dayName = d.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
+    const isToday = dateStr === todayStr;
+    const isSelected = dateStr === selectedDate;
+    const cls = ['week-day', isToday ? 'today' : '', isSelected ? 'selected' : ''].filter(Boolean).join(' ');
+    html += `
+      <div class="${cls}" onclick="selectDate('${dateStr}')">
+        <div class="week-day-name">${dayName}</div>
+        <div class="week-day-num">${d.getDate()}</div>
+        <div class="week-day-dots">
+          ${items.map(it => `<span class="cal-dot dot-${it.type}"></span>`).join('')}
+        </div>
+      </div>`;
+  }
+  html += '</div>';
+  document.getElementById('weekView').innerHTML = html;
+}
+
+function selectDate(dateStr) {
+  selectedDate = dateStr;
+  const dateMap = buildDateMap(currentYear, currentMonth);
+  const items = dateMap[dateStr] || [];
+  const panel = document.getElementById('dayPanel');
+  const panelTitle = document.getElementById('dayPanelTitle');
+  const panelContent = document.getElementById('dayPanelContent');
+
+  const d = new Date(dateStr + 'T12:00:00');
+  panelTitle.textContent = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+
+  if (items.length === 0) {
+    panelContent.innerHTML = '<p style="color:var(--text-dim);font-size:0.875rem;">Nothing scheduled this day.</p>';
+  } else {
+    const typeColor = { task: 'dot-task', event: 'dot-event', job: 'dot-job' };
+    panelContent.innerHTML = items.map(it => `
+      <div class="day-item">
+        <div class="day-type-dot cal-dot ${typeColor[it.type]}"></div>
+        <div>
+          <div class="day-item-title">${it.label}</div>
+          ${it.sub ? `<div class="day-item-sub">${it.sub}</div>` : ''}
+        </div>
+      </div>`).join('');
+  }
+  panel.classList.add('open');
+  renderMonth();
+  renderWeekView();
+}
+
+function prevMonth() {
+  currentMonth--;
+  if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+  renderMonth();
+}
+function nextMonth() {
+  currentMonth++;
+  if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+  renderMonth();
+}
+function goToday() {
+  currentYear = today.getFullYear();
+  currentMonth = today.getMonth();
+  renderMonth();
+  renderWeekView();
+}
+
+renderMonth();
+renderWeekView();
+</script>
+</body>
+</html>

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clients — Ecotopia</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/auth.js"></script>
+<script>try { AuthManager.requireAuth(); } catch(e) { throw e; }</script>
+<script src="assets/data.js"></script>
+<script src="assets/nav.js"></script>
+<style>
+  :root {
+    --forest: #1B4332; --forest-mid: #2D6A4F; --forest-light: #52B788;
+    --sage: #D8F3DC; --sage-dim: #B7E4C7; --earth: #8B5E3C;
+    --earth-light: #C68642; --gold: #F4A261; --cream: #F9F6F0;
+    --cream-dim: #E8E0D5; --text: #1C1C1C; --text-dim: #5A5A5A;
+    --border: rgba(45,106,79,0.2);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--text); }
+  .page { padding: 28px 32px; max-width: 900px; }
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+  h1 { font-family: 'Fraunces', serif; font-size: 1.9rem; color: var(--forest); }
+  .btn { padding: 10px 18px; border-radius: 8px; border: none; font-size: 0.875rem;
+    font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif;
+    text-decoration: none; display: inline-flex; gap: 6px; align-items: center;
+    transition: background 0.15s; }
+  .btn-primary { background: var(--forest); color: #fff; }
+  .btn-primary:hover { background: var(--forest-mid); }
+
+  .client-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+  .client-card {
+    background: #fff; border-radius: 12px; border: 1px solid var(--border);
+    padding: 20px; transition: box-shadow 0.15s;
+  }
+  .client-card:hover { box-shadow: 0 4px 16px rgba(27,67,50,0.1); }
+  .client-name { font-family: 'Fraunces', serif; font-size: 1.1rem; color: var(--forest);
+    margin-bottom: 8px; }
+  .client-info { font-size: 0.85rem; color: var(--text-dim); line-height: 1.8; }
+  .client-info a { color: var(--forest-mid); text-decoration: none; }
+  .client-info a:hover { text-decoration: underline; }
+  .client-jobs { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border);
+    font-size: 0.8rem; color: var(--text-dim); }
+  .job-link { display: inline-block; background: var(--sage); color: var(--forest);
+    padding: 2px 8px; border-radius: 20px; font-size: 0.75rem; font-weight: 600;
+    text-decoration: none; margin: 2px 2px 0 0; }
+  .job-link:hover { background: var(--sage-dim); }
+
+  /* Add modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+    z-index: 500; align-items: center; justify-content: center; padding: 20px; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: #fff; border-radius: 16px; padding: 28px;
+    width: 100%; max-width: 460px; box-shadow: 0 20px 60px rgba(0,0,0,0.25); }
+  .modal h2 { font-family: 'Fraunces', serif; color: var(--forest); margin-bottom: 20px; }
+  .form-group { margin-bottom: 16px; }
+  .form-group label { display: block; font-size: 0.82rem; font-weight: 600;
+    color: var(--text-dim); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .form-group input { width: 100%; padding: 10px 12px; border-radius: 7px;
+    border: 1.5px solid var(--border); font-size: 0.9rem; font-family: 'DM Sans', sans-serif; color: var(--text); }
+  .form-group input:focus { outline: none; border-color: var(--forest-light); }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+  .btn-cancel { background: var(--cream-dim); color: var(--text); padding: 10px 18px;
+    border-radius: 8px; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+  .success-msg { background: #d1fae5; border: 1px solid #6ee7b7; color: #065f46;
+    padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; display: none; font-size: 0.875rem; }
+  .success-msg.visible { display: block; }
+
+  @media (max-width: 600px) { .page { padding: 20px 16px; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="page-header">
+    <h1>Clients</h1>
+    <button class="btn btn-primary" onclick="openModal()">+ Add Client</button>
+  </div>
+  <div class="client-grid" id="clientGrid"></div>
+</div>
+
+<div class="modal-overlay" id="addClientModal">
+  <div class="modal">
+    <h2>Add Client</h2>
+    <div class="success-msg" id="clientSuccess">Client added!</div>
+    <form id="addClientForm" novalidate>
+      <div class="form-group">
+        <label>Name *</label>
+        <input type="text" id="c_name" required placeholder="Full name">
+      </div>
+      <div class="form-group">
+        <label>Address</label>
+        <input type="text" id="c_address" placeholder="Street address">
+      </div>
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" id="c_email" placeholder="email@example.com">
+      </div>
+      <div class="form-group">
+        <label>Phone</label>
+        <input type="tel" id="c_phone" placeholder="(814) 555-0000">
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Add Client</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+Nav.render();
+
+function renderGrid() {
+  const clients = DataStore.getClients();
+  const jobs = DataStore.getJobs();
+  const el = document.getElementById('clientGrid');
+  if (clients.length === 0) {
+    el.innerHTML = '<p style="color:var(--text-dim)">No clients yet.</p>';
+    return;
+  }
+  el.innerHTML = clients.map(c => {
+    const clientJobs = jobs.filter(j => j.clientId === c.id);
+    return `
+      <div class="client-card">
+        <div class="client-name">${c.name}</div>
+        <div class="client-info">
+          ${c.address ? `📍 ${c.address}<br>` : ''}
+          ${c.email ? `<a href="mailto:${c.email}">${c.email}</a><br>` : ''}
+          ${c.phone ? `<a href="tel:${c.phone}">${c.phone}</a>` : ''}
+        </div>
+        ${clientJobs.length > 0 ? `
+        <div class="client-jobs">
+          Jobs: ${clientJobs.map(j =>
+            `<a href="job-detail.html?id=${j.id}" class="job-link">${j.title}</a>`
+          ).join('')}
+        </div>` : ''}
+      </div>`;
+  }).join('');
+}
+
+renderGrid();
+
+function openModal() { document.getElementById('addClientModal').classList.add('open'); }
+function closeModal() {
+  document.getElementById('addClientModal').classList.remove('open');
+  document.getElementById('addClientForm').reset();
+  document.getElementById('clientSuccess').classList.remove('visible');
+}
+document.getElementById('addClientModal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+document.getElementById('addClientForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const name = document.getElementById('c_name').value.trim();
+  if (!name) return;
+  DataStore.addClient({
+    name,
+    address: document.getElementById('c_address').value.trim(),
+    email: document.getElementById('c_email').value.trim(),
+    phone: document.getElementById('c_phone').value.trim(),
+  });
+  document.getElementById('clientSuccess').classList.add('visible');
+  renderGrid();
+  setTimeout(closeModal, 1000);
+});
+</script>
+</body>
+</html>

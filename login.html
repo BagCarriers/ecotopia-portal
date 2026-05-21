@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign In — Ecotopia Earthcare</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/auth.js"></script>
+<style>
+  :root {
+    --forest: #1B4332; --forest-mid: #2D6A4F; --forest-light: #52B788;
+    --sage: #D8F3DC; --sage-dim: #B7E4C7; --earth: #8B5E3C;
+    --earth-light: #C68642; --gold: #F4A261; --cream: #F9F6F0;
+    --cream-dim: #E8E0D5; --text: #1C1C1C; --text-dim: #5A5A5A;
+    --border: rgba(45,106,79,0.2);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--forest);
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .login-wrap {
+    width: 100%; max-width: 400px;
+  }
+  .login-header {
+    text-align: center; margin-bottom: 32px;
+  }
+  .login-logo {
+    font-family: 'Fraunces', serif;
+    font-size: 2.2rem; font-weight: 700; color: var(--sage);
+    letter-spacing: -0.02em; display: block; margin-bottom: 6px;
+  }
+  .login-tagline {
+    color: rgba(216,243,220,0.7); font-size: 0.9rem;
+  }
+  .login-card {
+    background: var(--cream); border-radius: 16px;
+    padding: 36px 32px; box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+  }
+  .login-card h2 {
+    font-family: 'Fraunces', serif;
+    color: var(--forest); font-size: 1.4rem; margin-bottom: 24px;
+    text-align: center;
+  }
+  .form-group { margin-bottom: 18px; }
+  .form-group label {
+    display: block; font-size: 0.85rem; font-weight: 600;
+    color: var(--text-dim); margin-bottom: 6px; text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .form-group input {
+    width: 100%; padding: 12px 14px; border-radius: 8px;
+    border: 1.5px solid var(--border); background: #fff;
+    font-size: 1rem; font-family: 'DM Sans', sans-serif;
+    color: var(--text); transition: border-color 0.15s;
+  }
+  .form-group input:focus {
+    outline: none; border-color: var(--forest-light);
+    box-shadow: 0 0 0 3px rgba(82,183,136,0.15);
+  }
+  .btn-login {
+    width: 100%; padding: 14px; background: var(--forest);
+    color: #fff; border: none; border-radius: 8px;
+    font-size: 1rem; font-weight: 600; cursor: pointer;
+    font-family: 'DM Sans', sans-serif;
+    transition: background 0.15s;
+    margin-top: 8px;
+  }
+  .btn-login:hover { background: var(--forest-mid); }
+  .error-msg {
+    background: #fef2f2; border: 1px solid #fca5a5;
+    color: #dc2626; padding: 10px 14px; border-radius: 8px;
+    font-size: 0.875rem; margin-bottom: 16px;
+    display: none;
+  }
+  .error-msg.visible { display: block; }
+  .login-footer {
+    text-align: center; margin-top: 16px;
+    color: rgba(216,243,220,0.5); font-size: 0.8rem;
+  }
+</style>
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-header">
+    <span class="login-logo">🌿 Ecotopia</span>
+    <p class="login-tagline">Earthcare Portal</p>
+  </div>
+  <div class="login-card">
+    <h2>Admin Sign In</h2>
+    <div class="error-msg" id="errorMsg"></div>
+    <form id="loginForm" novalidate>
+      <div class="form-group">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" autocomplete="username"
+               placeholder="jordan" required>
+      </div>
+      <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" autocomplete="current-password"
+               placeholder="••••••••••••" required>
+      </div>
+      <button type="submit" class="btn-login">Sign In</button>
+    </form>
+  </div>
+  <p class="login-footer">Ecotopia Earthcare &mdash; Admin Portal</p>
+</div>
+<script>
+  // If already signed in, go to dashboard
+  if (AuthManager.isAuthenticated()) {
+    window.location.href = 'dashboard.html';
+  }
+
+  document.getElementById('loginForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const user = document.getElementById('username').value.trim();
+    const pass = document.getElementById('password').value;
+    const err = document.getElementById('errorMsg');
+
+    const result = AuthManager.signIn(user, pass);
+    if (result.success) {
+      window.location.href = 'dashboard.html';
+    } else {
+      err.textContent = result.error;
+      err.classList.add('visible');
+      document.getElementById('password').value = '';
+      document.getElementById('password').focus();
+    }
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Client Intake — Ecotopia Earthcare</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/data.js"></script>
+<style>
+  :root {
+    --forest: #1B4332; --forest-mid: #2D6A4F; --forest-light: #52B788;
+    --sage: #D8F3DC; --sage-dim: #B7E4C7; --earth: #8B5E3C;
+    --earth-light: #C68642; --gold: #F4A261; --cream: #F9F6F0;
+    --cream-dim: #E8E0D5; --text: #1C1C1C; --text-dim: #5A5A5A;
+    --border: rgba(45,106,79,0.2);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--text); min-height: 100vh; }
+
+  /* Public header */
+  .pub-header {
+    background: var(--forest); padding: 18px 24px;
+  }
+  .pub-logo { font-family: 'Fraunces', serif; font-size: 1.2rem; color: var(--sage); font-weight: 700; }
+  .pub-tagline { font-size: 0.8rem; color: rgba(216,243,220,0.7); margin-top: 2px; }
+
+  .container { max-width: 620px; margin: 0 auto; padding: 36px 20px 60px; }
+  h1 { font-family: 'Fraunces', serif; font-size: 2rem; color: var(--forest); margin-bottom: 8px; }
+  .intro { font-size: 0.9rem; color: var(--text-dim); margin-bottom: 32px; line-height: 1.6; }
+
+  .intake-card { background: #fff; border-radius: 16px; border: 1px solid var(--border); padding: 32px; }
+
+  /* Sections */
+  .form-section { margin-bottom: 28px; }
+  .form-section h2 { font-family: 'Fraunces', serif; font-size: 1rem; color: var(--forest);
+    margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .form-group { margin-bottom: 16px; }
+  .form-group label {
+    display: block; font-size: 0.78rem; font-weight: 700; color: var(--text-dim);
+    margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.04em;
+  }
+  .required::after { content: ' *'; color: #dc2626; }
+  .form-group input, .form-group select, .form-group textarea {
+    width: 100%; padding: 11px 13px; border-radius: 8px;
+    border: 1.5px solid var(--border); font-size: 0.925rem;
+    font-family: 'DM Sans', sans-serif; color: var(--text);
+    -webkit-appearance: none; appearance: none;
+    background: #fff;
+  }
+  select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%235A5A5A' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    padding-right: 32px;
+  }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+    outline: none; border-color: var(--forest-light);
+    box-shadow: 0 0 0 3px rgba(82,183,136,0.12);
+  }
+  .form-group textarea { resize: vertical; min-height: 90px; }
+
+  .btn-submit {
+    width: 100%; padding: 15px; background: var(--forest); color: #fff;
+    border: none; border-radius: 10px; font-size: 1rem; font-weight: 700;
+    cursor: pointer; font-family: 'DM Sans', sans-serif; transition: background 0.15s;
+    margin-top: 8px;
+  }
+  .btn-submit:hover { background: var(--forest-mid); }
+
+  .field-note { font-size: 0.75rem; color: var(--text-dim); margin-top: 4px; }
+
+  /* Thank you screen */
+  .thanks-screen { display: none; text-align: center; padding: 40px 20px; }
+  .thanks-screen.visible { display: block; }
+  .thanks-icon { font-size: 4rem; margin-bottom: 16px; }
+  .thanks-title { font-family: 'Fraunces', serif; font-size: 2rem; color: var(--forest);
+    margin-bottom: 10px; }
+  .thanks-sub { color: var(--text-dim); font-size: 0.95rem; line-height: 1.7; }
+  .thanks-badge {
+    display: inline-block; background: var(--sage); color: var(--forest);
+    padding: 8px 20px; border-radius: 20px; font-weight: 700; margin-top: 20px;
+    font-size: 0.875rem;
+  }
+
+  @media (max-width: 540px) {
+    .form-row { grid-template-columns: 1fr; }
+    .intake-card { padding: 20px; }
+  }
+</style>
+</head>
+<body>
+<div class="pub-header">
+  <div class="pub-logo">🌿 Ecotopia Earthcare</div>
+  <div class="pub-tagline">Ecological Landscaping &amp; Community Gardens</div>
+</div>
+
+<div class="container">
+  <h1>Get Started</h1>
+  <p class="intro">Interested in a project with Ecotopia? Tell us about your space and goals.
+    Jordan will follow up within a few days to discuss options.</p>
+
+  <div class="intake-card">
+    <!-- Thank you screen -->
+    <div class="thanks-screen" id="thanksScreen">
+      <div class="thanks-icon">🌱</div>
+      <div class="thanks-title">Thank you!</div>
+      <div class="thanks-sub">
+        Your request has been received. Jordan will be in touch soon to talk about your project.<br><br>
+        In the meantime, feel free to explore Ecotopia's gardens and upcoming events.
+      </div>
+      <span class="thanks-badge">We'll reach out within 2–3 business days</span>
+    </div>
+
+    <!-- Intake form -->
+    <form id="intakeForm" novalidate>
+      <!-- Contact -->
+      <div class="form-section">
+        <h2>Your Contact Info</h2>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="required">Name</label>
+            <input type="text" id="i_name" placeholder="Full name" required>
+          </div>
+          <div class="form-group">
+            <label class="required">Phone</label>
+            <input type="tel" id="i_phone" placeholder="(814) 555-0000" required>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Email</label>
+            <input type="email" id="i_email" placeholder="email@example.com">
+          </div>
+          <div class="form-group">
+            <label class="required">Property Address</label>
+            <input type="text" id="i_address" placeholder="Street address" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Preferred Contact Method</label>
+          <select id="i_contact_pref">
+            <option value="phone">Phone call</option>
+            <option value="text">Text message</option>
+            <option value="email">Email</option>
+            <option value="any">Any — whatever's easiest</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Project -->
+      <div class="form-section">
+        <h2>Your Project</h2>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="required">Service Type</label>
+            <select id="i_service" required>
+              <option value="">Select a service…</option>
+              <option value="meadow_conversion">Lawn to Meadow Conversion</option>
+              <option value="rain_garden">Rain Garden Design</option>
+              <option value="ecological_landscaping">Ecological Landscaping</option>
+              <option value="invasive_removal">Invasive Species Removal</option>
+              <option value="herb_garden">Medicinal Herb Garden</option>
+              <option value="native_planting">Native Planting Design</option>
+              <option value="consultation">Consultation Only</option>
+              <option value="other">Other / Not Sure</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Approximate Size</label>
+            <input type="text" id="i_size" placeholder="e.g. 500 sqft, small backyard">
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="required">Project Description</label>
+          <textarea id="i_description" placeholder="Tell us about your space, goals, and any specific ideas or concerns…" required></textarea>
+        </div>
+        <div class="form-group">
+          <label>How did you hear about us?</label>
+          <select id="i_referral">
+            <option value="">Select…</option>
+            <option value="word_of_mouth">Word of mouth / friend</option>
+            <option value="social_media">Social media</option>
+            <option value="flyer">Flyer or poster</option>
+            <option value="event">Ecotopia event</option>
+            <option value="web_search">Web search</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-submit">Submit Request →</button>
+    </form>
+  </div>
+</div>
+
+<script>
+document.getElementById('intakeForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const name = document.getElementById('i_name').value.trim();
+  const phone = document.getElementById('i_phone').value.trim();
+  const address = document.getElementById('i_address').value.trim();
+  const service = document.getElementById('i_service').value;
+  const description = document.getElementById('i_description').value.trim();
+
+  if (!name || !phone || !address || !service || !description) {
+    alert('Please fill in all required fields.');
+    return;
+  }
+
+  // Save as intake submission
+  const submission = DataStore.addIntakeSubmission({
+    name, phone,
+    email: document.getElementById('i_email').value.trim(),
+    address,
+    serviceType: service,
+    size: document.getElementById('i_size').value.trim(),
+    description,
+    contactPreference: document.getElementById('i_contact_pref').value,
+    referral: document.getElementById('i_referral').value,
+    submittedAt: new Date().toISOString()
+  });
+
+  // Also create a job inquiry
+  DataStore.addJob({
+    clientName: name,
+    title: service.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+    address,
+    type: service,
+    status: 'inquiry',
+    sqft: document.getElementById('i_size').value.trim(),
+    price: null, grantFunded: false, grantName: null, grantAmount: null,
+    notes: `Submitted via intake form.\n\nDescription: ${description}\n\nContact: ${phone}${document.getElementById('i_email').value.trim() ? ' / ' + document.getElementById('i_email').value.trim() : ''}.\nPreferred contact: ${document.getElementById('i_contact_pref').value}.`,
+    activityLog: [{ ts: new Date().toISOString(), note: 'Received via intake form.' }]
+  });
+
+  // Show thank you
+  document.getElementById('intakeForm').style.display = 'none';
+  document.getElementById('thanksScreen').classList.add('visible');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Volunteer — Ecotopia</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/auth.js"></script>
+<script>try { AuthManager.requireAuth(); } catch(e) { throw e; }</script>
+<script src="assets/data.js"></script>
+<script src="assets/nav.js"></script>
+<style>
+  :root {
+    --forest: #1B4332; --forest-mid: #2D6A4F; --forest-light: #52B788;
+    --sage: #D8F3DC; --sage-dim: #B7E4C7; --earth: #8B5E3C;
+    --earth-light: #C68642; --gold: #F4A261; --cream: #F9F6F0;
+    --cream-dim: #E8E0D5; --text: #1C1C1C; --text-dim: #5A5A5A;
+    --border: rgba(45,106,79,0.2);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--text); }
+  .page { padding: 28px 32px; max-width: 900px; }
+  .back-link { display: inline-flex; align-items: center; gap: 6px; color: var(--forest-mid);
+    text-decoration: none; font-size: 0.875rem; margin-bottom: 20px; }
+  .back-link:hover { text-decoration: underline; }
+
+  /* Profile header */
+  .profile-header {
+    background: #fff; border-radius: 14px; border: 1px solid var(--border);
+    padding: 24px 28px; margin-bottom: 24px; display: flex; gap: 20px; align-items: flex-start;
+  }
+  .profile-avatar {
+    width: 60px; height: 60px; background: var(--forest); border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Fraunces', serif; font-size: 1.6rem; color: var(--sage); flex-shrink: 0;
+  }
+  .profile-name { font-family: 'Fraunces', serif; font-size: 1.6rem; color: var(--forest); margin-bottom: 4px; }
+  .profile-contact { font-size: 0.875rem; color: var(--text-dim); line-height: 1.8; }
+  .profile-contact a { color: var(--forest-mid); text-decoration: none; }
+  .profile-avail { font-size: 0.85rem; color: var(--text-dim); margin-top: 8px; }
+  .skill-pill { background: var(--sage); color: var(--forest-mid); padding: 3px 10px;
+    border-radius: 20px; font-size: 0.78rem; font-weight: 600; margin-right: 4px; margin-top: 8px; display: inline-block; }
+
+  /* Sections */
+  .section { margin-bottom: 28px; }
+  .section h2 { font-family: 'Fraunces', serif; font-size: 1.15rem; color: var(--forest);
+    margin-bottom: 14px; }
+
+  /* Commitments */
+  .commit-table { width: 100%; border-collapse: collapse; background: #fff;
+    border-radius: 12px; overflow: hidden; border: 1px solid var(--border); }
+  .commit-table th { padding: 10px 14px; text-align: left; font-size: 0.75rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim);
+    background: var(--cream-dim); border-bottom: 1px solid var(--border); }
+  .commit-table td { padding: 11px 14px; font-size: 0.875rem; border-bottom: 1px solid var(--border); }
+  .commit-table tr:last-child td { border-bottom: none; }
+  .due-text { font-size: 0.8rem; font-weight: 600; }
+  .due-red { color: #dc2626; }
+  .due-amber { color: #d97706; }
+  .due-green { color: var(--forest-mid); }
+
+  /* Hours bar chart (CSS only) */
+  .hours-chart { background: #fff; border-radius: 12px; border: 1px solid var(--border); padding: 20px; }
+  .chart-bars { display: flex; align-items: flex-end; gap: 6px; height: 100px; }
+  .chart-bar-wrap { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .chart-bar {
+    width: 100%; background: var(--forest-light); border-radius: 4px 4px 0 0;
+    min-height: 4px; transition: height 0.3s;
+  }
+  .chart-bar-label { font-size: 0.65rem; color: var(--text-dim); white-space: nowrap; }
+  .chart-bar-val { font-size: 0.65rem; font-weight: 600; color: var(--forest); }
+
+  /* Check-in history */
+  .ci-table { width: 100%; border-collapse: collapse; background: #fff;
+    border-radius: 12px; overflow: hidden; border: 1px solid var(--border); }
+  .ci-table th { padding: 9px 14px; text-align: left; font-size: 0.75rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim);
+    background: var(--cream-dim); border-bottom: 1px solid var(--border); }
+  .ci-table td { padding: 10px 14px; font-size: 0.85rem; border-bottom: 1px solid var(--border); }
+  .ci-table tr:last-child td { border-bottom: none; }
+  .type-badge { padding: 2px 8px; border-radius: 20px; font-size: 0.7rem; font-weight: 600; }
+  .type-scheduled { background: var(--sage); color: var(--forest); }
+  .type-walkin { background: #dbeafe; color: #1e40af; }
+  .type-manual { background: var(--cream-dim); color: var(--text-dim); }
+
+  @media (max-width: 600px) {
+    .page { padding: 20px 16px; }
+    .profile-header { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <a href="volunteers.html" class="back-link">← Back to Volunteers</a>
+  <div id="pageContent"></div>
+</div>
+
+<script>
+Nav.render();
+
+const params = new URLSearchParams(window.location.search);
+const volId = params.get('id');
+const vol = volId ? DataStore.getVolunteer(volId) : null;
+
+function dueCls(d) { return d === null ? 'due-green' : d <= 0 ? 'due-red' : d <= 3 ? 'due-amber' : 'due-green'; }
+function dueLabel(d) {
+  if (d === null) return '—';
+  if (d < 0) return `${Math.abs(d)}d overdue`;
+  if (d === 0) return 'Today';
+  return `In ${d}d`;
+}
+
+function renderPage() {
+  const el = document.getElementById('pageContent');
+  if (!vol) {
+    el.innerHTML = '<p style="color:var(--text-dim)">Volunteer not found.</p>';
+    return;
+  }
+  document.title = `${vol.name} — Ecotopia`;
+
+  const initials = vol.name.split(' ').map(w => w[0]).join('').slice(0, 2);
+  const tasks = DataStore.getTasksByVolunteer(vol.id);
+  const allCheckins = DataStore.getCheckinsByVolunteer(vol.id)
+    .sort((a, b) => new Date(b.checkInTime) - new Date(a.checkInTime));
+
+  // Build monthly hours (last 6 months)
+  const now = new Date();
+  const months = [];
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const label = d.toLocaleDateString('en-US', { month: 'short' });
+    const monthStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const hrs = allCheckins.filter(c => c.checkInTime.startsWith(monthStr))
+      .reduce((sum, c) => sum + (c.hoursLogged || 0), 0);
+    months.push({ label, hrs });
+  }
+  const maxHrs = Math.max(...months.map(m => m.hrs), 1);
+
+  el.innerHTML = `
+    <!-- Profile Header -->
+    <div class="profile-header">
+      <div class="profile-avatar">${initials}</div>
+      <div style="flex:1">
+        <div class="profile-name">${vol.name}</div>
+        <div class="profile-contact">
+          ${vol.phone ? `<a href="tel:${vol.phone}">${vol.phone}</a><br>` : ''}
+          ${vol.email ? `<a href="mailto:${vol.email}">${vol.email}</a>` : ''}
+        </div>
+        <div class="profile-avail">
+          ${vol.availability ? `🗓 ${vol.availability}` : ''}
+        </div>
+        <div style="margin-top:8px">
+          ${(vol.skills || []).map(s => `<span class="skill-pill">${s}</span>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    <!-- Active Commitments -->
+    <div class="section">
+      <h2>Active Commitments</h2>
+      ${tasks.length === 0
+        ? '<p style="color:var(--text-dim);font-size:0.875rem;">No assigned tasks.</p>'
+        : `<table class="commit-table">
+          <thead><tr><th>Task</th><th>Garden</th><th>Cadence</th><th>Next Due</th></tr></thead>
+          <tbody>${tasks.map(t => {
+            const d = DataStore.daysUntil(t.nextDue);
+            const g = DataStore.getGarden(t.gardenId);
+            const cadLabel = t.cadenceDays <= 3 ? `${t.cadenceDays}x/wk` : t.cadenceDays <= 7 ? 'Weekly' :
+              t.cadenceDays <= 14 ? 'Biweekly' : t.cadenceDays <= 30 ? 'Monthly' : `Every ${t.cadenceDays}d`;
+            return `<tr>
+              <td>${t.title}</td>
+              <td>${g ? g.name : '—'}</td>
+              <td>${cadLabel}</td>
+              <td><span class="due-text ${dueCls(d)}">${dueLabel(d)}</span></td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table>`}
+    </div>
+
+    <!-- Hours Chart -->
+    <div class="section">
+      <h2>Hours by Month</h2>
+      <div class="hours-chart">
+        <div class="chart-bars">
+          ${months.map(m => {
+            const pct = Math.round((m.hrs / maxHrs) * 100);
+            return `
+              <div class="chart-bar-wrap">
+                <div class="chart-bar-val">${m.hrs > 0 ? m.hrs.toFixed(1) : ''}</div>
+                <div class="chart-bar" style="height:${pct}%"></div>
+                <div class="chart-bar-label">${m.label}</div>
+              </div>`;
+          }).join('')}
+        </div>
+        <div style="margin-top:8px;font-size:0.8rem;color:var(--text-dim)">
+          Total last 30 days: <strong>${DataStore.getHoursLast30(vol.id).toFixed(1)} hrs</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- Check-in History -->
+    <div class="section">
+      <h2>Check-in History</h2>
+      ${allCheckins.length === 0
+        ? '<p style="color:var(--text-dim);font-size:0.875rem;">No check-ins recorded.</p>'
+        : `<table class="ci-table">
+          <thead><tr><th>Date</th><th>Garden</th><th>Task</th><th>Hours</th><th>Type</th><th>Notes</th></tr></thead>
+          <tbody>${allCheckins.map(ci => `
+            <tr>
+              <td>${DataStore.formatDate(ci.checkInTime)}</td>
+              <td>${ci.gardenName}</td>
+              <td>${ci.taskTitle}</td>
+              <td>${ci.hoursLogged}</td>
+              <td><span class="type-badge type-${ci.type || 'manual'}">${ci.type || 'manual'}</span></td>
+              <td style="color:var(--text-dim)">${ci.notes || '—'}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table>`}
+    </div>
+  `;
+}
+
+renderPage();
+</script>
+</body>
+</html>

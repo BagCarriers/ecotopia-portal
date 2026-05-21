@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jobs — Ecotopia</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/auth.js"></script>
+<script>try { AuthManager.requireAuth(); } catch(e) { throw e; }</script>
+<script src="assets/data.js"></script>
+<script src="assets/nav.js"></script>
+<style>
+  :root {
+    --forest: #1B4332; --forest-mid: #2D6A4F; --forest-light: #52B788;
+    --sage: #D8F3DC; --sage-dim: #B7E4C7; --earth: #8B5E3C;
+    --earth-light: #C68642; --gold: #F4A261; --cream: #F9F6F0;
+    --cream-dim: #E8E0D5; --text: #1C1C1C; --text-dim: #5A5A5A;
+    --border: rgba(45,106,79,0.2);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--text); }
+  .page { padding: 28px 32px; }
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+  h1 { font-family: 'Fraunces', serif; font-size: 1.9rem; color: var(--forest); }
+
+  .btn {
+    padding: 10px 18px; border-radius: 8px; border: none;
+    font-size: 0.875rem; font-weight: 600; cursor: pointer;
+    font-family: 'DM Sans', sans-serif; text-decoration: none; display: inline-flex; gap: 6px; align-items: center;
+    transition: background 0.15s;
+  }
+  .btn-primary { background: var(--forest); color: #fff; }
+  .btn-primary:hover { background: var(--forest-mid); }
+
+  /* Kanban */
+  .kanban { display: flex; gap: 16px; overflow-x: auto; padding-bottom: 16px; align-items: flex-start; }
+  .kanban-col {
+    flex: 0 0 260px; background: var(--cream-dim); border-radius: 12px; padding: 0;
+    min-height: 200px; border: 1px solid var(--border);
+  }
+  .col-header {
+    padding: 14px 16px; display: flex; align-items: center; gap: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .col-header h3 { font-size: 0.9rem; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.06em; color: var(--text-dim); }
+  .col-count {
+    background: #fff; border: 1px solid var(--border); border-radius: 20px;
+    padding: 1px 7px; font-size: 0.75rem; font-weight: 600; color: var(--text-dim);
+  }
+  .col-cards { padding: 10px; display: flex; flex-direction: column; gap: 10px; }
+
+  /* Job card */
+  .job-card {
+    background: #fff; border-radius: 10px; padding: 14px;
+    border: 1px solid var(--border); cursor: pointer;
+    transition: box-shadow 0.15s, transform 0.1s;
+    text-decoration: none; display: block; color: var(--text);
+  }
+  .job-card:hover { box-shadow: 0 4px 16px rgba(27,67,50,0.12); transform: translateY(-1px); }
+  .job-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+  .job-client { font-weight: 600; font-size: 0.9rem; }
+  .job-type-pill {
+    padding: 2px 8px; border-radius: 20px; font-size: 0.7rem; font-weight: 600;
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .pill-meadow { background: #d1fae5; color: #065f46; }
+  .pill-rain { background: #dbeafe; color: #1e40af; }
+  .pill-eco { background: #d8f3dc; color: #1b4332; }
+  .pill-invasive { background: #fee2e2; color: #991b1b; }
+  .pill-herb { background: #fef3c7; color: #92400e; }
+  .pill-other { background: var(--cream-dim); color: var(--text-dim); }
+  .job-title { font-size: 0.82rem; color: var(--text-dim); margin-bottom: 4px; }
+  .job-addr { font-size: 0.78rem; color: var(--text-dim); }
+  .job-meta { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .grant-badge {
+    background: #fef3c7; color: #92400e; padding: 2px 7px;
+    border-radius: 20px; font-size: 0.7rem; font-weight: 600;
+  }
+  .sqft-badge {
+    background: var(--cream-dim); color: var(--text-dim); padding: 2px 7px;
+    border-radius: 20px; font-size: 0.7rem;
+  }
+
+  /* New Job Modal */
+  .modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+    z-index: 500; align-items: center; justify-content: center; padding: 20px;
+  }
+  .modal-overlay.open { display: flex; }
+  .modal {
+    background: #fff; border-radius: 16px; padding: 28px;
+    width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+  }
+  .modal h2 { font-family: 'Fraunces', serif; color: var(--forest); margin-bottom: 20px; }
+  .form-group { margin-bottom: 16px; }
+  .form-group label { display: block; font-size: 0.82rem; font-weight: 600;
+    color: var(--text-dim); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .form-group input, .form-group select, .form-group textarea {
+    width: 100%; padding: 10px 12px; border-radius: 7px;
+    border: 1.5px solid var(--border); font-size: 0.9rem;
+    font-family: 'DM Sans', sans-serif; color: var(--text);
+  }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+    outline: none; border-color: var(--forest-light);
+  }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; }
+  .btn-cancel { background: var(--cream-dim); color: var(--text); padding: 10px 18px;
+    border-radius: 8px; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: 0.875rem; }
+  .success-msg { background: #d1fae5; border: 1px solid #6ee7b7; color: #065f46;
+    padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; display: none; font-size: 0.875rem; }
+  .success-msg.visible { display: block; }
+
+  @media (max-width: 768px) {
+    .page { padding: 20px 16px; }
+    .kanban { flex-direction: column; }
+    .kanban-col { flex: none; width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="page-header">
+    <h1>Job Pipeline</h1>
+    <button class="btn btn-primary" onclick="openModal()">+ New Job</button>
+  </div>
+  <div class="kanban" id="kanban"></div>
+</div>
+
+<!-- New Job Modal -->
+<div class="modal-overlay" id="newJobModal">
+  <div class="modal">
+    <h2>New Job</h2>
+    <div class="success-msg" id="jobSuccess">Job added!</div>
+    <form id="newJobForm" novalidate>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Client Name *</label>
+          <input type="text" id="nj_client" required placeholder="Client name">
+        </div>
+        <div class="form-group">
+          <label>Job Title *</label>
+          <input type="text" id="nj_title" required placeholder="e.g. Rain Garden Design">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Address</label>
+        <input type="text" id="nj_address" placeholder="Street address">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Type</label>
+          <select id="nj_type">
+            <option value="meadow_conversion">Meadow Conversion</option>
+            <option value="rain_garden">Rain Garden</option>
+            <option value="ecological_landscaping">Ecological Landscaping</option>
+            <option value="invasive_removal">Invasive Removal</option>
+            <option value="herb_garden">Herb Garden</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Status</label>
+          <select id="nj_status">
+            <option value="inquiry">Inquiry</option>
+            <option value="site_visit">Site Visit</option>
+            <option value="proposal">Proposal</option>
+            <option value="active">Active</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Size (sqft)</label>
+          <input type="text" id="nj_sqft" placeholder="e.g. 500 sqft">
+        </div>
+        <div class="form-group">
+          <label>Price ($)</label>
+          <input type="number" id="nj_price" placeholder="0.00" min="0">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Notes</label>
+        <textarea id="nj_notes" rows="3" placeholder="Initial notes..."></textarea>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Add Job</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+Nav.render();
+
+const STATUSES = [
+  { key: 'inquiry',    label: 'Inquiry' },
+  { key: 'site_visit', label: 'Site Visit' },
+  { key: 'proposal',   label: 'Proposal' },
+  { key: 'active',     label: 'Active' },
+  { key: 'complete',   label: 'Complete' },
+];
+
+const TYPE_MAP = {
+  meadow_conversion: { label: 'Meadow', cls: 'pill-meadow' },
+  rain_garden:       { label: 'Rain Garden', cls: 'pill-rain' },
+  ecological_landscaping: { label: 'Eco Landscaping', cls: 'pill-eco' },
+  invasive_removal:  { label: 'Invasive Removal', cls: 'pill-invasive' },
+  herb_garden:       { label: 'Herb Garden', cls: 'pill-herb' },
+};
+
+function renderKanban() {
+  const jobs = DataStore.getJobs();
+  const board = document.getElementById('kanban');
+  board.innerHTML = STATUSES.map(st => {
+    const colJobs = jobs.filter(j => j.status === st.key);
+    return `
+      <div class="kanban-col">
+        <div class="col-header">
+          <h3>${st.label}</h3>
+          <span class="col-count">${colJobs.length}</span>
+        </div>
+        <div class="col-cards">
+          ${colJobs.length === 0
+            ? '<div style="padding:12px;font-size:0.8rem;color:var(--text-dim);text-align:center;">Empty</div>'
+            : colJobs.map(j => {
+              const typeInfo = TYPE_MAP[j.type] || { label: j.type, cls: 'pill-other' };
+              return `
+                <a href="job-detail.html?id=${j.id}" class="job-card">
+                  <div class="job-card-top">
+                    <div class="job-client">${j.clientName}</div>
+                    <span class="job-type-pill ${typeInfo.cls}">${typeInfo.label}</span>
+                  </div>
+                  <div class="job-title">${j.title}</div>
+                  ${j.address ? `<div class="job-addr">📍 ${j.address}</div>` : ''}
+                  <div class="job-meta">
+                    ${j.grantFunded ? `<span class="grant-badge">🏛 ${j.grantName || 'Grant'}</span>` : ''}
+                    ${j.sqft ? `<span class="sqft-badge">${j.sqft}</span>` : ''}
+                    ${j.price ? `<span class="sqft-badge">$${j.price}</span>` : ''}
+                  </div>
+                </a>`;
+            }).join('')}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+renderKanban();
+
+function openModal() { document.getElementById('newJobModal').classList.add('open'); }
+function closeModal() {
+  document.getElementById('newJobModal').classList.remove('open');
+  document.getElementById('newJobForm').reset();
+  document.getElementById('jobSuccess').classList.remove('visible');
+}
+
+document.getElementById('newJobModal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+document.getElementById('newJobForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const job = {
+    clientName: document.getElementById('nj_client').value.trim(),
+    title: document.getElementById('nj_title').value.trim(),
+    address: document.getElementById('nj_address').value.trim(),
+    type: document.getElementById('nj_type').value,
+    status: document.getElementById('nj_status').value,
+    sqft: document.getElementById('nj_sqft').value.trim(),
+    price: parseFloat(document.getElementById('nj_price').value) || null,
+    notes: document.getElementById('nj_notes').value.trim(),
+    grantFunded: false, activityLog: []
+  };
+  if (!job.clientName || !job.title) return;
+  DataStore.addJob(job);
+  document.getElementById('jobSuccess').classList.add('visible');
+  renderKanban();
+  setTimeout(closeModal, 1200);
+});
+</script>
+</body>
+</html>
