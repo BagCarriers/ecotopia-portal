@@ -73,6 +73,25 @@
   .btn-cancel { background: var(--cream-dim); color: var(--text); padding: 10px 18px;
     border-radius: 8px; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; }
 
+  /* Edit invoice modal */
+  .edit-modal { text-align: left; max-width: 440px; }
+  .edit-modal .modal-actions { justify-content: flex-end; }
+  .form-group { margin-bottom: 14px; }
+  .form-group label { display: block; font-size: 0.82rem; font-weight: 600;
+    color: var(--text-dim); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .form-group input, .form-group select, .form-group textarea {
+    width: 100%; padding: 9px 12px; border-radius: 7px;
+    border: 1.5px solid var(--border); font-size: 0.9rem; font-family: 'DM Sans', sans-serif; color: var(--text);
+  }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+    outline: none; border-color: var(--forest-light);
+  }
+  /* Edit button */
+  .btn-edit { font-size: 0.75rem; padding: 4px 9px; background: transparent;
+    border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
+    color: var(--text-dim); font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+  .btn-edit:hover { color: var(--forest); border-color: var(--forest-light); background: var(--sage); }
+
   @media (max-width: 700px) {
     .page { padding: 20px 16px; }
     .inv-table { font-size: 0.8rem; }
@@ -95,6 +114,33 @@
     </tr></thead>
     <tbody id="invBody"></tbody>
   </table>
+</div>
+
+<!-- Edit Invoice Modal -->
+<div class="modal-overlay" id="editInvModal">
+  <div class="modal edit-modal">
+    <h2>Edit Invoice</h2>
+    <form id="editInvForm" novalidate>
+      <div class="form-group"><label>Amount ($)</label>
+        <input type="number" id="ei_amount" min="0" step="0.01" placeholder="0.00"></div>
+      <div class="form-group"><label>Due Date</label>
+        <input type="date" id="ei_due"></div>
+      <div class="form-group"><label>Notes</label>
+        <textarea id="ei_notes" rows="2" placeholder="Invoice notes…"></textarea></div>
+      <div class="form-group"><label>Status</label>
+        <select id="ei_status">
+          <option value="draft">Draft</option>
+          <option value="sent">Sent</option>
+          <option value="paid">Paid</option>
+          <option value="overdue">Overdue</option>
+        </select></div>
+      <input type="hidden" id="ei_id">
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" onclick="closeEditInv()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+      </div>
+    </form>
+  </div>
 </div>
 
 <!-- Payment Link Modal -->
@@ -143,6 +189,7 @@ function renderTable() {
       <td>${inv.dueDate ? DataStore.formatDate(inv.dueDate + 'T00:00:00') : '—'}</td>
       <td>
         <div class="actions-cell">
+          <button class="btn-edit" onclick="openEditInv('${inv.id}')">✏️ Edit</button>
           ${inv.status !== 'paid' ? `
             <button class="btn btn-outline btn-sm" onclick="openPayModal()">Send Link</button>
             <button class="btn btn-primary btn-sm" onclick="markPaid('${inv.id}')">Mark Paid</button>
@@ -154,6 +201,37 @@ function renderTable() {
 
 renderStats();
 renderTable();
+
+function openEditInv(id) {
+  const inv = DataStore.getInvoice(id);
+  if (!inv) return;
+  document.getElementById('ei_id').value = inv.id;
+  document.getElementById('ei_amount').value = inv.amount != null ? inv.amount.toFixed(2) : '';
+  document.getElementById('ei_due').value = inv.dueDate || '';
+  document.getElementById('ei_notes').value = inv.notes || '';
+  document.getElementById('ei_status').value = inv.status || 'draft';
+  document.getElementById('editInvModal').classList.add('open');
+}
+function closeEditInv() {
+  document.getElementById('editInvModal').classList.remove('open');
+}
+document.getElementById('editInvModal').addEventListener('click', function(e) {
+  if (e.target === this) closeEditInv();
+});
+document.getElementById('editInvForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const id = document.getElementById('ei_id').value;
+  const amount = parseFloat(document.getElementById('ei_amount').value);
+  DataStore.updateInvoice(id, {
+    amount: isNaN(amount) ? 0 : amount,
+    dueDate: document.getElementById('ei_due').value || null,
+    notes: document.getElementById('ei_notes').value.trim(),
+    status: document.getElementById('ei_status').value
+  });
+  closeEditInv();
+  renderStats();
+  renderTable();
+});
 
 function markPaid(id) {
   if (!confirm('Mark this invoice as paid?')) return;

@@ -86,6 +86,24 @@
     padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; display: none; font-size: 0.875rem; }
   .success-msg.visible { display: block; }
 
+  /* Edit button */
+  .btn-edit { font-size: 0.8rem; padding: 4px 10px; background: transparent;
+    border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
+    color: var(--text-dim); font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+  .btn-edit:hover { color: var(--forest); border-color: var(--forest-light); background: var(--sage); }
+
+  /* Edit modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+    z-index: 500; align-items: center; justify-content: center; padding: 20px; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: #fff; border-radius: 16px; padding: 28px;
+    width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.25); text-align: left; }
+  .modal h2 { font-family: 'Fraunces', serif; color: var(--forest); margin-bottom: 20px; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+  .btn-cancel { background: var(--cream-dim); color: var(--text); padding: 10px 18px;
+    border-radius: 8px; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+
   @media (max-width: 600px) {
     .page { padding: 20px 16px; }
     .grant-body { grid-template-columns: 1fr; }
@@ -139,6 +157,48 @@
   </div>
 
   <div class="grant-list" id="grantList"></div>
+</div>
+
+<!-- Edit Grant Modal -->
+<div class="modal-overlay" id="editGrantModal">
+  <div class="modal">
+    <h2>Edit Grant</h2>
+    <form id="editGrantForm" novalidate>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-group"><label>Title / Program *</label>
+          <input type="text" id="eg_program" placeholder="Program name" required
+            style="width:100%;padding:9px 11px;border-radius:7px;border:1.5px solid var(--border);font-size:0.875rem;font-family:'DM Sans',sans-serif;"></div>
+        <div class="form-group"><label>Funder *</label>
+          <input type="text" id="eg_funder" placeholder="e.g. DCNR" required
+            style="width:100%;padding:9px 11px;border-radius:7px;border:1.5px solid var(--border);font-size:0.875rem;font-family:'DM Sans',sans-serif;"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-group"><label>Amount ($)</label>
+          <input type="number" id="eg_amount" min="0" placeholder="0"
+            style="width:100%;padding:9px 11px;border-radius:7px;border:1.5px solid var(--border);font-size:0.875rem;font-family:'DM Sans',sans-serif;"></div>
+        <div class="form-group"><label>Status</label>
+          <select id="eg_status"
+            style="width:100%;padding:9px 11px;border-radius:7px;border:1.5px solid var(--border);font-size:0.875rem;font-family:'DM Sans',sans-serif;">
+            <option value="applied">Applied</option>
+            <option value="under_review">Under Review</option>
+            <option value="approved">Approved</option>
+            <option value="active">Active</option>
+            <option value="complete">Complete</option>
+          </select></div>
+      </div>
+      <div class="form-group"><label>Deadline</label>
+        <input type="date" id="eg_deadline"
+          style="width:100%;padding:9px 11px;border-radius:7px;border:1.5px solid var(--border);font-size:0.875rem;font-family:'DM Sans',sans-serif;"></div>
+      <div class="form-group"><label>Notes</label>
+        <textarea id="eg_notes" rows="3" placeholder="Notes…"
+          style="width:100%;padding:9px 11px;border-radius:7px;border:1.5px solid var(--border);font-size:0.875rem;font-family:'DM Sans',sans-serif;"></textarea></div>
+      <input type="hidden" id="eg_id">
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" onclick="closeEditGrant()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+      </div>
+    </form>
+  </div>
 </div>
 
 <script>
@@ -209,6 +269,7 @@ function renderGrants() {
             <button class="btn btn-primary btn-sm" onclick="advanceGrant('${g.id}', '${STATUSES[idx + 1]}')">
               Move to ${STATUS_LABELS[STATUSES[idx + 1]]}
             </button>` : ''}
+          <button class="btn-edit" onclick="openEditGrant('${g.id}')">✏️ Edit</button>
         </div>
       </div>`;
   }).join('');
@@ -218,6 +279,42 @@ function advanceGrant(id, newStatus) {
   DataStore.updateGrant(id, { status: newStatus });
   renderGrants();
 }
+
+function openEditGrant(id) {
+  const g = DataStore.getGrant(id);
+  if (!g) return;
+  document.getElementById('eg_id').value = g.id;
+  document.getElementById('eg_program').value = g.program || '';
+  document.getElementById('eg_funder').value = g.funder || '';
+  document.getElementById('eg_amount').value = g.amount != null ? g.amount : '';
+  document.getElementById('eg_status').value = g.status || 'applied';
+  document.getElementById('eg_deadline').value = g.deadline || '';
+  document.getElementById('eg_notes').value = g.notes || '';
+  document.getElementById('editGrantModal').classList.add('open');
+}
+function closeEditGrant() {
+  document.getElementById('editGrantModal').classList.remove('open');
+}
+document.getElementById('editGrantModal').addEventListener('click', function(e) {
+  if (e.target === this) closeEditGrant();
+});
+document.getElementById('editGrantForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const id = document.getElementById('eg_id').value;
+  const program = document.getElementById('eg_program').value.trim();
+  const funder = document.getElementById('eg_funder').value.trim();
+  if (!program || !funder) return;
+  DataStore.updateGrant(id, {
+    program,
+    funder,
+    amount: parseFloat(document.getElementById('eg_amount').value) || 0,
+    status: document.getElementById('eg_status').value,
+    deadline: document.getElementById('eg_deadline').value || null,
+    notes: document.getElementById('eg_notes').value.trim()
+  });
+  closeEditGrant();
+  renderGrants();
+});
 
 renderGrants();
 

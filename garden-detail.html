@@ -149,10 +149,32 @@
   .form-group { margin-bottom: 12px; }
   .form-group label { display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-dim);
     margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
-  .form-group input, .form-group select { width: 100%; padding: 8px 10px; border-radius: 6px;
+  .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 8px 10px; border-radius: 6px;
     border: 1.5px solid var(--border); font-size: 0.875rem; font-family: 'DM Sans', sans-serif; }
-  .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--forest-light); }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: var(--forest-light); }
   .form-actions { display: flex; gap: 10px; }
+
+  /* Edit buttons */
+  .btn-edit {
+    font-size: 0.8rem; padding: 3px 9px; background: transparent;
+    border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
+    color: var(--text-dim); font-family: 'DM Sans', sans-serif; transition: all 0.15s;
+  }
+  .btn-edit:hover { color: var(--forest); border-color: var(--forest-light); background: var(--sage); }
+
+  /* Edit modals */
+  .modal-form .form-group { margin-bottom: 14px; }
+  .modal-form .form-group label { display: block; font-size: 0.78rem; font-weight: 600;
+    color: var(--text-dim); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .modal-form .form-group input,
+  .modal-form .form-group select,
+  .modal-form .form-group textarea { width: 100%; padding: 9px 11px; border-radius: 7px;
+    border: 1.5px solid var(--border); font-size: 0.875rem; font-family: 'DM Sans', sans-serif; }
+  .modal-form .form-group input:focus,
+  .modal-form .form-group select:focus,
+  .modal-form .form-group textarea:focus { outline: none; border-color: var(--forest-light); }
+  .edit-modal { max-width: 480px; text-align: left; }
+  .edit-modal .modal-actions { justify-content: flex-end; }
 
   @media (max-width: 768px) {
     .page { padding: 20px 16px; }
@@ -179,6 +201,80 @@
       <button class="btn-cancel btn" onclick="closeQR()">Close</button>
       <button class="btn btn-primary" onclick="printQR()">🖨 Print</button>
     </div>
+  </div>
+</div>
+
+<!-- Edit Task Modal -->
+<div class="modal-overlay" id="editTaskModal">
+  <div class="modal edit-modal">
+    <h2>Edit Task</h2>
+    <form id="editTaskForm" class="modal-form" novalidate>
+      <div class="form-group"><label>Title *</label>
+        <input type="text" id="et_title" placeholder="Task title" required></div>
+      <div class="form-group"><label>Description</label>
+        <textarea id="et_desc" rows="2" placeholder="Optional description…"></textarea></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-group"><label>Frequency (every X days)</label>
+          <input type="number" id="et_cadence" min="1" placeholder="7"></div>
+        <div class="form-group"><label>Estimated Minutes</label>
+          <input type="number" id="et_mins" min="5" placeholder="30"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-group"><label>Skill Level</label>
+          <select id="et_skill">
+            <option value="none">None</option>
+            <option value="basic">Basic</option>
+            <option value="experienced">Experienced</option>
+          </select></div>
+        <div class="form-group"><label>Owner</label>
+          <select id="et_owner" onchange="toggleVolSelect()">
+            <option value="open">Open</option>
+            <option value="jordan">Jordan</option>
+            <option value="volunteer">Volunteer</option>
+          </select></div>
+      </div>
+      <div class="form-group" id="et_vol_group" style="display:none"><label>Assign to Volunteer</label>
+        <select id="et_vol"></select></div>
+      <input type="hidden" id="et_id">
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel btn" onclick="closeEditTask()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Edit Walk-in Task Modal -->
+<div class="modal-overlay" id="editWalkinModal">
+  <div class="modal edit-modal">
+    <h2>Edit Walk-in Task</h2>
+    <form id="editWalkinForm" class="modal-form" novalidate>
+      <div class="form-group"><label>Title *</label>
+        <input type="text" id="ew_title" placeholder="Task title" required></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-group"><label>Estimated Minutes</label>
+          <input type="number" id="ew_mins" min="1" placeholder="20"></div>
+        <div class="form-group"><label>Type</label>
+          <select id="ew_type">
+            <option value="general">General</option>
+            <option value="watering">Watering</option>
+            <option value="weeding">Weeding</option>
+            <option value="inspection">Inspection</option>
+            <option value="cleanup">Cleanup</option>
+            <option value="harvest">Harvest</option>
+          </select></div>
+      </div>
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:0.875rem;font-weight:600;color:var(--text);">
+          <input type="checkbox" id="ew_active"> Active (show on QR check-in page)
+        </label>
+      </div>
+      <input type="hidden" id="ew_id">
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel btn" onclick="closeEditWalkin()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+      </div>
+    </form>
   </div>
 </div>
 
@@ -271,7 +367,7 @@ function renderPage() {
         ? '<p style="color:var(--text-dim);font-size:0.875rem;">No tasks yet.</p>'
         : `<table class="task-table">
           <thead><tr>
-            <th>Task</th><th>Cadence</th><th>Est.</th><th>Owner</th><th>Next Due</th><th>Skill</th>
+            <th>Task</th><th>Cadence</th><th>Est.</th><th>Owner</th><th>Next Due</th><th>Skill</th><th></th>
           </tr></thead>
           <tbody>${tasks.map(t => {
             const d = DataStore.daysUntil(t.nextDue);
@@ -286,6 +382,7 @@ function renderPage() {
               <td><span class="owner-pill ${ownerCls}">${ownerLabel}</span></td>
               <td><span class="due-text ${dueCls(d)}">${dueLabel(d)}</span></td>
               <td>${t.skillLevel === 'none' ? '' : t.skillLevel}</td>
+              <td><button class="btn-edit" onclick="openEditTask('${t.id}')">✏️</button></td>
             </tr>`;
           }).join('')}</tbody>
         </table>`}
@@ -317,10 +414,11 @@ function renderPage() {
         ${DataStore.getWalkins().filter(w => w.gardenId === garden.id).map(w => `
           <div class="walkin-card">
             <button class="walkin-toggle ${w.active ? 'on' : ''}" onclick="toggleWalkin('${w.id}', this)" aria-label="Toggle"></button>
-            <div class="walkin-info">
+            <div class="walkin-info" style="flex:1">
               <div class="walkin-title">${w.title}</div>
               <div class="walkin-time">~${w.estMinutes} min</div>
             </div>
+            <button class="btn-edit" onclick="openEditWalkin('${w.id}')">✏️</button>
           </div>`).join('')}
       </div>
     </div>
@@ -344,6 +442,92 @@ function renderPage() {
     </div>
   `;
 }
+
+// ── Edit Task ────────────────────────────────────────────────────────────────
+function openEditTask(id) {
+  const t = DataStore.getTask(id);
+  if (!t) return;
+  document.getElementById('et_id').value = t.id;
+  document.getElementById('et_title').value = t.title || '';
+  document.getElementById('et_desc').value = t.description || '';
+  document.getElementById('et_cadence').value = t.cadenceDays || 7;
+  document.getElementById('et_mins').value = t.estMinutes || 30;
+  document.getElementById('et_skill').value = t.skillLevel || 'none';
+  document.getElementById('et_owner').value = t.owner || 'open';
+  // Populate volunteer dropdown
+  const vols = DataStore.getVolunteers();
+  document.getElementById('et_vol').innerHTML = vols.map(v =>
+    `<option value="${v.id}" ${v.id === t.volunteerId ? 'selected' : ''}>${v.name}</option>`
+  ).join('');
+  toggleVolSelect();
+  document.getElementById('editTaskModal').classList.add('open');
+}
+function closeEditTask() {
+  document.getElementById('editTaskModal').classList.remove('open');
+}
+function toggleVolSelect() {
+  const owner = document.getElementById('et_owner').value;
+  document.getElementById('et_vol_group').style.display = owner === 'volunteer' ? 'block' : 'none';
+}
+document.getElementById('editTaskModal').addEventListener('click', function(e) {
+  if (e.target === this) closeEditTask();
+});
+document.getElementById('editTaskForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const id = document.getElementById('et_id').value;
+  const title = document.getElementById('et_title').value.trim();
+  if (!title) return;
+  const owner = document.getElementById('et_owner').value;
+  const volId = owner === 'volunteer' ? document.getElementById('et_vol').value : null;
+  const vol = volId ? DataStore.getVolunteer(volId) : null;
+  DataStore.updateTask(id, {
+    title,
+    description: document.getElementById('et_desc').value.trim(),
+    cadenceDays: parseInt(document.getElementById('et_cadence').value) || 7,
+    estMinutes: parseInt(document.getElementById('et_mins').value) || 30,
+    skillLevel: document.getElementById('et_skill').value,
+    owner,
+    volunteerId: volId,
+    volunteerName: vol ? vol.name : null
+  });
+  closeEditTask();
+  garden = DataStore.getGarden(garden.id);
+  renderPage();
+});
+
+// ── Edit Walk-in Task ─────────────────────────────────────────────────────────
+function openEditWalkin(id) {
+  const all = DataStore.getWalkins();
+  const w = all.find(x => x.id === id);
+  if (!w) return;
+  document.getElementById('ew_id').value = w.id;
+  document.getElementById('ew_title').value = w.title || '';
+  document.getElementById('ew_mins').value = w.estMinutes || 20;
+  document.getElementById('ew_type').value = w.type || 'general';
+  document.getElementById('ew_active').checked = w.active !== false;
+  document.getElementById('editWalkinModal').classList.add('open');
+}
+function closeEditWalkin() {
+  document.getElementById('editWalkinModal').classList.remove('open');
+}
+document.getElementById('editWalkinModal').addEventListener('click', function(e) {
+  if (e.target === this) closeEditWalkin();
+});
+document.getElementById('editWalkinForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const id = document.getElementById('ew_id').value;
+  const title = document.getElementById('ew_title').value.trim();
+  if (!title) return;
+  DataStore.updateWalkin(id, {
+    title,
+    estMinutes: parseInt(document.getElementById('ew_mins').value) || 20,
+    type: document.getElementById('ew_type').value,
+    active: document.getElementById('ew_active').checked
+  });
+  closeEditWalkin();
+  garden = DataStore.getGarden(garden.id);
+  renderPage();
+});
 
 function toggleAddTask() {
   document.getElementById('addTaskForm').classList.toggle('open');

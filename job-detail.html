@@ -105,6 +105,21 @@
   .btn-cancel { background: var(--cream-dim); color: var(--text); padding: 10px 18px;
     border-radius: 8px; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; }
 
+  /* Edit job modal */
+  .edit-modal { max-width: 500px; max-height: 90vh; overflow-y: auto; }
+  .form-group { margin-bottom: 14px; }
+  .form-group label { display: block; font-size: 0.82rem; font-weight: 600;
+    color: var(--text-dim); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .form-group input, .form-group select, .form-group textarea {
+    width: 100%; padding: 9px 12px; border-radius: 7px;
+    border: 1.5px solid var(--border); font-size: 0.9rem; font-family: 'DM Sans', sans-serif; color: var(--text);
+  }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+    outline: none; border-color: var(--forest-light);
+  }
+  .grant-fields { display: none; }
+  .grant-fields.visible { display: block; }
+
   @media (max-width: 768px) {
     .page { padding: 20px 16px; }
     .detail-grid { grid-template-columns: 1fr; }
@@ -117,6 +132,53 @@
 <div class="page">
   <a href="jobs.html" class="back-link">← Back to Jobs</a>
   <div id="jobContent"></div>
+</div>
+
+<!-- Edit Job Modal -->
+<div class="modal-overlay" id="editJobModal">
+  <div class="modal edit-modal">
+    <h2>Edit Job</h2>
+    <form id="editJobForm" novalidate>
+      <div class="form-group"><label>Title *</label>
+        <input type="text" id="ej_title" placeholder="Job title" required></div>
+      <div class="form-group"><label>Job Type</label>
+        <select id="ej_type">
+          <option value="lawn_to_meadow">Lawn to Meadow</option>
+          <option value="ecological_design">Ecological Design</option>
+          <option value="invasive_removal">Invasive Removal</option>
+          <option value="willow_structure">Willow Structure</option>
+          <option value="maintenance">Maintenance</option>
+          <option value="community_garden">Community Garden</option>
+          <option value="grant_project">Grant Project</option>
+          <option value="nursery_sale">Nursery Sale</option>
+          <option value="rain_garden">Rain Garden</option>
+          <option value="ecological_landscaping">Ecological Landscaping</option>
+          <option value="herb_garden">Herb Garden</option>
+          <option value="other">Other</option>
+        </select></div>
+      <div class="form-group"><label>Address</label>
+        <input type="text" id="ej_address" placeholder="Street address"></div>
+      <div class="form-group"><label>Square Footage</label>
+        <input type="text" id="ej_sqft" placeholder="e.g. 640 sqft"></div>
+      <div class="form-group"><label>Notes</label>
+        <textarea id="ej_notes" rows="3" placeholder="Job notes…"></textarea></div>
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:8px;text-transform:none;font-size:0.875rem;font-weight:600;color:var(--text);">
+          <input type="checkbox" id="ej_grant" onchange="toggleGrantFields()"> Grant Funded
+        </label>
+      </div>
+      <div class="grant-fields" id="grantFields">
+        <div class="form-group"><label>Grant Source</label>
+          <input type="text" id="ej_grant_source" placeholder="e.g. DCNR Lawn-to-Meadow"></div>
+        <div class="form-group"><label>Grant Amount ($)</label>
+          <input type="number" id="ej_grant_amount" placeholder="0" min="0"></div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" onclick="closeEditJob()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+      </div>
+    </form>
+  </div>
 </div>
 
 <!-- Invoice Modal -->
@@ -171,6 +233,7 @@ function render() {
     <div class="actions-row">
       ${nextStatus ? `<button class="btn btn-primary" onclick="moveToStatus('${nextStatus}')">Move to ${STATUS_LABELS[nextStatus]}</button>` : ''}
       <button class="btn btn-outline" onclick="openInvoiceModal()">💵 Create Invoice</button>
+      <button class="btn btn-outline" onclick="openEditJob()">✏️ Edit Job</button>
     </div>
 
     ${job.grantFunded ? `
@@ -226,6 +289,49 @@ function render() {
     </div>
   `;
 }
+
+function openEditJob() {
+  if (!job) return;
+  document.getElementById('ej_title').value = job.title || '';
+  document.getElementById('ej_type').value = job.type || 'other';
+  document.getElementById('ej_address').value = job.address || '';
+  document.getElementById('ej_sqft').value = job.sqft || '';
+  document.getElementById('ej_notes').value = job.notes || '';
+  document.getElementById('ej_grant').checked = !!job.grantFunded;
+  document.getElementById('ej_grant_source').value = job.grantName || '';
+  document.getElementById('ej_grant_amount').value = job.grantAmount || '';
+  toggleGrantFields();
+  document.getElementById('editJobModal').classList.add('open');
+}
+function closeEditJob() {
+  document.getElementById('editJobModal').classList.remove('open');
+}
+function toggleGrantFields() {
+  const checked = document.getElementById('ej_grant').checked;
+  document.getElementById('grantFields').classList.toggle('visible', checked);
+}
+document.getElementById('editJobModal').addEventListener('click', function(e) {
+  if (e.target === this) closeEditJob();
+});
+document.getElementById('editJobForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const title = document.getElementById('ej_title').value.trim();
+  if (!title || !job) return;
+  const grantFunded = document.getElementById('ej_grant').checked;
+  DataStore.updateJob(job.id, {
+    title,
+    type: document.getElementById('ej_type').value,
+    address: document.getElementById('ej_address').value.trim(),
+    sqft: document.getElementById('ej_sqft').value.trim(),
+    notes: document.getElementById('ej_notes').value.trim(),
+    grantFunded,
+    grantName: grantFunded ? document.getElementById('ej_grant_source').value.trim() : null,
+    grantAmount: grantFunded ? parseFloat(document.getElementById('ej_grant_amount').value) || null : null
+  });
+  job = DataStore.getJob(job.id);
+  closeEditJob();
+  render();
+});
 
 function moveToStatus(newStatus) {
   if (!job) return;

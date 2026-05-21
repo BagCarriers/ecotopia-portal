@@ -86,6 +86,24 @@
     padding: 10px 14px; border-radius: 8px; margin-bottom: 14px; display: none; font-size: 0.875rem; }
   .success-msg.visible { display: block; }
 
+  /* Edit button */
+  .btn-edit { font-size: 0.8rem; padding: 4px 10px; background: transparent;
+    border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
+    color: var(--text-dim); font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+  .btn-edit:hover { color: var(--forest); border-color: var(--forest-light); background: var(--sage); }
+
+  /* Edit modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+    z-index: 500; align-items: center; justify-content: center; padding: 20px; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: #fff; border-radius: 16px; padding: 28px;
+    width: 100%; max-width: 480px; max-height: 90vh; overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.25); }
+  .modal h2 { font-family: 'Fraunces', serif; color: var(--forest); margin-bottom: 20px; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+  .btn-cancel { background: var(--cream-dim); color: var(--text); padding: 10px 18px;
+    border-radius: 8px; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+
   @media (max-width: 600px) {
     .page { padding: 20px 16px; }
     .event-card { flex-direction: column; gap: 12px; }
@@ -134,6 +152,41 @@
   <div id="eventList"></div>
 </div>
 
+<!-- Edit Event Modal -->
+<div class="modal-overlay" id="editEventModal">
+  <div class="modal">
+    <h2>Edit Event</h2>
+    <form id="editEventForm" novalidate>
+      <div class="form-group"><label>Title *</label>
+        <input type="text" id="ee_title" placeholder="Event name" required></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-group"><label>Type</label>
+          <select id="ee_type">
+            <option value="workday">Volunteer Workday</option>
+            <option value="plant_sale">Plant Sale</option>
+            <option value="workshop">Workshop</option>
+            <option value="other">Other</option>
+          </select></div>
+        <div class="form-group"><label>Date *</label>
+          <input type="date" id="ee_date" required></div>
+      </div>
+      <div class="form-group"><label>Location</label>
+        <input type="text" id="ee_location" placeholder="Location or garden name"></div>
+      <div class="form-group"><label>Description</label>
+        <textarea id="ee_desc" rows="3" placeholder="Event details…"
+          style="width:100%;padding:9px 11px;border-radius:7px;border:1.5px solid var(--border);font-size:0.875rem;font-family:'DM Sans',sans-serif;"></textarea></div>
+      <div class="form-group"><label>Volunteer Count Target</label>
+        <input type="number" id="ee_vol_count" min="0" placeholder="e.g. 10"
+          style="width:100%;padding:9px 11px;border-radius:7px;border:1.5px solid var(--border);font-size:0.875rem;font-family:'DM Sans',sans-serif;"></div>
+      <input type="hidden" id="ee_id">
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" onclick="closeEditEvent()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
 Nav.render();
 
@@ -160,7 +213,7 @@ function renderEvents() {
     const month = d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
     const day = d.getDate();
     const garden = ev.gardenId ? DataStore.getGarden(ev.gardenId) : null;
-    const loc = ev.gardenName || (garden ? garden.name : '') || 'Location TBD';
+    const loc = ev.location || ev.gardenName || (garden ? garden.name : '') || 'Location TBD';
     const signups = ev.signups || [];
     return `
       <div class="event-card">
@@ -169,7 +222,10 @@ function renderEvents() {
           <div class="event-day">${day}</div>
         </div>
         <div class="event-info">
-          <div class="event-title">${ev.title}</div>
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
+            <div class="event-title">${ev.title}</div>
+            <button class="btn-edit" onclick="openEditEvent('${ev.id}')">✏️ Edit</button>
+          </div>
           <span class="event-type-pill type-${ev.type}">${typeLabel(ev.type)}</span>
           <div class="event-location">📍 ${loc}</div>
           ${ev.description ? `<div class="event-desc">${ev.description}</div>` : ''}
@@ -223,6 +279,43 @@ document.getElementById('eventFormEl').addEventListener('submit', function(e) {
     document.getElementById('eventFormEl').reset();
     document.getElementById('eventSuccess').classList.remove('visible');
   }, 1200);
+});
+
+function openEditEvent(id) {
+  const ev = DataStore.getEvent(id);
+  if (!ev) return;
+  document.getElementById('ee_id').value = ev.id;
+  document.getElementById('ee_title').value = ev.title || '';
+  document.getElementById('ee_type').value = ev.type || 'workday';
+  document.getElementById('ee_date').value = ev.date || '';
+  document.getElementById('ee_location').value = ev.location || ev.gardenName || '';
+  document.getElementById('ee_desc').value = ev.description || '';
+  document.getElementById('ee_vol_count').value = ev.volunteerCount || '';
+  document.getElementById('editEventModal').classList.add('open');
+}
+function closeEditEvent() {
+  document.getElementById('editEventModal').classList.remove('open');
+}
+document.getElementById('editEventModal').addEventListener('click', function(e) {
+  if (e.target === this) closeEditEvent();
+});
+document.getElementById('editEventForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const id = document.getElementById('ee_id').value;
+  const title = document.getElementById('ee_title').value.trim();
+  const date = document.getElementById('ee_date').value;
+  if (!title || !date) return;
+  DataStore.updateEvent(id, {
+    title,
+    type: document.getElementById('ee_type').value,
+    date,
+    location: document.getElementById('ee_location').value.trim(),
+    gardenName: document.getElementById('ee_location').value.trim(),
+    description: document.getElementById('ee_desc').value.trim(),
+    volunteerCount: parseInt(document.getElementById('ee_vol_count').value) || null
+  });
+  closeEditEvent();
+  renderEvents();
 });
 
 function quickSignup(eventId) {

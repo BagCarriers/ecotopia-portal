@@ -80,6 +80,19 @@
   }
   .log-hours-btn:hover { background: var(--sage); }
 
+  /* Edit button */
+  .btn-edit {
+    font-size: 0.8rem; padding: 4px 10px; background: transparent;
+    border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
+    color: var(--text-dim); font-family: 'DM Sans', sans-serif; transition: all 0.15s;
+  }
+  .btn-edit:hover { color: var(--forest); border-color: var(--forest-light); background: var(--sage); }
+
+  /* Skill checkboxes */
+  .skill-checks { display: flex; flex-wrap: wrap; gap: 8px; }
+  .skill-check-label { display: flex; align-items: center; gap: 5px;
+    font-size: 0.82rem; cursor: pointer; }
+
   @media (max-width: 700px) {
     .page { padding: 20px 16px; }
     .vol-table { font-size: 0.8rem; }
@@ -100,7 +113,7 @@
   <table class="vol-table" id="volTable">
     <thead><tr>
       <th>Name</th><th>Skills</th><th>Active Tasks</th>
-      <th>Hours (30d)</th><th>Last Active</th><th>Status</th>
+      <th>Hours (30d)</th><th>Last Active</th><th>Status</th><th></th>
     </tr></thead>
     <tbody id="volBody"></tbody>
   </table>
@@ -125,6 +138,45 @@
       <div class="modal-actions">
         <button type="button" class="btn-cancel" onclick="closeAddVol()">Cancel</button>
         <button type="submit" class="btn btn-primary">Add Volunteer</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Edit Volunteer Modal -->
+<div class="modal-overlay" id="editVolModal">
+  <div class="modal">
+    <h2>Edit Volunteer</h2>
+    <form id="editVolForm" novalidate>
+      <div class="form-group"><label>Name *</label>
+        <input type="text" id="ev_name" placeholder="Full name" required></div>
+      <div class="form-group"><label>Phone</label>
+        <input type="tel" id="ev_phone" placeholder="(814) 555-0000"></div>
+      <div class="form-group"><label>Email</label>
+        <input type="email" id="ev_email" placeholder="email@example.com"></div>
+      <div class="form-group"><label>Skills</label>
+        <div class="skill-checks">
+          <label class="skill-check-label"><input type="checkbox" value="planting"> Planting</label>
+          <label class="skill-check-label"><input type="checkbox" value="weeding"> Weeding</label>
+          <label class="skill-check-label"><input type="checkbox" value="heavy_labor"> Heavy Labor</label>
+          <label class="skill-check-label"><input type="checkbox" value="events"> Events</label>
+          <label class="skill-check-label"><input type="checkbox" value="inspection"> Inspection</label>
+          <label class="skill-check-label"><input type="checkbox" value="pruning"> Pruning</label>
+          <label class="skill-check-label"><input type="checkbox" value="harvest"> Harvest</label>
+          <label class="skill-check-label"><input type="checkbox" value="general"> General</label>
+        </div>
+      </div>
+      <div class="form-group"><label>Availability Notes</label>
+        <input type="text" id="ev_avail" placeholder="e.g. Weekends only"></div>
+      <div class="form-group">
+        <label class="skill-check-label" style="font-size:0.82rem;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.04em;">
+          <input type="checkbox" id="ev_active"> Active
+        </label>
+      </div>
+      <input type="hidden" id="ev_id">
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" onclick="closeEditVol()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Changes</button>
       </div>
     </form>
   </div>
@@ -179,6 +231,9 @@ function renderTable() {
         <td>${lastActive}</td>
         <td><span class="${v.status === 'active' ? 'status-active' : 'status-inactive'}">
           ${v.status === 'active' ? '● Active' : '○ Inactive'}</span></td>
+        <td onclick="event.stopPropagation()">
+          <button class="btn-edit" onclick="openEditVol('${v.id}')">✏️ Edit</button>
+        </td>
       </tr>`;
   }).join('');
 }
@@ -209,6 +264,46 @@ document.getElementById('addVolForm').addEventListener('submit', function(e) {
   document.getElementById('volSuccess').classList.add('visible');
   renderTable();
   setTimeout(closeAddVol, 1000);
+});
+
+function openEditVol(id) {
+  const v = DataStore.getVolunteer(id);
+  if (!v) return;
+  document.getElementById('ev_id').value = v.id;
+  document.getElementById('ev_name').value = v.name || '';
+  document.getElementById('ev_phone').value = v.phone || '';
+  document.getElementById('ev_email').value = v.email || '';
+  document.getElementById('ev_avail').value = v.availability || '';
+  document.getElementById('ev_active').checked = v.status === 'active';
+  const skills = v.skills || [];
+  document.querySelectorAll('#editVolModal .skill-checks input[type=checkbox]').forEach(cb => {
+    cb.checked = skills.includes(cb.value);
+  });
+  document.getElementById('editVolModal').classList.add('open');
+}
+function closeEditVol() {
+  document.getElementById('editVolModal').classList.remove('open');
+}
+document.getElementById('editVolModal').addEventListener('click', function(e) {
+  if (e.target === this) closeEditVol();
+});
+document.getElementById('editVolForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  const id = document.getElementById('ev_id').value;
+  const name = document.getElementById('ev_name').value.trim();
+  if (!name) return;
+  const skills = Array.from(document.querySelectorAll('#editVolModal .skill-checks input[type=checkbox]:checked'))
+    .map(cb => cb.value);
+  DataStore.updateVolunteer(id, {
+    name,
+    phone: document.getElementById('ev_phone').value.trim(),
+    email: document.getElementById('ev_email').value.trim(),
+    availability: document.getElementById('ev_avail').value.trim(),
+    skills,
+    status: document.getElementById('ev_active').checked ? 'active' : 'inactive'
+  });
+  closeEditVol();
+  renderTable();
 });
 
 function openLogHours() {
