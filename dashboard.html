@@ -5,8 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dashboard — Ecotopia</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/mapping.js"></script>
 <script src="assets/auth.js"></script>
-<script>try { AuthManager.requireAuth(); } catch(e) { throw e; }</script>
+<script>if (!AuthManager.hasCachedSession()) location.replace('login.html');</script>
 <script src="assets/data.js"></script>
 <script src="assets/nav.js"></script>
 <style>
@@ -176,21 +180,30 @@
 </div>
 
 <script>
-Nav.render();
+(async function init() {
+try {
+  await AuthManager.requireAuth();
+  Nav.render();
 
-// Date subtitle
-const now = new Date();
-document.getElementById('dateSubtitle').textContent =
-  now.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
+  // Date subtitle
+  const now = new Date();
+  document.getElementById('dateSubtitle').textContent =
+    now.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
 
-// Stats
-const jobs = DataStore.getJobs();
-const activeJobs = jobs.filter(j => j.status === 'active').length;
-const openTasks = DataStore.getOpenTasks().length;
-const upcomingEvents = DataStore.getUpcomingEvents().length;
-const unpaidInvoices = DataStore.getUnpaidInvoices().length;
+  const [gardens, jobs, invoices, unpaidInvoicesList, jordanTasksList, openTasksList, recentCheckins, upcomingEventsList, observations] =
+    await Promise.all([
+      DataStore.getGardens(), DataStore.getJobs(), DataStore.getInvoices(),
+      DataStore.getUnpaidInvoices(), DataStore.getJordanTasks(), DataStore.getOpenTasks(),
+      DataStore.getRecentCheckins(5), DataStore.getUpcomingEvents(), DataStore.getObservations(),
+    ]);
 
-document.getElementById('statsRow').innerHTML = `
+  // Stats
+  const activeJobs = jobs.filter(j => j.status === 'active').length;
+  const openTasks = openTasksList.length;
+  const upcomingEvents = upcomingEventsList.length;
+  const unpaidInvoices = unpaidInvoicesList.length;
+
+  document.getElementById('statsRow').innerHTML = `
   <div class="stat-card green">
     <div class="stat-label">Active Jobs</div>
     <div class="stat-value">${activeJobs}</div>
@@ -214,8 +227,7 @@ document.getElementById('statsRow').innerHTML = `
 `;
 
 // My Workload — Jordan's tasks
-const jordanTasks = DataStore.getJordanTasks().sort((a, b) => new Date(a.nextDue) - new Date(b.nextDue));
-const gardens = DataStore.getGardens();
+const jordanTasks = jordanTasksList.slice().sort((a, b) => new Date(a.nextDue) - new Date(b.nextDue));
 function gardenName(gId) { return (gardens.find(g => g.id === gId) || {}).name || ''; }
 
 function dueCls(days) {
@@ -251,7 +263,6 @@ if (jordanTasks.length === 0) {
 }
 
 // Recent Activity
-const recentCheckins = DataStore.getRecentCheckins(5);
 const activityEl = document.getElementById('recentActivity');
 if (recentCheckins.length === 0) {
   activityEl.innerHTML = '<div class="empty">No recent check-ins.</div>';
@@ -279,7 +290,6 @@ if (recentCheckins.length === 0) {
 
 // Needs Attention
 const attentionItems = [];
-const openTasksList = DataStore.getOpenTasks();
 if (openTasksList.length > 0) {
   attentionItems.push({
     badge: 'amber', label: 'Needs Owner',
@@ -287,7 +297,6 @@ if (openTasksList.length > 0) {
     link: 'gardens.html', linkText: 'Assign →'
   });
 }
-const invoices = DataStore.getInvoices();
 const overdueInv = invoices.filter(i => i.status === 'overdue');
 if (overdueInv.length > 0) {
   attentionItems.push({
@@ -296,7 +305,7 @@ if (overdueInv.length > 0) {
     link: 'invoices.html', linkText: 'View →'
   });
 }
-const flaggedObs = DataStore.getObservations().filter(o => o.flagged);
+const flaggedObs = observations.filter(o => o.flagged);
 if (flaggedObs.length > 0) {
   attentionItems.push({
     badge: 'amber', label: 'Flagged',
@@ -324,6 +333,11 @@ if (attentionItems.length === 0) {
       <a href="${item.link}" class="attention-link">${item.linkText}</a>
     </div>`).join('');
 }
+} catch (err) {
+  document.getElementById('statsRow').innerHTML =
+    '<div class="empty">Could not load data (' + err.message + '). <a href="javascript:location.reload()">Retry</a></div>';
+}
+})();
 </script>
 </body>
 </html>

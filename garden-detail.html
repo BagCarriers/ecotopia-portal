@@ -5,8 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Garden Detail — Ecotopia</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/mapping.js"></script>
 <script src="assets/auth.js"></script>
-<script>try { AuthManager.requireAuth(); } catch(e) { throw e; }</script>
+<script>if (!AuthManager.hasCachedSession()) location.replace('login.html');</script>
 <script src="assets/data.js"></script>
 <script src="assets/nav.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -176,6 +180,9 @@
   .edit-modal { max-width: 480px; text-align: left; }
   .edit-modal .modal-actions { justify-content: flex-end; }
 
+  .modal-error { color: #b3261e; font-size: 0.85rem; margin-top: 8px; }
+  .empty { padding: 20px; color: var(--text-dim); font-size: 0.875rem; text-align: center; }
+
   @media (max-width: 768px) {
     .page { padding: 20px 16px; }
     .garden-header { flex-direction: column; }
@@ -236,6 +243,7 @@
       <div class="form-group" id="et_vol_group" style="display:none"><label>Assign to Volunteer</label>
         <select id="et_vol"></select></div>
       <input type="hidden" id="et_id">
+      <div class="modal-error" id="editTaskError"></div>
       <div class="modal-actions">
         <button type="button" class="btn-cancel btn" onclick="closeEditTask()">Cancel</button>
         <button type="submit" class="btn btn-primary">Save Changes</button>
@@ -270,6 +278,7 @@
         </label>
       </div>
       <input type="hidden" id="ew_id">
+      <div class="modal-error" id="editWalkinError"></div>
       <div class="modal-actions">
         <button type="button" class="btn-cancel btn" onclick="closeEditWalkin()">Cancel</button>
         <button type="submit" class="btn btn-primary">Save Changes</button>
@@ -279,11 +288,14 @@
 </div>
 
 <script>
-Nav.render();
-
 const params = new URLSearchParams(window.location.search);
 const gardenId = params.get('id');
-let garden = gardenId ? DataStore.getGarden(gardenId) : null;
+let garden = null;
+let tasks = [];
+let walkins = [];
+let checkins = [];
+let observations = [];
+let volunteers = [];
 let qrInstance = null;
 
 function dueCls(d) { return d === null ? 'green' : d <= 0 ? 'due-red' : d <= 3 ? 'due-amber' : 'due-green'; }
@@ -301,14 +313,13 @@ function renderPage() {
     return;
   }
   document.title = `${garden.name} — Ecotopia`;
-  const tasks = DataStore.getTasksByGarden(garden.id);
-  const checkins = DataStore.getCheckinsByGarden(garden.id)
+  const gTasks = tasks;
+  const gCheckins = checkins.slice()
     .sort((a, b) => new Date(b.checkInTime) - new Date(a.checkInTime))
     .slice(0, 10);
-  const walkins = DataStore.getWalkinsByGarden(garden.id);
-  const observations = DataStore.getObservationsByGarden(garden.id)
+  const gWalkins = walkins.filter(w => w.gardenId === garden.id);
+  const gObservations = observations.slice()
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-  // allWalkins rendered inline below via DataStore.getWalkins()
 
   el.innerHTML = `
     <!-- Header -->
@@ -358,18 +369,19 @@ function renderPage() {
             <option value="jordan">Jordan</option>
           </select>
         </div>
+        <div class="modal-error" id="addTaskError"></div>
         <div class="form-actions">
           <button class="btn-sm btn-outline-sm" onclick="toggleAddTask()">Cancel</button>
           <button class="btn-sm" onclick="addTask()">Add Task</button>
         </div>
       </div>
-      ${tasks.length === 0
+      ${gTasks.length === 0
         ? '<p style="color:var(--text-dim);font-size:0.875rem;">No tasks yet.</p>'
         : `<table class="task-table">
           <thead><tr>
             <th>Task</th><th>Cadence</th><th>Est.</th><th>Owner</th><th>Next Due</th><th>Skill</th><th></th>
           </tr></thead>
-          <tbody>${tasks.map(t => {
+          <tbody>${gTasks.map(t => {
             const d = DataStore.daysUntil(t.nextDue);
             const ownerCls = t.owner === 'volunteer' ? 'owner-vol' : t.owner === 'jordan' ? 'owner-jordan' : 'owner-open';
             const ownerLabel = t.owner === 'volunteer' ? t.volunteerName : t.owner === 'jordan' ? 'Jordan' : 'Open';
@@ -391,11 +403,11 @@ function renderPage() {
     <!-- Recent Check-ins -->
     <div class="section">
       <div class="section-header"><h2>Recent Check-ins</h2></div>
-      ${checkins.length === 0
+      ${gCheckins.length === 0
         ? '<p style="color:var(--text-dim);font-size:0.875rem;">No check-ins yet.</p>'
         : `<table class="ci-table">
           <thead><tr><th>Volunteer</th><th>Task</th><th>Date</th><th>Hours</th><th>Notes</th></tr></thead>
-          <tbody>${checkins.map(ci => `
+          <tbody>${gCheckins.map(ci => `
             <tr>
               <td>${ci.volunteerName}</td>
               <td>${ci.taskTitle}</td>
@@ -411,7 +423,7 @@ function renderPage() {
     <div class="section">
       <div class="section-header"><h2>Walk-In Tasks</h2><span style="font-size:0.8rem;color:var(--text-dim)">Toggle on/off for QR page</span></div>
       <div class="walkin-grid" id="walkinGrid">
-        ${DataStore.getWalkins().filter(w => w.gardenId === garden.id).map(w => `
+        ${gWalkins.map(w => `
           <div class="walkin-card">
             <button class="walkin-toggle ${w.active ? 'on' : ''}" onclick="toggleWalkin('${w.id}', this)" aria-label="Toggle"></button>
             <div class="walkin-info" style="flex:1">
@@ -429,9 +441,9 @@ function renderPage() {
         <h2>Plant Observations</h2>
         <span style="font-size:0.8rem;color:var(--text-dim)">Submitted by volunteers</span>
       </div>
-      ${observations.length === 0
+      ${gObservations.length === 0
         ? '<p style="color:var(--text-dim);font-size:0.875rem;">No observations submitted.</p>'
-        : `<div class="obs-list">${observations.map(o => `
+        : `<div class="obs-list">${gObservations.map(o => `
           <div class="obs-item ${o.flagged ? 'flagged' : ''}">
             <div style="flex:1">
               <div class="obs-meta">${o.submittedBy} · ${DataStore.formatDate(o.createdAt)}</div>
@@ -445,8 +457,9 @@ function renderPage() {
 
 // ── Edit Task ────────────────────────────────────────────────────────────────
 function openEditTask(id) {
-  const t = DataStore.getTask(id);
+  const t = tasks.find(x => x.id === id);
   if (!t) return;
+  document.getElementById('editTaskError').textContent = '';
   document.getElementById('et_id').value = t.id;
   document.getElementById('et_title').value = t.title || '';
   document.getElementById('et_desc').value = t.description || '';
@@ -455,8 +468,7 @@ function openEditTask(id) {
   document.getElementById('et_skill').value = t.skillLevel || 'none';
   document.getElementById('et_owner').value = t.owner || 'open';
   // Populate volunteer dropdown
-  const vols = DataStore.getVolunteers();
-  document.getElementById('et_vol').innerHTML = vols.map(v =>
+  document.getElementById('et_vol').innerHTML = volunteers.map(v =>
     `<option value="${v.id}" ${v.id === t.volunteerId ? 'selected' : ''}>${v.name}</option>`
   ).join('');
   toggleVolSelect();
@@ -472,34 +484,40 @@ function toggleVolSelect() {
 document.getElementById('editTaskModal').addEventListener('click', function(e) {
   if (e.target === this) closeEditTask();
 });
-document.getElementById('editTaskForm').addEventListener('submit', function(e) {
+document.getElementById('editTaskForm').addEventListener('submit', async function(e) {
   e.preventDefault();
   const id = document.getElementById('et_id').value;
   const title = document.getElementById('et_title').value.trim();
   if (!title) return;
   const owner = document.getElementById('et_owner').value;
   const volId = owner === 'volunteer' ? document.getElementById('et_vol').value : null;
-  const vol = volId ? DataStore.getVolunteer(volId) : null;
-  DataStore.updateTask(id, {
-    title,
-    description: document.getElementById('et_desc').value.trim(),
-    cadenceDays: parseInt(document.getElementById('et_cadence').value) || 7,
-    estMinutes: parseInt(document.getElementById('et_mins').value) || 30,
-    skillLevel: document.getElementById('et_skill').value,
-    owner,
-    volunteerId: volId,
-    volunteerName: vol ? vol.name : null
-  });
-  closeEditTask();
-  garden = DataStore.getGarden(garden.id);
-  renderPage();
+  const vol = volId ? volunteers.find(v => v.id === volId) : null;
+  const errEl = document.getElementById('editTaskError');
+  errEl.textContent = '';
+  try {
+    await DataStore.updateTask(id, {
+      title,
+      description: document.getElementById('et_desc').value.trim(),
+      cadenceDays: parseInt(document.getElementById('et_cadence').value) || 7,
+      estMinutes: parseInt(document.getElementById('et_mins').value) || 30,
+      skillLevel: document.getElementById('et_skill').value,
+      owner,
+      volunteerId: volId,
+      volunteerName: vol ? vol.name : null
+    });
+    tasks = await DataStore.getTasksByGarden(garden.id);
+    closeEditTask();
+    renderPage();
+  } catch (err) {
+    errEl.textContent = 'Could not save changes. ' + err.message;
+  }
 });
 
 // ── Edit Walk-in Task ─────────────────────────────────────────────────────────
 function openEditWalkin(id) {
-  const all = DataStore.getWalkins();
-  const w = all.find(x => x.id === id);
+  const w = walkins.find(x => x.id === id);
   if (!w) return;
+  document.getElementById('editWalkinError').textContent = '';
   document.getElementById('ew_id').value = w.id;
   document.getElementById('ew_title').value = w.title || '';
   document.getElementById('ew_mins').value = w.estMinutes || 20;
@@ -513,52 +531,69 @@ function closeEditWalkin() {
 document.getElementById('editWalkinModal').addEventListener('click', function(e) {
   if (e.target === this) closeEditWalkin();
 });
-document.getElementById('editWalkinForm').addEventListener('submit', function(e) {
+document.getElementById('editWalkinForm').addEventListener('submit', async function(e) {
   e.preventDefault();
   const id = document.getElementById('ew_id').value;
   const title = document.getElementById('ew_title').value.trim();
   if (!title) return;
-  DataStore.updateWalkin(id, {
-    title,
-    estMinutes: parseInt(document.getElementById('ew_mins').value) || 20,
-    type: document.getElementById('ew_type').value,
-    active: document.getElementById('ew_active').checked
-  });
-  closeEditWalkin();
-  garden = DataStore.getGarden(garden.id);
-  renderPage();
+  const errEl = document.getElementById('editWalkinError');
+  errEl.textContent = '';
+  try {
+    await DataStore.updateWalkin(id, {
+      title,
+      estMinutes: parseInt(document.getElementById('ew_mins').value) || 20,
+      type: document.getElementById('ew_type').value,
+      active: document.getElementById('ew_active').checked
+    });
+    walkins = await DataStore.getWalkins();
+    closeEditWalkin();
+    renderPage();
+  } catch (err) {
+    errEl.textContent = 'Could not save changes. ' + err.message;
+  }
 });
 
 function toggleAddTask() {
   document.getElementById('addTaskForm').classList.toggle('open');
 }
 
-function addTask() {
+async function addTask() {
   const title = document.getElementById('at_title').value.trim();
   if (!title) return;
   const cadence = parseInt(document.getElementById('at_cadence').value) || 7;
   const nextDue = new Date(Date.now() + cadence * 86400000).toISOString();
-  DataStore.addTask({
-    gardenId: garden.id,
-    title,
-    cadenceDays: cadence,
-    estMinutes: parseInt(document.getElementById('at_mins').value) || 30,
-    skillLevel: document.getElementById('at_skill').value,
-    owner: document.getElementById('at_owner').value,
-    volunteerId: null, volunteerName: null,
-    active: true, nextDue,
-    lastCompleted: null
-  });
-  garden = DataStore.getGarden(garden.id);
-  renderPage();
-  document.getElementById('addTaskForm').classList.remove('open');
+  const errEl = document.getElementById('addTaskError');
+  errEl.textContent = '';
+  try {
+    await DataStore.addTask({
+      gardenId: garden.id,
+      title,
+      cadenceDays: cadence,
+      estMinutes: parseInt(document.getElementById('at_mins').value) || 30,
+      skillLevel: document.getElementById('at_skill').value,
+      owner: document.getElementById('at_owner').value,
+      volunteerId: null, volunteerName: null,
+      active: true, nextDue,
+      lastCompleted: null
+    });
+    tasks = await DataStore.getTasksByGarden(garden.id);
+    renderPage();
+  } catch (err) {
+    errEl.textContent = 'Could not add task. ' + err.message;
+  }
 }
 
-function toggleWalkin(id, btn) {
-  const w = DataStore.getWalkins().find(w => w.id === id);
+async function toggleWalkin(id, btn) {
+  const w = walkins.find(w => w.id === id);
   if (!w) return;
-  DataStore.updateWalkin(id, { active: !w.active });
-  btn.classList.toggle('on');
+  const next = !w.active;
+  btn.classList.toggle('on'); // optimistic
+  try {
+    await DataStore.updateWalkin(id, { active: next });
+    w.active = next;
+  } catch (err) {
+    btn.classList.toggle('on'); // revert on failure
+  }
 }
 
 function openQR() {
@@ -582,7 +617,25 @@ function printQR() {
   window.print();
 }
 
-renderPage();
+(async function init() {
+  try {
+    await AuthManager.requireAuth();
+    Nav.render();
+    if (!gardenId) { garden = null; renderPage(); return; }
+    [garden, tasks, walkins, checkins, observations, volunteers] = await Promise.all([
+      DataStore.getGarden(gardenId),
+      DataStore.getTasksByGarden(gardenId),
+      DataStore.getWalkins(),
+      DataStore.getCheckinsByGarden(gardenId),
+      DataStore.getObservationsByGarden(gardenId),
+      DataStore.getVolunteers(),
+    ]);
+    renderPage();
+  } catch (err) {
+    document.getElementById('pageContent').innerHTML =
+      '<div class="empty">Could not load data (' + err.message + '). <a href="javascript:location.reload()">Retry</a></div>';
+  }
+})();
 </script>
 </body>
 </html>

@@ -5,8 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Gardens — Ecotopia</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/mapping.js"></script>
 <script src="assets/auth.js"></script>
-<script>try { AuthManager.requireAuth(); } catch(e) { throw e; }</script>
+<script>if (!AuthManager.hasCachedSession()) location.replace('login.html');</script>
 <script src="assets/data.js"></script>
 <script src="assets/nav.js"></script>
 <style>
@@ -65,6 +69,8 @@
   .due-dot.amber { background: #f59e0b; }
   .due-dot.green { background: var(--forest-light); }
 
+  .empty { padding: 20px; color: var(--text-dim); font-size: 0.875rem; text-align: center; }
+
   @media (max-width: 600px) { .page { padding: 20px 16px; } }
 </style>
 </head>
@@ -75,25 +81,22 @@
 </div>
 
 <script>
-Nav.render();
-
-function renderGardens() {
-  const gardens = DataStore.getGardens();
+function renderGardens(gardens, tasks) {
   const el = document.getElementById('gardenGrid');
 
   el.innerHTML = gardens.map(g => {
-    const tasks = DataStore.getTasksByGarden(g.id);
-    const total = tasks.length;
-    const volCount = tasks.filter(t => t.owner === 'volunteer').length;
-    const jordanCount = tasks.filter(t => t.owner === 'jordan').length;
-    const openCount = tasks.filter(t => t.owner === 'open').length;
+    const gTasks = tasks.filter(t => t.gardenId === g.id);
+    const total = gTasks.length;
+    const volCount = gTasks.filter(t => t.owner === 'volunteer').length;
+    const jordanCount = gTasks.filter(t => t.owner === 'jordan').length;
+    const openCount = gTasks.filter(t => t.owner === 'open').length;
 
     const volPct = total ? Math.round(volCount / total * 100) : 0;
     const jordanPct = total ? Math.round(jordanCount / total * 100) : 0;
     const openPct = total ? 100 - volPct - jordanPct : 0;
 
     // Find soonest due task
-    const sortedTasks = [...tasks].sort((a, b) => new Date(a.nextDue) - new Date(b.nextDue));
+    const sortedTasks = [...gTasks].sort((a, b) => new Date(a.nextDue) - new Date(b.nextDue));
     const soonest = sortedTasks[0];
     let dueCls = 'green', dueText = 'All tasks scheduled';
     if (soonest) {
@@ -131,9 +134,20 @@ function renderGardens() {
         </div>
       </a>`;
   }).join('');
+  if (!gardens.length) el.innerHTML = '<div class="empty">No gardens yet. Add your first garden.</div>';
 }
 
-renderGardens();
+(async function init() {
+  try {
+    await AuthManager.requireAuth();
+    Nav.render();
+    const [gardens, tasks] = await Promise.all([DataStore.getGardens(), DataStore.getTasks()]);
+    renderGardens(gardens, tasks);
+  } catch (err) {
+    document.getElementById('gardenGrid').innerHTML =
+      '<div class="empty">Could not load data (' + err.message + '). <a href="javascript:location.reload()">Retry</a></div>';
+  }
+})();
 </script>
 </body>
 </html>
