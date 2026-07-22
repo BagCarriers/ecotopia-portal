@@ -5,8 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Jobs — Ecotopia</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/mapping.js"></script>
 <script src="assets/auth.js"></script>
-<script>try { AuthManager.requireAuth(); } catch(e) { throw e; }</script>
+<script>if (!AuthManager.hasCachedSession()) location.replace('login.html');</script>
 <script src="assets/data.js"></script>
 <script src="assets/nav.js"></script>
 <style>
@@ -112,6 +116,8 @@
   .success-msg { background: #d1fae5; border: 1px solid #6ee7b7; color: #065f46;
     padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; display: none; font-size: 0.875rem; }
   .success-msg.visible { display: block; }
+  .modal-error { color: #b3261e; font-size: 0.85rem; margin-top: 8px; }
+  .empty { padding: 20px; color: var(--text-dim); font-size: 0.875rem; text-align: center; }
 
   @media (max-width: 768px) {
     .page { padding: 20px 16px; }
@@ -185,6 +191,7 @@
         <label>Notes</label>
         <textarea id="nj_notes" rows="3" placeholder="Initial notes..."></textarea>
       </div>
+      <div class="modal-error" id="jobError"></div>
       <div class="modal-actions">
         <button type="button" class="btn-cancel" onclick="closeModal()">Cancel</button>
         <button type="submit" class="btn btn-primary">Add Job</button>
@@ -194,7 +201,8 @@
 </div>
 
 <script>
-Nav.render();
+const esc = DataStore.esc;
+let jobs = [];
 
 const STATUSES = [
   { key: 'inquiry',    label: 'Inquiry' },
@@ -213,7 +221,6 @@ const TYPE_MAP = {
 };
 
 function renderKanban() {
-  const jobs = DataStore.getJobs();
   const board = document.getElementById('kanban');
   board.innerHTML = STATUSES.map(st => {
     const colJobs = jobs.filter(j => j.status === st.key);
@@ -231,14 +238,14 @@ function renderKanban() {
               return `
                 <a href="job-detail.html?id=${j.id}" class="job-card">
                   <div class="job-card-top">
-                    <div class="job-client">${j.clientName}</div>
-                    <span class="job-type-pill ${typeInfo.cls}">${typeInfo.label}</span>
+                    <div class="job-client">${esc(j.clientName)}</div>
+                    <span class="job-type-pill ${typeInfo.cls}">${esc(typeInfo.label)}</span>
                   </div>
-                  <div class="job-title">${j.title}</div>
-                  ${j.address ? `<div class="job-addr">📍 ${j.address}</div>` : ''}
+                  <div class="job-title">${esc(j.title)}</div>
+                  ${j.address ? `<div class="job-addr">📍 ${esc(j.address)}</div>` : ''}
                   <div class="job-meta">
-                    ${j.grantFunded ? `<span class="grant-badge">🏛 ${j.grantName || 'Grant'}</span>` : ''}
-                    ${j.sqft ? `<span class="sqft-badge">${j.sqft}</span>` : ''}
+                    ${j.grantFunded ? `<span class="grant-badge">🏛 ${esc(j.grantName || 'Grant')}</span>` : ''}
+                    ${j.sqft ? `<span class="sqft-badge">${esc(j.sqft)}</span>` : ''}
                     ${j.price ? `<span class="sqft-badge">$${j.price}</span>` : ''}
                   </div>
                 </a>`;
@@ -248,20 +255,19 @@ function renderKanban() {
   }).join('');
 }
 
-renderKanban();
-
 function openModal() { document.getElementById('newJobModal').classList.add('open'); }
 function closeModal() {
   document.getElementById('newJobModal').classList.remove('open');
   document.getElementById('newJobForm').reset();
   document.getElementById('jobSuccess').classList.remove('visible');
+  document.getElementById('jobError').textContent = '';
 }
 
 document.getElementById('newJobModal').addEventListener('click', function(e) {
   if (e.target === this) closeModal();
 });
 
-document.getElementById('newJobForm').addEventListener('submit', function(e) {
+document.getElementById('newJobForm').addEventListener('submit', async function(e) {
   e.preventDefault();
   const job = {
     clientName: document.getElementById('nj_client').value.trim(),
@@ -275,11 +281,30 @@ document.getElementById('newJobForm').addEventListener('submit', function(e) {
     grantFunded: false, activityLog: []
   };
   if (!job.clientName || !job.title) return;
-  DataStore.addJob(job);
-  document.getElementById('jobSuccess').classList.add('visible');
-  renderKanban();
-  setTimeout(closeModal, 1200);
+  const errEl = document.getElementById('jobError');
+  errEl.textContent = '';
+  try {
+    await DataStore.addJob(job);
+    jobs = await DataStore.getJobs();
+    document.getElementById('jobSuccess').classList.add('visible');
+    renderKanban();
+    setTimeout(closeModal, 1200);
+  } catch (err) {
+    errEl.textContent = 'Could not add job. ' + err.message;
+  }
 });
+
+(async function init() {
+  try {
+    await AuthManager.requireAuth();
+    Nav.render();
+    jobs = await DataStore.getJobs();
+    renderKanban();
+  } catch (err) {
+    document.getElementById('kanban').innerHTML =
+      '<div class="empty">Could not load data (' + esc(err.message) + '). <a href="javascript:location.reload()">Retry</a></div>';
+  }
+})();
 </script>
 </body>
 </html>

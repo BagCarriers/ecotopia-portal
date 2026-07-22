@@ -5,8 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Job Detail — Ecotopia</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/mapping.js"></script>
 <script src="assets/auth.js"></script>
-<script>try { AuthManager.requireAuth(); } catch(e) { throw e; }</script>
+<script>if (!AuthManager.hasCachedSession()) location.replace('login.html');</script>
 <script src="assets/data.js"></script>
 <script src="assets/nav.js"></script>
 <style>
@@ -120,6 +124,9 @@
   .grant-fields { display: none; }
   .grant-fields.visible { display: block; }
 
+  .modal-error { color: #b3261e; font-size: 0.85rem; margin-top: 8px; }
+  .empty { padding: 20px; color: var(--text-dim); font-size: 0.875rem; text-align: center; }
+
   @media (max-width: 768px) {
     .page { padding: 20px 16px; }
     .detail-grid { grid-template-columns: 1fr; }
@@ -173,6 +180,7 @@
         <div class="form-group"><label>Grant Amount ($)</label>
           <input type="number" id="ej_grant_amount" placeholder="0" min="0"></div>
       </div>
+      <div class="modal-error" id="editJobError"></div>
       <div class="modal-actions">
         <button type="button" class="btn-cancel" onclick="closeEditJob()">Cancel</button>
         <button type="submit" class="btn btn-primary">Save Changes</button>
@@ -187,6 +195,7 @@
     <h2>Create Invoice</h2>
     <p>This will create a draft invoice for this job. You can then review and send it from the Invoices page.</p>
     <div id="invoiceFormArea"></div>
+    <div class="modal-error" id="invoiceError"></div>
     <div class="modal-actions">
       <button class="btn-cancel" onclick="closeInvoiceModal()">Cancel</button>
       <button class="btn btn-primary" onclick="createInvoice()">Create Invoice</button>
@@ -195,11 +204,12 @@
 </div>
 
 <script>
-Nav.render();
+const esc = DataStore.esc;
 
 const params = new URLSearchParams(window.location.search);
 const jobId = params.get('id');
-let job = jobId ? DataStore.getJob(jobId) : null;
+let job = null;
+let client = null;
 
 const STATUS_ORDER = ['inquiry', 'site_visit', 'proposal', 'active', 'complete'];
 const STATUS_LABELS = {
@@ -215,12 +225,11 @@ function render() {
   }
   document.title = `${job.title} — Ecotopia`;
   const currentIdx = STATUS_ORDER.indexOf(job.status);
-  const client = job.clientId ? DataStore.getClient(job.clientId) : null;
   const nextStatus = STATUS_ORDER[currentIdx + 1];
 
   el.innerHTML = `
-    <h1>${job.title}</h1>
-    <p class="sub">${job.clientName}${job.address ? ' · ' + job.address : ''}</p>
+    <h1>${esc(job.title)}</h1>
+    <p class="sub">${esc(job.clientName)}${job.address ? ' · ' + esc(job.address) : ''}</p>
 
     <!-- Status Stepper -->
     <div class="stepper">
@@ -235,11 +244,12 @@ function render() {
       <button class="btn btn-outline" onclick="openInvoiceModal()">💵 Create Invoice</button>
       <button class="btn btn-outline" onclick="openEditJob()">✏️ Edit Job</button>
     </div>
+    <div class="modal-error" id="statusError"></div>
 
     ${job.grantFunded ? `
     <div class="grant-box">
       <h3>🏛 Grant Funded</h3>
-      <div class="info-row"><span class="info-label">Program</span><span class="info-value">${job.grantName}</span></div>
+      <div class="info-row"><span class="info-label">Program</span><span class="info-value">${esc(job.grantName)}</span></div>
       <div class="info-row"><span class="info-label">Amount</span><span class="info-value">$${job.grantAmount?.toLocaleString()}</span></div>
     </div>` : ''}
 
@@ -247,23 +257,23 @@ function render() {
       <!-- Client Info -->
       <div class="card">
         <h2>Client</h2>
-        <div class="info-row"><span class="info-label">Name</span><span class="info-value">${job.clientName}</span></div>
+        <div class="info-row"><span class="info-label">Name</span><span class="info-value">${esc(job.clientName)}</span></div>
         ${client ? `
-        <div class="info-row"><span class="info-label">Phone</span><span class="info-value"><a href="tel:${client.phone}">${client.phone}</a></span></div>
-        <div class="info-row"><span class="info-label">Email</span><span class="info-value"><a href="mailto:${client.email}">${client.email}</a></span></div>
-        <div class="info-row"><span class="info-label">Address</span><span class="info-value">${client.address}</span></div>
+        <div class="info-row"><span class="info-label">Phone</span><span class="info-value"><a href="tel:${esc(client.phone)}">${esc(client.phone)}</a></span></div>
+        <div class="info-row"><span class="info-label">Email</span><span class="info-value"><a href="mailto:${esc(client.email)}">${esc(client.email)}</a></span></div>
+        <div class="info-row"><span class="info-label">Address</span><span class="info-value">${esc(client.address)}</span></div>
         ` : '<div class="info-row"><span class="info-label">No client record linked</span></div>'}
       </div>
 
       <!-- Job Details -->
       <div class="card">
         <h2>Job Details</h2>
-        <div class="info-row"><span class="info-label">Type</span><span class="info-value">${job.type?.replace(/_/g,' ')}</span></div>
+        <div class="info-row"><span class="info-label">Type</span><span class="info-value">${esc(job.type?.replace(/_/g,' '))}</span></div>
         <div class="info-row"><span class="info-label">Status</span><span class="info-value"><span class="status-pill pill-${job.status}">${STATUS_LABELS[job.status]}</span></span></div>
-        ${job.sqft ? `<div class="info-row"><span class="info-label">Size</span><span class="info-value">${job.sqft}</span></div>` : ''}
+        ${job.sqft ? `<div class="info-row"><span class="info-label">Size</span><span class="info-value">${esc(job.sqft)}</span></div>` : ''}
         ${job.price ? `<div class="info-row"><span class="info-label">Price</span><span class="info-value">$${job.price.toLocaleString()}</span></div>` : ''}
         <div class="info-row"><span class="info-label">Created</span><span class="info-value">${DataStore.formatDate(job.createdAt)}</span></div>
-        ${job.notes ? `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:0.875rem;color:var(--text-dim);line-height:1.5;">${job.notes}</div>` : ''}
+        ${job.notes ? `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:0.875rem;color:var(--text-dim);line-height:1.5;">${esc(job.notes)}</div>` : ''}
       </div>
     </div>
 
@@ -278,7 +288,7 @@ function render() {
               <div class="log-dot"></div>
               <div style="flex:1">
                 <div class="log-ts">${DataStore.formatDate(entry.ts)} · ${DataStore.formatTime(entry.ts)}</div>
-                <div class="log-note">${entry.note}</div>
+                <div class="log-note">${esc(entry.note)}</div>
               </div>
             </div>`).join('')}
       </div>
@@ -286,12 +296,14 @@ function render() {
         <input type="text" id="noteInput" placeholder="Add a note…">
         <button class="btn btn-primary btn-sm" onclick="addNote()">Add</button>
       </div>
+      <div class="modal-error" id="noteError"></div>
     </div>
   `;
 }
 
 function openEditJob() {
   if (!job) return;
+  document.getElementById('editJobError').textContent = '';
   document.getElementById('ej_title').value = job.title || '';
   document.getElementById('ej_type').value = job.type || 'other';
   document.getElementById('ej_address').value = job.address || '';
@@ -305,6 +317,7 @@ function openEditJob() {
 }
 function closeEditJob() {
   document.getElementById('editJobModal').classList.remove('open');
+  document.getElementById('editJobError').textContent = '';
 }
 function toggleGrantFields() {
   const checked = document.getElementById('ej_grant').checked;
@@ -313,42 +326,61 @@ function toggleGrantFields() {
 document.getElementById('editJobModal').addEventListener('click', function(e) {
   if (e.target === this) closeEditJob();
 });
-document.getElementById('editJobForm').addEventListener('submit', function(e) {
+document.getElementById('editJobForm').addEventListener('submit', async function(e) {
   e.preventDefault();
   const title = document.getElementById('ej_title').value.trim();
   if (!title || !job) return;
   const grantFunded = document.getElementById('ej_grant').checked;
-  DataStore.updateJob(job.id, {
-    title,
-    type: document.getElementById('ej_type').value,
-    address: document.getElementById('ej_address').value.trim(),
-    sqft: document.getElementById('ej_sqft').value.trim(),
-    notes: document.getElementById('ej_notes').value.trim(),
-    grantFunded,
-    grantName: grantFunded ? document.getElementById('ej_grant_source').value.trim() : null,
-    grantAmount: grantFunded ? parseFloat(document.getElementById('ej_grant_amount').value) || null : null
-  });
-  job = DataStore.getJob(job.id);
-  closeEditJob();
-  render();
-});
+  const errEl = document.getElementById('editJobError');
+  errEl.textContent = '';
+  try {
+    await DataStore.updateJob(job.id, {
+      title,
+      type: document.getElementById('ej_type').value,
+      address: document.getElementById('ej_address').value.trim(),
+      sqft: document.getElementById('ej_sqft').value.trim(),
+      notes: document.getElementById('ej_notes').value.trim(),
+      grantFunded,
+      grantName: grantFunded ? document.getElementById('ej_grant_source').value.trim() : null,
+      grantAmount: grantFunded ? parseFloat(document.getElementById('ej_grant_amount').value) || null : null
+    });
+    job = await DataStore.getJob(job.id);
+    closeEditJob();
+    render();
+  } catch (err) {
+    errEl.textContent = 'Could not save changes. ' + err.message;
+  }
+}
+);
 
-function moveToStatus(newStatus) {
+async function moveToStatus(newStatus) {
   if (!job) return;
-  DataStore.updateJob(job.id, { status: newStatus });
-  DataStore.addJobNote(job.id, `Status changed to: ${STATUS_LABELS[newStatus]}`);
-  job = DataStore.getJob(job.id);
-  render();
+  const errEl = document.getElementById('statusError');
+  if (errEl) errEl.textContent = '';
+  try {
+    await DataStore.updateJob(job.id, { status: newStatus });
+    await DataStore.addJobNote(job.id, `Status changed to: ${STATUS_LABELS[newStatus]}`);
+    job = await DataStore.getJob(job.id);
+    render();
+  } catch (err) {
+    if (errEl) errEl.textContent = 'Could not update status. ' + err.message;
+  }
 }
 
-function addNote() {
+async function addNote() {
   const input = document.getElementById('noteInput');
   const note = input.value.trim();
   if (!note || !job) return;
-  DataStore.addJobNote(job.id, note);
-  job = DataStore.getJob(job.id);
-  input.value = '';
-  render();
+  const errEl = document.getElementById('noteError');
+  if (errEl) errEl.textContent = '';
+  try {
+    await DataStore.addJobNote(job.id, note);
+    job = await DataStore.getJob(job.id);
+    input.value = '';
+    render();
+  } catch (err) {
+    if (errEl) errEl.textContent = 'Could not add note. ' + err.message;
+  }
 }
 
 document.addEventListener('keydown', function(e) {
@@ -356,11 +388,12 @@ document.addEventListener('keydown', function(e) {
 });
 
 function openInvoiceModal() {
+  document.getElementById('invoiceError').textContent = '';
   const el = document.getElementById('invoiceFormArea');
   el.innerHTML = `
     <div style="font-size:0.875rem;margin-bottom:12px;">
-      <strong>Job:</strong> ${job?.title}<br>
-      <strong>Client:</strong> ${job?.clientName}<br>
+      <strong>Job:</strong> ${esc(job?.title)}<br>
+      <strong>Client:</strong> ${esc(job?.clientName)}<br>
     </div>
     <div style="margin-bottom:12px;">
       <label style="font-size:0.82rem;font-weight:600;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:5px;">Amount ($)</label>
@@ -377,26 +410,46 @@ function openInvoiceModal() {
 }
 function closeInvoiceModal() {
   document.getElementById('invoiceModal').classList.remove('open');
+  document.getElementById('invoiceError').textContent = '';
 }
-function createInvoice() {
+async function createInvoice() {
+  if (!job) return;
   const amount = parseFloat(document.getElementById('inv_amount').value) || 0;
   const dueDate = document.getElementById('inv_due').value;
-  DataStore.addInvoice({
-    clientId: job.clientId,
-    clientName: job.clientName,
-    jobId: job.id,
-    jobTitle: job.title,
-    amount,
-    status: 'draft',
-    dueDate: dueDate || null,
-    issuedDate: null,
-    paidDate: null
-  });
-  closeInvoiceModal();
-  alert('Invoice created as draft. View it in Invoices.');
+  const errEl = document.getElementById('invoiceError');
+  errEl.textContent = '';
+  try {
+    await DataStore.addInvoice({
+      clientId: job.clientId,
+      clientName: job.clientName,
+      jobId: job.id,
+      jobTitle: job.title,
+      amount,
+      status: 'draft',
+      dueDate: dueDate || null,
+      issuedDate: null,
+      paidDate: null
+    });
+    closeInvoiceModal();
+    alert('Invoice created as draft. View it in Invoices.');
+  } catch (err) {
+    errEl.textContent = 'Could not create invoice. ' + err.message;
+  }
 }
 
-render();
+(async function init() {
+  try {
+    await AuthManager.requireAuth();
+    Nav.render();
+    if (!jobId) { job = null; render(); return; }
+    job = await DataStore.getJob(jobId);
+    client = job && job.clientId ? await DataStore.getClient(job.clientId) : null;
+    render();
+  } catch (err) {
+    document.getElementById('jobContent').innerHTML =
+      '<div class="empty">Could not load data (' + esc(err.message) + '). <a href="javascript:location.reload()">Retry</a></div>';
+  }
+})();
 </script>
 </body>
 </html>

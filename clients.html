@@ -5,8 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Clients — Ecotopia</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/mapping.js"></script>
 <script src="assets/auth.js"></script>
-<script>try { AuthManager.requireAuth(); } catch(e) { throw e; }</script>
+<script>if (!AuthManager.hasCachedSession()) location.replace('login.html');</script>
 <script src="assets/data.js"></script>
 <script src="assets/nav.js"></script>
 <style>
@@ -66,6 +70,8 @@
   .success-msg { background: #d1fae5; border: 1px solid #6ee7b7; color: #065f46;
     padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; display: none; font-size: 0.875rem; }
   .success-msg.visible { display: block; }
+  .modal-error { color: #b3261e; font-size: 0.85rem; margin-top: 8px; }
+  .empty { padding: 20px; color: var(--text-dim); font-size: 0.875rem; text-align: center; }
 
   .form-group textarea { width: 100%; padding: 10px 12px; border-radius: 7px;
     border: 1.5px solid var(--border); font-size: 0.9rem; font-family: 'DM Sans', sans-serif; color: var(--text); }
@@ -117,6 +123,7 @@
         <textarea id="ec_notes" rows="3" placeholder="Client notes…"></textarea>
       </div>
       <input type="hidden" id="ec_id">
+      <div class="modal-error" id="editClientError"></div>
       <div class="modal-actions">
         <button type="button" class="btn-cancel" onclick="closeEditClient()">Cancel</button>
         <button type="submit" class="btn btn-primary">Save Changes</button>
@@ -146,6 +153,7 @@
         <label>Phone</label>
         <input type="tel" id="c_phone" placeholder="(814) 555-0000">
       </div>
+      <div class="modal-error" id="addClientError"></div>
       <div class="modal-actions">
         <button type="button" class="btn-cancel" onclick="closeModal()">Cancel</button>
         <button type="submit" class="btn btn-primary">Add Client</button>
@@ -155,11 +163,11 @@
 </div>
 
 <script>
-Nav.render();
+const esc = DataStore.esc;
+let clients = [];
+let jobs = [];
 
 function renderGrid() {
-  const clients = DataStore.getClients();
-  const jobs = DataStore.getJobs();
   const el = document.getElementById('clientGrid');
   if (clients.length === 0) {
     el.innerHTML = '<p style="color:var(--text-dim)">No clients yet.</p>';
@@ -169,17 +177,17 @@ function renderGrid() {
     const clientJobs = jobs.filter(j => j.clientId === c.id);
     return `
       <div class="client-card">
-        <div class="client-name">${c.name}</div>
+        <div class="client-name">${esc(c.name)}</div>
         <div class="client-info">
-          ${c.address ? `📍 ${c.address}<br>` : ''}
-          ${c.email ? `<a href="mailto:${c.email}">${c.email}</a><br>` : ''}
-          ${c.phone ? `<a href="tel:${c.phone}">${c.phone}</a>` : ''}
-          ${c.notes ? `<div style="margin-top:6px;font-size:0.8rem;color:var(--text-dim)">${c.notes}</div>` : ''}
+          ${c.address ? `📍 ${esc(c.address)}<br>` : ''}
+          ${c.email ? `<a href="mailto:${esc(c.email)}">${esc(c.email)}</a><br>` : ''}
+          ${c.phone ? `<a href="tel:${esc(c.phone)}">${esc(c.phone)}</a>` : ''}
+          ${c.notes ? `<div style="margin-top:6px;font-size:0.8rem;color:var(--text-dim)">${esc(c.notes)}</div>` : ''}
         </div>
         ${clientJobs.length > 0 ? `
         <div class="client-jobs">
           Jobs: ${clientJobs.map(j =>
-            `<a href="job-detail.html?id=${j.id}" class="job-link">${j.title}</a>`
+            `<a href="job-detail.html?id=${j.id}" class="job-link">${esc(j.title)}</a>`
           ).join('')}
         </div>` : ''}
         <div class="card-actions">
@@ -189,11 +197,10 @@ function renderGrid() {
   }).join('');
 }
 
-renderGrid();
-
 function openEditClient(id) {
-  const c = DataStore.getClient(id);
+  const c = clients.find(x => x.id === id);
   if (!c) return;
+  document.getElementById('editClientError').textContent = '';
   document.getElementById('ec_id').value = c.id;
   document.getElementById('ec_name').value = c.name || '';
   document.getElementById('ec_phone').value = c.phone || '';
@@ -205,24 +212,32 @@ function openEditClient(id) {
 function closeEditClient() {
   document.getElementById('editClientModal').classList.remove('open');
   document.getElementById('editClientForm').reset();
+  document.getElementById('editClientError').textContent = '';
 }
 document.getElementById('editClientModal').addEventListener('click', function(e) {
   if (e.target === this) closeEditClient();
 });
-document.getElementById('editClientForm').addEventListener('submit', function(e) {
+document.getElementById('editClientForm').addEventListener('submit', async function(e) {
   e.preventDefault();
   const id = document.getElementById('ec_id').value;
   const name = document.getElementById('ec_name').value.trim();
   if (!name) return;
-  DataStore.updateClient(id, {
-    name,
-    phone: document.getElementById('ec_phone').value.trim(),
-    email: document.getElementById('ec_email').value.trim(),
-    address: document.getElementById('ec_address').value.trim(),
-    notes: document.getElementById('ec_notes').value.trim()
-  });
-  closeEditClient();
-  renderGrid();
+  const errEl = document.getElementById('editClientError');
+  errEl.textContent = '';
+  try {
+    await DataStore.updateClient(id, {
+      name,
+      phone: document.getElementById('ec_phone').value.trim(),
+      email: document.getElementById('ec_email').value.trim(),
+      address: document.getElementById('ec_address').value.trim(),
+      notes: document.getElementById('ec_notes').value.trim()
+    });
+    clients = await DataStore.getClients();
+    closeEditClient();
+    renderGrid();
+  } catch (err) {
+    errEl.textContent = 'Could not save changes. ' + err.message;
+  }
 });
 
 function openModal() { document.getElementById('addClientModal').classList.add('open'); }
@@ -230,24 +245,44 @@ function closeModal() {
   document.getElementById('addClientModal').classList.remove('open');
   document.getElementById('addClientForm').reset();
   document.getElementById('clientSuccess').classList.remove('visible');
+  document.getElementById('addClientError').textContent = '';
 }
 document.getElementById('addClientModal').addEventListener('click', function(e) {
   if (e.target === this) closeModal();
 });
-document.getElementById('addClientForm').addEventListener('submit', function(e) {
+document.getElementById('addClientForm').addEventListener('submit', async function(e) {
   e.preventDefault();
   const name = document.getElementById('c_name').value.trim();
   if (!name) return;
-  DataStore.addClient({
-    name,
-    address: document.getElementById('c_address').value.trim(),
-    email: document.getElementById('c_email').value.trim(),
-    phone: document.getElementById('c_phone').value.trim(),
-  });
-  document.getElementById('clientSuccess').classList.add('visible');
-  renderGrid();
-  setTimeout(closeModal, 1000);
+  const errEl = document.getElementById('addClientError');
+  errEl.textContent = '';
+  try {
+    await DataStore.addClient({
+      name,
+      address: document.getElementById('c_address').value.trim(),
+      email: document.getElementById('c_email').value.trim(),
+      phone: document.getElementById('c_phone').value.trim(),
+    });
+    clients = await DataStore.getClients();
+    document.getElementById('clientSuccess').classList.add('visible');
+    renderGrid();
+    setTimeout(closeModal, 1000);
+  } catch (err) {
+    errEl.textContent = 'Could not add client. ' + err.message;
+  }
 });
+
+(async function init() {
+  try {
+    await AuthManager.requireAuth();
+    Nav.render();
+    [clients, jobs] = await Promise.all([DataStore.getClients(), DataStore.getJobs()]);
+    renderGrid();
+  } catch (err) {
+    document.getElementById('clientGrid').innerHTML =
+      '<div class="empty">Could not load data (' + esc(err.message) + '). <a href="javascript:location.reload()">Retry</a></div>';
+  }
+})();
 </script>
 </body>
 </html>
