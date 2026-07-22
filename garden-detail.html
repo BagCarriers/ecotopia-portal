@@ -288,6 +288,7 @@
 </div>
 
 <script>
+const esc = DataStore.esc;
 const params = new URLSearchParams(window.location.search);
 const gardenId = params.get('id');
 let garden = null;
@@ -325,8 +326,8 @@ function renderPage() {
     <!-- Header -->
     <div class="garden-header">
       <div>
-        <h1>${garden.name}</h1>
-        <div class="garden-meta">📍 ${garden.address} · ${garden.sqft.toLocaleString()} sqft</div>
+        <h1>${esc(garden.name)}</h1>
+        <div class="garden-meta">📍 ${esc(garden.address)} · ${garden.sqft.toLocaleString()} sqft</div>
       </div>
       <button class="btn-qr" onclick="openQR()">📱 QR Check-in</button>
     </div>
@@ -388,12 +389,12 @@ function renderPage() {
             const cadenceLabel = t.cadenceDays <= 3 ? `${t.cadenceDays}x/wk` : t.cadenceDays <= 7 ? 'Weekly' :
               t.cadenceDays <= 14 ? 'Biweekly' : t.cadenceDays <= 30 ? 'Monthly' : `Every ${t.cadenceDays}d`;
             return `<tr>
-              <td>${t.title}</td>
+              <td>${esc(t.title)}</td>
               <td>${cadenceLabel}</td>
               <td>${t.estMinutes >= 60 ? (t.estMinutes/60).toFixed(1)+'h' : t.estMinutes+'min'}</td>
-              <td><span class="owner-pill ${ownerCls}">${ownerLabel}</span></td>
+              <td><span class="owner-pill ${ownerCls}">${esc(ownerLabel)}</span></td>
               <td><span class="due-text ${dueCls(d)}">${dueLabel(d)}</span></td>
-              <td>${t.skillLevel === 'none' ? '' : t.skillLevel}</td>
+              <td>${t.skillLevel === 'none' ? '' : esc(t.skillLevel)}</td>
               <td><button class="btn-edit" onclick="openEditTask('${t.id}')">✏️</button></td>
             </tr>`;
           }).join('')}</tbody>
@@ -409,11 +410,11 @@ function renderPage() {
           <thead><tr><th>Volunteer</th><th>Task</th><th>Date</th><th>Hours</th><th>Notes</th></tr></thead>
           <tbody>${gCheckins.map(ci => `
             <tr>
-              <td>${ci.volunteerName}</td>
-              <td>${ci.taskTitle}</td>
+              <td>${esc(ci.volunteerName)}</td>
+              <td>${esc(ci.taskTitle)}</td>
               <td>${DataStore.formatDate(ci.checkInTime)}</td>
               <td>${ci.hoursLogged}</td>
-              <td style="color:var(--text-dim)">${ci.notes || '—'}</td>
+              <td style="color:var(--text-dim)">${ci.notes ? esc(ci.notes) : '—'}</td>
             </tr>`).join('')}
           </tbody>
         </table>`}
@@ -427,7 +428,7 @@ function renderPage() {
           <div class="walkin-card">
             <button class="walkin-toggle ${w.active ? 'on' : ''}" onclick="toggleWalkin('${w.id}', this)" aria-label="Toggle"></button>
             <div class="walkin-info" style="flex:1">
-              <div class="walkin-title">${w.title}</div>
+              <div class="walkin-title">${esc(w.title)}</div>
               <div class="walkin-time">~${w.estMinutes} min</div>
             </div>
             <button class="btn-edit" onclick="openEditWalkin('${w.id}')">✏️</button>
@@ -446,8 +447,8 @@ function renderPage() {
         : `<div class="obs-list">${gObservations.map(o => `
           <div class="obs-item ${o.flagged ? 'flagged' : ''}">
             <div style="flex:1">
-              <div class="obs-meta">${o.submittedBy} · ${DataStore.formatDate(o.createdAt)}</div>
-              <div class="obs-note">${o.note}</div>
+              <div class="obs-meta">${esc(o.submittedBy)} · ${DataStore.formatDate(o.createdAt)}</div>
+              <div class="obs-note">${esc(o.note)}</div>
             </div>
             ${o.flagged ? '<span class="flag-badge">⚑ Flagged</span>' : '<span class="clear-badge">✓ Clear</span>'}
           </div>`).join('')}</div>`}
@@ -469,7 +470,7 @@ function openEditTask(id) {
   document.getElementById('et_owner').value = t.owner || 'open';
   // Populate volunteer dropdown
   document.getElementById('et_vol').innerHTML = volunteers.map(v =>
-    `<option value="${v.id}" ${v.id === t.volunteerId ? 'selected' : ''}>${v.name}</option>`
+    `<option value="${v.id}" ${v.id === t.volunteerId ? 'selected' : ''}>${esc(v.name)}</option>`
   ).join('');
   toggleVolSelect();
   document.getElementById('editTaskModal').classList.add('open');
@@ -633,7 +634,7 @@ function printQR() {
     renderPage();
   } catch (err) {
     document.getElementById('pageContent').innerHTML =
-      '<div class="empty">Could not load data (' + err.message + '). <a href="javascript:location.reload()">Retry</a></div>';
+      '<div class="empty">Could not load data (' + esc(err.message) + '). <a href="javascript:location.reload()">Retry</a></div>';
   }
 })();
 </script>

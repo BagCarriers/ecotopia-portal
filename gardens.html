@@ -81,6 +81,7 @@
 </div>
 
 <script>
+const esc = DataStore.esc;
 function renderGardens(gardens, tasks) {
   const el = document.getElementById('gardenGrid');
 
@@ -103,16 +104,16 @@ function renderGardens(gardens, tasks) {
       const d = DataStore.daysUntil(soonest.nextDue);
       dueCls = d <= 0 ? 'red' : d <= 3 ? 'amber' : 'green';
       dueText = d <= 0
-        ? `${soonest.title} overdue`
-        : d === 0 ? `${soonest.title} due today`
-        : `${soonest.title} in ${d}d`;
+        ? `${esc(soonest.title)} overdue`
+        : d === 0 ? `${esc(soonest.title)} due today`
+        : `${esc(soonest.title)} in ${d}d`;
     }
 
     return `
       <a href="garden-detail.html?id=${g.id}" class="garden-card">
         <div class="garden-card-top">
-          <div class="garden-name">${g.name}</div>
-          <div class="garden-addr">📍 ${g.address}</div>
+          <div class="garden-name">${esc(g.name)}</div>
+          <div class="garden-addr">📍 ${esc(g.address)}</div>
           <div class="garden-sqft">${g.sqft.toLocaleString()} sqft</div>
         </div>
         <div class="garden-card-body">
@@ -145,7 +146,7 @@ function renderGardens(gardens, tasks) {
     renderGardens(gardens, tasks);
   } catch (err) {
     document.getElementById('gardenGrid').innerHTML =
-      '<div class="empty">Could not load data (' + err.message + '). <a href="javascript:location.reload()">Retry</a></div>';
+      '<div class="empty">Could not load data (' + esc(err.message) + '). <a href="javascript:location.reload()">Retry</a></div>';
   }
 })();
 </script>

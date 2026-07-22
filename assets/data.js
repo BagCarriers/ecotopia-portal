@@ -165,6 +165,12 @@ const DataStore = (() => {
     getVolunteerApplications: () => list('volunteer_applications'),
 
     // Sync utilities (unchanged from the demo version)
+    esc(v) {
+      if (v == null) return '';
+      return String(v)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    },
     uid: () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
     formatDate(isoStr) {
       if (!isoStr) return '-';

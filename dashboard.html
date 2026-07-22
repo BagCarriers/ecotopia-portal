@@ -181,6 +181,7 @@
 
 <script>
 (async function init() {
+const esc = DataStore.esc;
 try {
   await AuthManager.requireAuth();
   Nav.render();
@@ -254,8 +255,8 @@ if (jordanTasks.length === 0) {
       <div class="task-row">
         <div class="due-dot ${cls}"></div>
         <div class="task-info">
-          <div class="task-title">${t.title}</div>
-          <div class="task-garden">${gardenName(t.gardenId)}</div>
+          <div class="task-title">${esc(t.title)}</div>
+          <div class="task-garden">${esc(gardenName(t.gardenId))}</div>
         </div>
         <div class="task-due ${cls}">${dueLabel(d)}</div>
       </div>`;
@@ -278,10 +279,10 @@ if (recentCheckins.length === 0) {
     })();
     return `
       <div class="activity-row">
-        <div class="activity-avatar">${initials}</div>
+        <div class="activity-avatar">${esc(initials)}</div>
         <div class="activity-info">
-          <div class="activity-name">${ci.volunteerName}</div>
-          <div class="activity-detail">${ci.taskTitle} · ${ci.gardenName}</div>
+          <div class="activity-name">${esc(ci.volunteerName)}</div>
+          <div class="activity-detail">${esc(ci.taskTitle)} · ${esc(ci.gardenName)}</div>
         </div>
         <div class="activity-time">${timeAgo}</div>
       </div>`;
@@ -335,7 +336,7 @@ if (attentionItems.length === 0) {
 }
 } catch (err) {
   document.getElementById('statsRow').innerHTML =
-    '<div class="empty">Could not load data (' + err.message + '). <a href="javascript:location.reload()">Retry</a></div>';
+    '<div class="empty">Could not load data (' + esc(err.message) + '). <a href="javascript:location.reload()">Retry</a></div>';
 }
 })();
 </script>
