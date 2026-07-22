@@ -1,0 +1,5 @@
+{
+  "name": "ecotopia-portal",
+  "private": true,
+  "scripts": { "test": "node --test tests/*.js" }
+}
