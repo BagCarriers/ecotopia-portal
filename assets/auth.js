@@ -1,64 +1,73 @@
 /**
- * Ecotopia Portal — Auth Manager
- * Single admin session using sessionStorage.
+ * Ecotopia Portal — Auth Manager (Supabase Auth).
+ * All methods async except hasCachedSession(), a cheap sync pre-render guard.
+ * requireAuth() is authoritative: valid session AND active portal_users row.
  */
 const AuthManager = (() => {
-  const SESSION_KEY = 'ecotopia_session';
-  const SESSION_DURATION_MS = 8 * 60 * 60 * 1000; // 8 hours
-  const CREDENTIALS = { username: 'jordan', password: 'ecotopia2025' };
+  const sb = window.ecoSupabase;
 
-  function isAuthenticated() {
+  function hasCachedSession() {
     try {
-      const raw = sessionStorage.getItem(SESSION_KEY);
-      if (!raw) return false;
-      const session = JSON.parse(raw);
-      if (!session || !session.user || !session.expires) return false;
-      if (Date.now() > session.expires) {
-        sessionStorage.removeItem(SESSION_KEY);
-        return false;
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('sb-') && k.endsWith('-auth-token')) return true;
       }
-      return true;
-    } catch (e) {
-      return false;
-    }
+    } catch (e) { /* storage blocked: fall through to async check */ }
+    return false;
   }
 
-  function signIn(username, password) {
-    if (username === CREDENTIALS.username && password === CREDENTIALS.password) {
-      const session = {
-        user: username,
-        expires: Date.now() + SESSION_DURATION_MS,
-        loginTime: Date.now()
-      };
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
-      return { success: true };
-    }
-    return { success: false, error: 'Invalid username or password.' };
+  async function isAuthenticated() {
+    const { data } = await sb.auth.getSession();
+    return !!(data && data.session);
   }
 
-  function signOut() {
-    sessionStorage.removeItem(SESSION_KEY);
+  let cachedRole; // undefined = not fetched yet; null = no portal access
+  async function getRole() {
+    if (cachedRole !== undefined) return cachedRole;
+    const { data } = await sb.auth.getSession();
+    if (!data || !data.session) { cachedRole = null; return null; }
+    const res = await sb.from('portal_users').select('role, active')
+      .eq('user_id', data.session.user.id).maybeSingle();
+    cachedRole = (res.data && res.data.active) ? res.data.role : null;
+    return cachedRole;
+  }
+
+  async function signIn(email, password) {
+    const { error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) return { success: false, error: 'Invalid email or password.' };
+    cachedRole = undefined;
+    const role = await getRole();
+    if (!role) {
+      await sb.auth.signOut();
+      return { success: false, error: 'This account does not have portal access.' };
+    }
+    return { success: true };
+  }
+
+  async function signOut() {
+    await sb.auth.signOut();
     window.location.href = 'login.html';
   }
 
-  function requireAuth() {
-    if (!isAuthenticated()) {
-      window.location.href = 'login.html';
-      // Throw to stop any further script execution on the page
-      throw new Error('Not authenticated — redirecting.');
+  async function requireAuth() {
+    const { data } = await sb.auth.getSession();
+    if (!data || !data.session) {
+      window.location.replace('login.html');
+      throw new Error('Not authenticated');
     }
+    const role = await getRole();
+    if (!role) {
+      await sb.auth.signOut();
+      window.location.replace('login.html');
+      throw new Error('No portal access');
+    }
+    return data.session;
   }
 
-  function getUser() {
-    try {
-      const raw = sessionStorage.getItem(SESSION_KEY);
-      if (!raw) return null;
-      const session = JSON.parse(raw);
-      return session ? session.user : null;
-    } catch (e) {
-      return null;
-    }
+  async function getUser() {
+    const { data } = await sb.auth.getSession();
+    return (data && data.session) ? data.session.user.email : null;
   }
 
-  return { isAuthenticated, signIn, signOut, requireAuth, getUser };
+  return { hasCachedSession, isAuthenticated, signIn, signOut, requireAuth, getUser, getRole };
 })();

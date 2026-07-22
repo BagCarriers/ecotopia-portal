@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Sign In — Ecotopia Earthcare</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/mapping.js"></script>
 <script src="assets/auth.js"></script>
 <style>
   :root {
@@ -94,9 +98,9 @@
     <div class="error-msg" id="errorMsg"></div>
     <form id="loginForm" novalidate>
       <div class="form-group">
-        <label for="username">Username</label>
-        <input type="text" id="username" name="username" autocomplete="username"
-               placeholder="jordan" required>
+        <label for="username">Email</label>
+        <input type="email" id="username" name="username" autocomplete="username"
+               placeholder="you@example.com" required>
       </div>
       <div class="form-group">
         <label for="password">Password</label>
@@ -109,18 +113,15 @@
   <p class="login-footer">Ecotopia Earthcare &mdash; Admin Portal</p>
 </div>
 <script>
-  // If already signed in, go to dashboard
-  if (AuthManager.isAuthenticated()) {
-    window.location.href = 'dashboard.html';
-  }
+  // If already signed in, skip the login page
+  (async () => { if (await AuthManager.isAuthenticated()) window.location.replace('dashboard.html'); })();
 
-  document.getElementById('loginForm').addEventListener('submit', function(e) {
+  document.getElementById('loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
-    const user = document.getElementById('username').value.trim();
+    const email = document.getElementById('username').value.trim();
     const pass = document.getElementById('password').value;
     const err = document.getElementById('errorMsg');
-
-    const result = AuthManager.signIn(user, pass);
+    const result = await AuthManager.signIn(email, pass);
     if (result.success) {
       window.location.href = 'dashboard.html';
     } else {

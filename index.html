@@ -4,13 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Ecotopia Earthcare Portal</title>
+<script src="assets/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/mapping.js"></script>
 <script src="assets/auth.js"></script>
 <script>
-  if (AuthManager.isAuthenticated()) {
-    window.location.href = 'dashboard.html';
-  } else {
-    window.location.href = 'login.html';
-  }
+(async () => {
+  window.location.replace((await AuthManager.isAuthenticated()) ? 'dashboard.html' : 'login.html');
+})();
 </script>
 </head>
 <body>
