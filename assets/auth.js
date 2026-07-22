@@ -28,6 +28,11 @@ const AuthManager = (() => {
     if (!data || !data.session) { cachedRole = null; return null; }
     const res = await sb.from('portal_users').select('role, active')
       .eq('user_id', data.session.user.id).maybeSingle();
+    if (res.error) {
+      // Transient failure: do NOT cache, so the next call retries. Distinguish
+      // this from a genuinely absent/inactive row (which caches null below).
+      throw new Error('Could not verify portal access. Please try again.');
+    }
     cachedRole = (res.data && res.data.active) ? res.data.role : null;
     return cachedRole;
   }
@@ -36,7 +41,14 @@ const AuthManager = (() => {
     const { error } = await sb.auth.signInWithPassword({ email, password });
     if (error) return { success: false, error: 'Invalid email or password.' };
     cachedRole = undefined;
-    const role = await getRole();
+    let role;
+    try {
+      role = await getRole();
+    } catch (err) {
+      // Transient role-fetch failure: the session may be fine, so do NOT sign
+      // out. Surface the error and let the user retry.
+      return { success: false, error: err.message };
+    }
     if (!role) {
       await sb.auth.signOut();
       return { success: false, error: 'This account does not have portal access.' };
@@ -45,6 +57,7 @@ const AuthManager = (() => {
   }
 
   async function signOut() {
+    cachedRole = undefined; // defense in depth: never leak a stale role
     await sb.auth.signOut();
     window.location.href = 'login.html';
   }
@@ -55,6 +68,8 @@ const AuthManager = (() => {
       window.location.replace('login.html');
       throw new Error('Not authenticated');
     }
+    // A transient role-fetch failure throws; do NOT sign out or redirect for it.
+    // Rethrow so the page's bootstrap catch shows its error banner (fail-safe).
     const role = await getRole();
     if (!role) {
       await sb.auth.signOut();
