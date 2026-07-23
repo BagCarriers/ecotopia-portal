@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Check In — Ecotopia</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/mapping.js"></script>
+<script src="assets/auth.js"></script>
 <script src="assets/data.js"></script>
 <style>
   :root {
@@ -103,6 +108,10 @@
     padding: 14px; border-radius: 10px; text-decoration: none; font-weight: 600;
     margin-bottom: 10px; text-align: center; font-size: 0.9rem; }
 
+  .checkin-error { color: #b3261e; font-size: 0.9rem; text-align: center;
+    margin-bottom: 12px; display: none; }
+  .checkin-error.visible { display: block; }
+
   .not-found { text-align: center; padding: 60px 20px; }
   .not-found h2 { font-family: 'Fraunces', serif; color: var(--forest); margin-bottom: 10px; }
   .not-found p { color: var(--text-dim); }
@@ -128,31 +137,51 @@
 </div>
 
 <script>
+const esc = DataStore.esc;
 const params = new URLSearchParams(window.location.search);
 const gardenToken = params.get('garden');
-const garden = gardenToken ? DataStore.getGardenByToken(gardenToken) : null;
 
 const el = document.getElementById('pageContent');
 const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
+let garden = null;
+let tasks = [];
+let walkins = [];
+let volunteersPublic = [];
 let selectedPath = null;
 let selectedTask = null;
 let checkInStartTime = null;
 
-if (!garden) {
-  el.innerHTML = `
-    <div class="not-found">
-      <h2>Garden not found</h2>
-      <p>This QR code may be outdated. Please ask a staff member for help.</p>
-    </div>`;
-} else {
-  renderMain();
-}
+(async function init() {
+  try {
+    garden = gardenToken ? await DataStore.getGardenByToken(gardenToken) : null;
+    if (!garden) {
+      el.innerHTML = `
+        <div class="not-found">
+          <h2>Garden not found</h2>
+          <p>This QR code may be outdated. Please ask a staff member for help.</p>
+        </div>`;
+      return;
+    }
+    [tasks, walkins, volunteersPublic] = await Promise.all([
+      DataStore.getTasksByGarden(garden.id),
+      DataStore.getWalkinsByGarden(garden.id),
+      DataStore.getVolunteersPublic(),
+    ]);
+    renderMain();
+  } catch (err) {
+    el.innerHTML = `
+      <div class="not-found">
+        <h2>Could not load this garden</h2>
+        <p>Please check your connection and refresh the page.</p>
+      </div>`;
+  }
+})();
 
 function renderMain() {
   el.innerHTML = `
     <div class="garden-header">
-      <h1>${garden.name}</h1>
+      <h1>${esc(garden.name)}</h1>
       <div class="date">${todayStr}</div>
     </div>
 
@@ -179,6 +208,7 @@ function renderMain() {
                oninput="lookupPhone(this.value)">
       </div>
       <div id="taskLookupResult"></div>
+      <div id="scheduledError" class="checkin-error"></div>
       <button class="btn-big btn-green" id="pathABtn" onclick="checkInScheduled()" style="display:none">
         ✓ Check In
       </button>
@@ -211,6 +241,7 @@ function renderMain() {
       <p style="text-align:center;color:var(--text-dim);font-size:0.9rem;margin-bottom:20px">
         Timer started. When you're done, tap below.
       </p>
+      <div id="activeError" class="checkin-error"></div>
       <button class="btn-big btn-done" onclick="finishWalkin()">✅ I'm finished!</button>
     </div>
 
@@ -220,15 +251,14 @@ function renderMain() {
     </div>
   `;
 
-  // Populate walk-in tasks
-  const walkins = DataStore.getWalkinsByGarden(garden.id);
+  // Populate walk-in tasks (walkins preloaded in init)
   const walkinIcons = { 'Trash pickup': '🗑', 'Plant inspection + notes': '🔍',
     'Pull weeds anywhere': '🌿', 'Water if dry': '💧', 'Harvest ripe fruit/veg': '🍎' };
   document.getElementById('walkinGrid').innerHTML = walkins.map(w => `
-    <div class="walkin-item" id="wi_${w.id}" onclick="selectWalkin('${w.id}', '${w.title}', ${w.estMinutes})">
+    <div class="walkin-item" id="wi_${w.id}" onclick="selectWalkin('${w.id}')">
       <span class="walkin-icon">${walkinIcons[w.title] || '🌱'}</span>
       <div>
-        <div class="walkin-title">${w.title}</div>
+        <div class="walkin-title">${esc(w.title)}</div>
         <div class="walkin-time">~${w.estMinutes} min</div>
       </div>
     </div>`).join('');
@@ -243,66 +273,92 @@ function selectPath(p) {
 }
 
 // ── Path A: Scheduled ────────────────────────────────────────────────────
-function lookupPhone(phone) {
+let lookupSeq = 0;
+async function lookupPhone(phone) {
   const cleaned = phone.replace(/\D/g, '');
   const resultEl = document.getElementById('taskLookupResult');
   const btn = document.getElementById('pathABtn');
+  document.getElementById('scheduledError').classList.remove('visible');
 
   if (cleaned.length < 10) {
     resultEl.innerHTML = '';
     btn.style.display = 'none';
+    selectedTask = null;
     return;
   }
 
-  const vols = DataStore.getVolunteers();
-  const vol = vols.find(v => v.phone && v.phone.replace(/\D/g, '') === cleaned);
+  const seq = ++lookupSeq;
+  let vol;
+  try {
+    vol = await DataStore.matchVolunteerByPhone(phone);
+  } catch (err) {
+    if (seq !== lookupSeq) return;
+    resultEl.innerHTML = `<p style="color:var(--text-dim);font-size:0.875rem;margin-bottom:12px">
+      Could not look up that number right now. Try the walk-in option instead.</p>`;
+    btn.style.display = 'none';
+    return;
+  }
+  if (seq !== lookupSeq) return; // a newer keystroke superseded this lookup
 
   if (!vol) {
     resultEl.innerHTML = `<p style="color:var(--text-dim);font-size:0.875rem;margin-bottom:12px">
       No record found for this number. Try the walk-in option instead.</p>`;
     btn.style.display = 'none';
+    selectedTask = null;
     return;
   }
 
-  const tasks = DataStore.getTasksByVolunteer(vol.id).filter(t => t.gardenId === garden.id);
-  if (tasks.length === 0) {
+  const volTasks = tasks.filter(t => t.volunteerId === vol.id);
+  if (volTasks.length === 0) {
     resultEl.innerHTML = `<p style="color:var(--text-dim);font-size:0.875rem;margin-bottom:12px">
-      Hi ${vol.name}! No tasks assigned at this garden. Pick a walk-in task instead.</p>`;
+      Hi ${esc(vol.name)}! No tasks assigned at this garden. Pick a walk-in task instead.</p>`;
     btn.style.display = 'none';
+    selectedTask = null;
     return;
   }
 
-  const task = tasks[0];
+  const task = volTasks[0];
   selectedTask = { ...task, volunteerName: vol.name, volunteerId: vol.id };
   resultEl.innerHTML = `
     <div class="task-confirm-card">
-      <div class="task-confirm-title">Hi ${vol.name}! 👋</div>
-      <div class="task-confirm-sub">Your task: <strong>${task.title}</strong></div>
+      <div class="task-confirm-title">Hi ${esc(vol.name)}! 👋</div>
+      <div class="task-confirm-sub">Your task: <strong>${esc(task.title)}</strong></div>
       <div style="font-size:0.8rem;color:var(--forest-mid);margin-top:4px">~${task.estMinutes >= 60 ? (task.estMinutes/60).toFixed(1)+'h' : task.estMinutes+'min'}</div>
     </div>`;
   btn.style.display = 'block';
 }
 
-function checkInScheduled() {
+async function checkInScheduled() {
   if (!selectedTask) return;
-  DataStore.addCheckin({
-    gardenId: garden.id, gardenName: garden.name,
-    volunteerId: selectedTask.volunteerId, volunteerName: selectedTask.volunteerName,
-    taskId: selectedTask.id, taskTitle: selectedTask.title,
-    hoursLogged: Math.round(selectedTask.estMinutes / 60 * 4) / 4,
-    checkInTime: new Date().toISOString(), checkOutTime: new Date().toISOString(),
-    type: 'scheduled', notes: ''
-  });
-  DataStore.updateTask(selectedTask.id, { lastCompleted: new Date().toISOString(),
-    nextDue: new Date(Date.now() + selectedTask.cadenceDays * 86400000).toISOString() });
-  showSuccess(selectedTask.volunteerName, selectedTask.title);
+  const errEl = document.getElementById('scheduledError');
+  errEl.classList.remove('visible');
+  const btn = document.getElementById('pathABtn');
+  btn.disabled = true;
+  try {
+    await DataStore.addCheckin({
+      gardenId: garden.id, gardenName: garden.name,
+      volunteerId: selectedTask.volunteerId, volunteerName: selectedTask.volunteerName,
+      taskId: selectedTask.id, taskTitle: selectedTask.title,
+      hoursLogged: Math.round(selectedTask.estMinutes / 60 * 4) / 4,
+      checkInTime: new Date().toISOString(), checkOutTime: new Date().toISOString(),
+      type: 'scheduled', notes: ''
+    });
+    await DataStore.completeTask(selectedTask.id);
+    showSuccess(selectedTask.volunteerName, selectedTask.title);
+  } catch (err) {
+    btn.disabled = false;
+    errEl.textContent = 'Check-in did not save. Please try again.';
+    errEl.classList.add('visible');
+  }
 }
 
 // ── Path B: Walk-in ─────────────────────────────────────────────────────
-function selectWalkin(id, title, estMins) {
+function selectWalkin(id) {
+  const w = walkins.find(x => x.id === id);
+  if (!w) return;
   document.querySelectorAll('.walkin-item').forEach(el => el.classList.remove('selected'));
   document.getElementById('wi_' + id).classList.add('selected');
-  selectedTask = { id, title, estMinutes: estMins, type: 'walkin' };
+  selectedTask = { id: w.id, title: w.title, estMinutes: w.estMinutes, type: 'walkin' };
   document.getElementById('walkinGrid').style.display = 'none';
   document.getElementById('walkinForm').style.display = 'block';
 }
@@ -330,25 +386,31 @@ function checkInWalkin() {
   document.getElementById('activeTaskSub').textContent = `Started at ${checkInStartTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} · ${garden.name}`;
 }
 
-function finishWalkin() {
+async function finishWalkin() {
   const elapsed = checkInStartTime ? (Date.now() - checkInStartTime.getTime()) / 3600000 : (selectedTask.estMinutes / 60);
   const hours = Math.max(0.25, Math.round(elapsed * 4) / 4);
+  const errEl = document.getElementById('activeError');
+  errEl.classList.remove('visible');
 
-  // Try to match to a volunteer by phone
-  const phone = selectedTask.volunteerPhone ? selectedTask.volunteerPhone.replace(/\D/g, '') : '';
-  const matchedVol = phone ? DataStore.getVolunteers().find(v => v.phone && v.phone.replace(/\D/g, '') === phone) : null;
-
-  DataStore.addCheckin({
-    gardenId: garden.id, gardenName: garden.name,
-    volunteerId: matchedVol ? matchedVol.id : null,
-    volunteerName: selectedTask.volunteerName,
-    taskId: null, taskTitle: selectedTask.title,
-    hoursLogged: hours,
-    checkInTime: checkInStartTime ? checkInStartTime.toISOString() : new Date().toISOString(),
-    checkOutTime: new Date().toISOString(),
-    type: 'walkin', notes: ''
-  });
-  showSuccess(selectedTask.volunteerName, selectedTask.title, hours);
+  const phone = selectedTask.volunteerPhone ? selectedTask.volunteerPhone.trim() : '';
+  try {
+    // Try to match to a volunteer by phone
+    const matchedVol = phone ? await DataStore.matchVolunteerByPhone(phone) : null;
+    await DataStore.addCheckin({
+      gardenId: garden.id, gardenName: garden.name,
+      volunteerId: matchedVol ? matchedVol.id : null,
+      volunteerName: selectedTask.volunteerName,
+      taskId: null, taskTitle: selectedTask.title,
+      hoursLogged: hours,
+      checkInTime: checkInStartTime ? checkInStartTime.toISOString() : new Date().toISOString(),
+      checkOutTime: new Date().toISOString(),
+      type: 'walkin', notes: ''
+    });
+    showSuccess(selectedTask.volunteerName, selectedTask.title, hours);
+  } catch (err) {
+    errEl.textContent = 'Check-in did not save. Please try again.';
+    errEl.classList.add('visible');
+  }
 }
 
 function showSuccess(name, task, hours) {
@@ -356,15 +418,15 @@ function showSuccess(name, task, hours) {
   el.innerHTML = `
     <div class="success-screen">
       <div class="success-icon">🌿</div>
-      <div class="success-title">Thank you, ${name}!</div>
+      <div class="success-title">Thank you, ${esc(name)}!</div>
       <div class="success-sub">
-        Checked in for: <strong>${task}</strong> at ${garden.name}.<br>
+        Checked in for: <strong>${esc(task)}</strong> at ${esc(garden.name)}.<br>
         ${hoursText}<br><br>
         Your contribution helps this community space thrive.
       </div>
       <div class="success-links">
         <a href="volunteer-board.html" class="success-link">📋 See open responsibilities →</a>
-        <a href="qr-checkin.html?garden=${gardenToken}" class="success-link">↩ New check-in</a>
+        <a href="qr-checkin.html?garden=${encodeURIComponent(gardenToken)}" class="success-link">↩ New check-in</a>
       </div>
     </div>`;
 }

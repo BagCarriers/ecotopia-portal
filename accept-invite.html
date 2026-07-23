@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Accept Invite — Ecotopia Earthcare</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/config.js"></script>
+<style>
+  :root {
+    --forest: #1B4332; --forest-mid: #2D6A4F; --forest-light: #52B788;
+    --sage: #D8F3DC; --sage-dim: #B7E4C7; --earth: #8B5E3C;
+    --earth-light: #C68642; --gold: #F4A261; --cream: #F9F6F0;
+    --cream-dim: #E8E0D5; --text: #1C1C1C; --text-dim: #5A5A5A;
+    --border: rgba(45,106,79,0.2);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--forest);
+    min-height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+    padding: 20px;
+  }
+  .login-wrap { width: 100%; max-width: 400px; }
+  .login-header { text-align: center; margin-bottom: 32px; }
+  .login-logo {
+    font-family: 'Fraunces', serif;
+    font-size: 2.2rem; font-weight: 700; color: var(--sage);
+    letter-spacing: -0.02em; display: block; margin-bottom: 6px;
+  }
+  .login-tagline { color: rgba(216,243,220,0.7); font-size: 0.9rem; }
+  .login-card {
+    background: var(--cream); border-radius: 16px;
+    padding: 36px 32px; box-shadow: 0 12px 40px rgba(0,0,0,0.3);
+  }
+  .login-card h2 {
+    font-family: 'Fraunces', serif;
+    color: var(--forest); font-size: 1.4rem; margin-bottom: 8px;
+    text-align: center;
+  }
+  .login-card .sub {
+    text-align: center; color: var(--text-dim); font-size: 0.85rem; margin-bottom: 24px;
+  }
+  .form-group { margin-bottom: 18px; }
+  .form-group label {
+    display: block; font-size: 0.85rem; font-weight: 600;
+    color: var(--text-dim); margin-bottom: 6px; text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .form-group input {
+    width: 100%; padding: 12px 14px; border-radius: 8px;
+    border: 1.5px solid var(--border); background: #fff;
+    font-size: 1rem; font-family: 'DM Sans', sans-serif;
+    color: var(--text); transition: border-color 0.15s;
+  }
+  .form-group input:focus {
+    outline: none; border-color: var(--forest-light);
+    box-shadow: 0 0 0 3px rgba(82,183,136,0.15);
+  }
+  .btn-login {
+    width: 100%; padding: 14px; background: var(--forest);
+    color: #fff; border: none; border-radius: 8px;
+    font-size: 1rem; font-weight: 600; cursor: pointer;
+    font-family: 'DM Sans', sans-serif; transition: background 0.15s; margin-top: 8px;
+  }
+  .btn-login:hover { background: var(--forest-mid); }
+  .btn-login[disabled] { opacity: 0.6; cursor: default; }
+  .error-msg {
+    background: #fef2f2; border: 1px solid #fca5a5;
+    color: #dc2626; padding: 10px 14px; border-radius: 8px;
+    font-size: 0.875rem; margin-bottom: 16px; display: none;
+  }
+  .error-msg.visible { display: block; }
+  .success-box { text-align: center; }
+  .success-box .icon { font-size: 3rem; margin-bottom: 12px; }
+  .success-box h3 { font-family: 'Fraunces', serif; color: var(--forest); margin-bottom: 8px; }
+  .success-box p { color: var(--text-dim); font-size: 0.9rem; margin-bottom: 20px; line-height: 1.6; }
+  .success-link {
+    display: inline-block; background: var(--forest); color: #fff;
+    padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 600;
+  }
+  .login-footer {
+    text-align: center; margin-top: 16px;
+    color: rgba(216,243,220,0.5); font-size: 0.8rem;
+  }
+</style>
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-header">
+    <span class="login-logo">🌿 Ecotopia</span>
+    <p class="login-tagline">Earthcare Portal</p>
+  </div>
+  <div class="login-card">
+    <div id="formView">
+      <h2>Set Your Password</h2>
+      <p class="sub">Create a password to activate your portal account.</p>
+      <div class="error-msg" id="errorMsg"></div>
+      <form id="acceptForm" novalidate>
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" autocomplete="new-password"
+                 placeholder="At least 8 characters" required>
+        </div>
+        <div class="form-group">
+          <label for="confirm">Confirm Password</label>
+          <input type="password" id="confirm" autocomplete="new-password"
+                 placeholder="Re-enter password" required>
+        </div>
+        <button type="submit" class="btn-login" id="submitBtn">Activate Account</button>
+      </form>
+    </div>
+    <div class="success-box" id="successView" style="display:none">
+      <div class="icon">🌱</div>
+      <h3>You are all set!</h3>
+      <p>Your account is active. You can now sign in to the portal.</p>
+      <a href="login.html" class="success-link">Go to Sign In</a>
+    </div>
+  </div>
+  <p class="login-footer">Ecotopia Earthcare Admin Portal</p>
+</div>
+<script>
+  const token = new URLSearchParams(window.location.search).get('token');
+  const errEl = document.getElementById('errorMsg');
+
+  function showError(msg) {
+    errEl.textContent = msg;
+    errEl.classList.add('visible');
+  }
+
+  if (!token) {
+    showError('This invite link is missing its token. Please ask an admin for a new link.');
+    document.getElementById('acceptForm').style.display = 'none';
+  }
+
+  document.getElementById('acceptForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    errEl.classList.remove('visible');
+    const password = document.getElementById('password').value;
+    const confirm = document.getElementById('confirm').value;
+
+    if (password.length < 8) { showError('Password must be at least 8 characters.'); return; }
+    if (password !== confirm) { showError('The two passwords do not match.'); return; }
+
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true;
+    btn.textContent = 'Activating…';
+
+    try {
+      const res = await fetch(window.ECO_CONFIG.SUPABASE_URL + '/functions/v1/accept-invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: window.ECO_CONFIG.SUPABASE_ANON_KEY },
+        body: JSON.stringify({ token, password }),
+      });
+      const body = await res.json();
+      if (body.ok) {
+        document.getElementById('formView').style.display = 'none';
+        document.getElementById('successView').style.display = 'block';
+      } else {
+        showError(body.error || 'Could not activate your account. Please try again.');
+        btn.disabled = false;
+        btn.textContent = 'Activate Account';
+      }
+    } catch (err) {
+      showError('Could not reach the server. Please check your connection and try again.');
+      btn.disabled = false;
+      btn.textContent = 'Activate Account';
+    }
+  });
+</script>
+</body>
+</html>

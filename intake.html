@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Client Intake — Ecotopia Earthcare</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/mapping.js"></script>
+<script src="assets/auth.js"></script>
 <script src="assets/data.js"></script>
 <style>
   :root {
@@ -70,6 +75,9 @@
   .btn-submit:hover { background: var(--forest-mid); }
 
   .field-note { font-size: 0.75rem; color: var(--text-dim); margin-top: 4px; }
+
+  .modal-error { color: #b3261e; font-size: 0.875rem; margin-bottom: 12px; display: none; }
+  .modal-error.visible { display: block; }
 
   /* Thank you screen */
   .thanks-screen { display: none; text-align: center; padding: 40px 20px; }
@@ -190,13 +198,14 @@
         </div>
       </div>
 
+      <div id="intakeError" class="modal-error"></div>
       <button type="submit" class="btn-submit">Submit Request →</button>
     </form>
   </div>
 </div>
 
 <script>
-document.getElementById('intakeForm').addEventListener('submit', function(e) {
+document.getElementById('intakeForm').addEventListener('submit', async function(e) {
   e.preventDefault();
   const name = document.getElementById('i_name').value.trim();
   const phone = document.getElementById('i_phone').value.trim();
@@ -209,36 +218,49 @@ document.getElementById('intakeForm').addEventListener('submit', function(e) {
     return;
   }
 
-  // Save as intake submission
-  const submission = DataStore.addIntakeSubmission({
-    name, phone,
-    email: document.getElementById('i_email').value.trim(),
-    address,
-    serviceType: service,
-    size: document.getElementById('i_size').value.trim(),
-    description,
-    contactPreference: document.getElementById('i_contact_pref').value,
-    referral: document.getElementById('i_referral').value,
-    submittedAt: new Date().toISOString()
-  });
+  const errEl = document.getElementById('intakeError');
+  errEl.classList.remove('visible');
+  errEl.textContent = '';
 
-  // Also create a job inquiry
-  DataStore.addJob({
-    clientName: name,
-    title: service.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
-    address,
-    type: service,
-    status: 'inquiry',
-    sqft: document.getElementById('i_size').value.trim(),
-    price: null, grantFunded: false, grantName: null, grantAmount: null,
-    notes: `Submitted via intake form.\n\nDescription: ${description}\n\nContact: ${phone}${document.getElementById('i_email').value.trim() ? ' / ' + document.getElementById('i_email').value.trim() : ''}.\nPreferred contact: ${document.getElementById('i_contact_pref').value}.`,
-    activityLog: [{ ts: new Date().toISOString(), note: 'Received via intake form.' }]
-  });
+  const email = document.getElementById('i_email').value.trim();
+  const size = document.getElementById('i_size').value.trim();
+  const contactPref = document.getElementById('i_contact_pref').value;
 
-  // Show thank you
-  document.getElementById('intakeForm').style.display = 'none';
-  document.getElementById('thanksScreen').classList.add('visible');
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  try {
+    // Save as intake submission
+    await DataStore.addIntakeSubmission({
+      name, phone,
+      email,
+      address,
+      serviceType: service,
+      size,
+      description,
+      contactPreference: contactPref,
+      referral: document.getElementById('i_referral').value,
+      submittedAt: new Date().toISOString()
+    });
+
+    // Also create a job inquiry (submitInquiryJob sets status internally)
+    await DataStore.submitInquiryJob({
+      clientName: name,
+      title: service.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+      address,
+      type: service,
+      sqft: size,
+      price: null, grantFunded: false, grantName: null, grantAmount: null,
+      notes: `Submitted via intake form.\n\nDescription: ${description}\n\nContact: ${phone}${email ? ' / ' + email : ''}.\nPreferred contact: ${contactPref}.`,
+      activityLog: [{ ts: new Date().toISOString(), note: 'Received via intake form.' }]
+    });
+
+    // Show thank you
+    document.getElementById('intakeForm').style.display = 'none';
+    document.getElementById('thanksScreen').classList.add('visible');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch (err) {
+    errEl.textContent =
+      'Something went wrong sending your request. Please try again, or call us directly.';
+    errEl.classList.add('visible');
+  }
 });
 </script>
 </body>

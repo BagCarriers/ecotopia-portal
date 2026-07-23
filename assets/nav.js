@@ -201,6 +201,32 @@ const Nav = (() => {
       moreDrawer.classList.toggle('open');
     });
     document.addEventListener('click', () => moreDrawer.classList.remove('open'));
+
+    // ── Admin-only Users link (async: role fetch) ────────────────────────────
+    if (typeof AuthManager !== 'undefined' && AuthManager.getRole) {
+      AuthManager.getRole().then((role) => {
+        if (role !== 'admin') return;
+        const activeCls = isActive('users.html') ? 'active' : '';
+        // Desktop sidebar (appended after the last nav link, before the footer)
+        const nav = document.querySelector('#eco-sidebar nav');
+        if (nav) {
+          const a = document.createElement('a');
+          a.href = 'users.html';
+          a.className = activeCls;
+          a.innerHTML = '<span class="nav-icon">🔑</span>Users';
+          nav.appendChild(a);
+        }
+        // Mobile "More" drawer
+        const drawer = document.getElementById('eco-more-drawer');
+        if (drawer) {
+          const m = document.createElement('a');
+          m.href = 'users.html';
+          m.className = activeCls;
+          m.innerHTML = '<span class="nav-icon">🔑</span>Users';
+          drawer.appendChild(m);
+        }
+      }).catch(() => { /* role fetch failed: omit the admin link, fail closed */ });
+    }
   }
 
   return { render };

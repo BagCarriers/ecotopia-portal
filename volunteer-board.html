@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Open Responsibilities — Ecotopia</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/mapping.js"></script>
+<script src="assets/auth.js"></script>
 <script src="assets/data.js"></script>
 <style>
   :root {
@@ -78,6 +83,7 @@
     font-size: 0.875rem; font-weight: 600; text-align: center; }
 
   .empty-tasks { color: var(--text-dim); font-size: 0.875rem; font-style: italic; }
+  .claim-error { color: #b3261e; font-size: 0.8rem; margin-top: 8px; }
 
   @media (max-width: 540px) {
     .task-grid { grid-template-columns: 1fr; }
@@ -101,7 +107,10 @@
 </div>
 
 <script>
+const esc = DataStore.esc;
 const claimedTasks = {};
+let gardens = [];
+let allTasks = [];
 
 function cadenceLabel(days) {
   if (days <= 2) return `${days}x/wk`;
@@ -115,15 +124,14 @@ function timeLabel(mins) {
 }
 
 function renderBoard() {
-  const gardens = DataStore.getGardens();
   const el = document.getElementById('boardContent');
 
   el.innerHTML = gardens.map(g => {
-    const openTasks = DataStore.getTasksByGarden(g.id).filter(t => t.owner === 'open');
+    const openTasks = allTasks.filter(t => t.gardenId === g.id && t.owner === 'open');
     return `
       <div class="garden-section">
-        <div class="garden-name">${g.name}</div>
-        <div class="garden-addr">📍 ${g.address} · ${g.sqft.toLocaleString()} sqft</div>
+        <div class="garden-name">${esc(g.name)}</div>
+        <div class="garden-addr">📍 ${esc(g.address)} · ${Number(g.sqft || 0).toLocaleString()} sqft</div>
         ${openTasks.length === 0
           ? '<p class="empty-tasks">All tasks at this garden are covered. 🎉</p>'
           : `<div class="task-grid">
@@ -137,18 +145,18 @@ function taskCard(t, g) {
   const isClaimed = claimedTasks[t.id];
   return `
     <div class="task-card" id="card_${t.id}">
-      <div class="task-card-title">${t.title}</div>
+      <div class="task-card-title">${esc(t.title)}</div>
       <div class="task-meta">
         <span class="meta-pill pill-cadence">${cadenceLabel(t.cadenceDays)}</span>
         <span class="meta-pill pill-time">~${timeLabel(t.estMinutes)}</span>
-        ${t.skillLevel !== 'none' ? `<span class="meta-pill pill-skill">${t.skillLevel}</span>` : ''}
+        ${t.skillLevel !== 'none' ? `<span class="meta-pill pill-skill">${esc(t.skillLevel)}</span>` : ''}
       </div>
-      <div style="font-size:0.8rem;color:var(--text-dim)">📍 ${g.name} · ${g.address}</div>
+      <div style="font-size:0.8rem;color:var(--text-dim)">📍 ${esc(g.name)} · ${esc(g.address)}</div>
       ${isClaimed
         ? `<div class="claimed-badge">✓ You signed up for this!</div>`
         : `<button class="btn-claim" onclick="openClaimForm('${t.id}')">I'll take this →</button>
            <div class="claim-form" id="form_${t.id}">
-             <h4>Sign up for "${t.title}"</h4>
+             <h4>Sign up for "${esc(t.title)}"</h4>
              <div class="cf-group"><label>Your Name *</label>
                <input type="text" id="cf_name_${t.id}" placeholder="First & last name"></div>
              <div class="cf-group"><label>Phone *</label>
@@ -159,8 +167,9 @@ function taskCard(t, g) {
                <input type="text" id="cf_sched_${t.id}" placeholder="e.g. Saturday mornings"></div>
              <div class="cf-actions">
                <button class="btn-cancel" onclick="closeClaimForm('${t.id}')">Cancel</button>
-               <button class="btn-submit" onclick="submitClaim('${t.id}', '${g.id}', '${g.name}', '${t.title.replace(/'/g, "\\'")}')">Submit</button>
+               <button class="btn-submit" onclick="submitClaim('${t.id}')">Submit</button>
              </div>
+             <div class="claim-error" id="err_${t.id}"></div>
            </div>`}
     </div>`;
 }
@@ -172,20 +181,33 @@ function closeClaimForm(taskId) {
   document.getElementById('form_' + taskId).classList.remove('open');
 }
 
-function submitClaim(taskId, gardenId, gardenName, taskTitle) {
+async function submitClaim(taskId) {
+  const task = allTasks.find(t => t.id === taskId);
+  if (!task) return;
+  const garden = gardens.find(g => g.id === task.gardenId);
   const name = document.getElementById('cf_name_' + taskId).value.trim();
   const phone = document.getElementById('cf_phone_' + taskId).value.trim();
+  const errEl = document.getElementById('err_' + taskId);
+  if (errEl) errEl.textContent = '';
   if (!name || !phone) {
     alert('Name and phone are required.');
     return;
   }
-  DataStore.addVolunteerApplication({
-    taskId, gardenId, gardenName, taskTitle,
-    name, phone,
-    email: document.getElementById('cf_email_' + taskId).value.trim(),
-    preferredSchedule: document.getElementById('cf_sched_' + taskId).value.trim(),
-    submittedAt: new Date().toISOString()
-  });
+  try {
+    await DataStore.addVolunteerApplication({
+      taskId,
+      gardenId: task.gardenId,
+      gardenName: garden ? garden.name : null,
+      taskTitle: task.title,
+      name, phone,
+      email: document.getElementById('cf_email_' + taskId).value.trim(),
+      preferredSchedule: document.getElementById('cf_sched_' + taskId).value.trim(),
+      submittedAt: new Date().toISOString()
+    });
+  } catch (err) {
+    if (errEl) errEl.textContent = 'Could not submit your sign-up. Please try again.';
+    return;
+  }
   claimedTasks[taskId] = true;
   renderBoard();
   // Smooth scroll to the submitted card
@@ -195,7 +217,15 @@ function submitClaim(taskId, gardenId, gardenName, taskTitle) {
   }, 100);
 }
 
-renderBoard();
+(async function init() {
+  try {
+    [gardens, allTasks] = await Promise.all([DataStore.getGardens(), DataStore.getTasks()]);
+    renderBoard();
+  } catch (err) {
+    document.getElementById('boardContent').innerHTML =
+      '<p class="empty-tasks">Could not load open tasks right now. Please refresh the page.</p>';
+  }
+})();
 </script>
 </body>
 </html>

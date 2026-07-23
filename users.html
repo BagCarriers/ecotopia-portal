@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Users — Ecotopia</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/mapping.js"></script>
+<script src="assets/auth.js"></script>
+<script>if (!AuthManager.hasCachedSession()) location.replace('login.html');</script>
+<script src="assets/data.js"></script>
+<script src="assets/nav.js"></script>
+<style>
+  :root {
+    --forest: #1B4332; --forest-mid: #2D6A4F; --forest-light: #52B788;
+    --sage: #D8F3DC; --sage-dim: #B7E4C7; --earth: #8B5E3C;
+    --earth-light: #C68642; --gold: #F4A261; --cream: #F9F6F0;
+    --cream-dim: #E8E0D5; --text: #1C1C1C; --text-dim: #5A5A5A;
+    --border: rgba(45,106,79,0.2);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--text); }
+  .page { padding: 28px 32px; max-width: 900px; }
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+  h1 { font-family: 'Fraunces', serif; font-size: 1.9rem; color: var(--forest); }
+  h2.section { font-family: 'Fraunces', serif; font-size: 1.2rem; color: var(--forest);
+    margin: 32px 0 14px; }
+  .btn { padding: 10px 18px; border-radius: 8px; border: none; font-size: 0.875rem;
+    font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif;
+    text-decoration: none; display: inline-flex; gap: 6px; align-items: center;
+    transition: background 0.15s; }
+  .btn-primary { background: var(--forest); color: #fff; }
+  .btn-primary:hover { background: var(--forest-mid); }
+
+  .card { background: #fff; border-radius: 12px; border: 1px solid var(--border); overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; }
+  thead th { text-align: left; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--text-dim); padding: 12px 16px; border-bottom: 1px solid var(--border); font-weight: 700; }
+  tbody td { padding: 14px 16px; font-size: 0.9rem; border-bottom: 1px solid var(--border);
+    vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  .role-pill { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 0.72rem;
+    font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+  .role-admin { background: var(--sage); color: var(--forest); }
+  .role-user { background: var(--cream-dim); color: var(--text-dim); }
+  .status-active { color: var(--forest-mid); font-weight: 600; }
+  .status-inactive { color: #b3261e; font-weight: 600; }
+  .row-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn-sm { font-size: 0.78rem; padding: 5px 10px; background: transparent; border: 1px solid var(--border);
+    border-radius: 6px; cursor: pointer; color: var(--text-dim); font-family: 'DM Sans', sans-serif;
+    transition: all 0.15s; }
+  .btn-sm:hover { color: var(--forest); border-color: var(--forest-light); background: var(--sage); }
+  .btn-sm[disabled] { opacity: 0.5; cursor: default; }
+
+  .invite-row { padding: 14px 16px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+  .invite-row:last-child { border-bottom: none; }
+  .invite-info { font-size: 0.9rem; }
+  .invite-meta { font-size: 0.78rem; color: var(--text-dim); margin-top: 2px; }
+  .invite-link { font-size: 0.75rem; color: var(--forest-mid); word-break: break-all;
+    max-width: 420px; margin-top: 4px; }
+
+  .empty { padding: 20px 16px; color: var(--text-dim); font-size: 0.875rem; text-align: center; }
+  .modal-error { color: #b3261e; font-size: 0.85rem; margin-top: 8px; }
+  #pageError { margin-bottom: 16px; }
+  #pageError:empty { display: none; }
+
+  /* Modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+    z-index: 500; align-items: center; justify-content: center; padding: 20px; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: #fff; border-radius: 16px; padding: 28px;
+    width: 100%; max-width: 460px; box-shadow: 0 20px 60px rgba(0,0,0,0.25); }
+  .modal h2 { font-family: 'Fraunces', serif; color: var(--forest); margin-bottom: 20px; }
+  .form-group { margin-bottom: 16px; }
+  .form-group label { display: block; font-size: 0.82rem; font-weight: 600;
+    color: var(--text-dim); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .form-group input, .form-group select { width: 100%; padding: 10px 12px; border-radius: 7px;
+    border: 1.5px solid var(--border); font-size: 0.9rem; font-family: 'DM Sans', sans-serif;
+    color: var(--text); background: #fff; }
+  .form-group input:focus, .form-group select:focus { outline: none; border-color: var(--forest-light); }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+  .btn-cancel { background: var(--cream-dim); color: var(--text); padding: 10px 18px;
+    border-radius: 8px; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+
+  .invite-result { display: none; background: var(--sage); border-radius: 10px; padding: 14px;
+    margin-bottom: 16px; }
+  .invite-result.visible { display: block; }
+  .invite-result label { display: block; font-size: 0.75rem; font-weight: 700; color: var(--forest);
+    text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; }
+  .invite-result .link-row { display: flex; gap: 8px; }
+  .invite-result input { flex: 1; padding: 8px 10px; border-radius: 6px; border: 1px solid var(--border);
+    font-size: 0.78rem; font-family: 'DM Sans', sans-serif; background: #fff; color: var(--text); }
+
+  @media (max-width: 600px) { .page { padding: 20px 16px; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="page-header">
+    <h1>Users</h1>
+    <button class="btn btn-primary" onclick="openInvite()">+ Invite User</button>
+  </div>
+
+  <div class="modal-error" id="pageError"></div>
+
+  <h2 class="section">Portal Users</h2>
+  <div class="card" id="usersCard">
+    <div class="empty">Loading…</div>
+  </div>
+
+  <h2 class="section">Pending Invites</h2>
+  <div class="card" id="invitesCard">
+    <div class="empty">Loading…</div>
+  </div>
+</div>
+
+<!-- Invite modal -->
+<div class="modal-overlay" id="inviteModal">
+  <div class="modal">
+    <h2>Invite a User</h2>
+    <div class="invite-result" id="inviteResult">
+      <label>Share this accept link</label>
+      <div class="link-row">
+        <input type="text" id="inviteLink" readonly>
+        <button type="button" class="btn btn-primary" onclick="copyInviteLink()">Copy</button>
+      </div>
+    </div>
+    <form id="inviteForm" novalidate>
+      <div class="form-group">
+        <label>Email *</label>
+        <input type="email" id="inv_email" required placeholder="person@example.com">
+      </div>
+      <div class="form-group">
+        <label>Role *</label>
+        <select id="inv_role">
+          <option value="user">User</option>
+          <option value="admin">Admin</option>
+        </select>
+      </div>
+      <div class="modal-error" id="inviteError"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" onclick="closeInvite()">Close</button>
+        <button type="submit" class="btn btn-primary">Create Invite</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+const esc = DataStore.esc;
+let currentUserId = null;
+let invites = [];
+
+function acceptLinkFor(token) {
+  return location.origin + location.pathname.replace('users.html', 'accept-invite.html') + '?token=' + token;
+}
+
+function renderUsers(users) {
+  const el = document.getElementById('usersCard');
+  if (!users.length) { el.innerHTML = '<div class="empty">No portal users yet.</div>'; return; }
+  el.innerHTML = `
+    <table>
+      <thead><tr><th>Email</th><th>Role</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>
+        ${users.map(u => {
+          const isSelf = u.user_id === currentUserId;
+          const roleCls = u.role === 'admin' ? 'role-admin' : 'role-user';
+          const otherRole = u.role === 'admin' ? 'user' : 'admin';
+          return `
+            <tr>
+              <td>${esc(u.email)}${isSelf ? ' <span style="color:var(--text-dim);font-size:0.78rem">(you)</span>' : ''}</td>
+              <td><span class="role-pill ${roleCls}">${esc(u.role)}</span></td>
+              <td class="${u.active ? 'status-active' : 'status-inactive'}">${u.active ? 'Active' : 'Inactive'}</td>
+              <td>
+                <div class="row-actions">
+                  <button class="btn-sm" onclick="toggleRole('${u.user_id}')" ${isSelf ? 'disabled title="You cannot change your own role"' : ''}>Make ${esc(otherRole)}</button>
+                  ${u.active
+                    ? `<button class="btn-sm" onclick="setActive('${u.user_id}', false)" ${isSelf ? 'disabled title="You cannot deactivate yourself"' : ''}>Deactivate</button>`
+                    : `<button class="btn-sm" onclick="setActive('${u.user_id}', true)">Reactivate</button>`}
+                </div>
+              </td>
+            </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+}
+
+function renderInvites(rows) {
+  invites = rows;
+  const el = document.getElementById('invitesCard');
+  if (!rows.length) { el.innerHTML = '<div class="empty">No pending invites.</div>'; return; }
+  el.innerHTML = rows.map(inv => `
+    <div class="invite-row">
+      <div class="invite-info">
+        <div>${esc(inv.email)} <span class="role-pill ${inv.role === 'admin' ? 'role-admin' : 'role-user'}">${esc(inv.role)}</span></div>
+        <div class="invite-meta">Expires ${DataStore.formatDate(inv.expires_at)}</div>
+        <div class="invite-link">${esc(acceptLinkFor(inv.token))}</div>
+      </div>
+      <button class="btn-sm" onclick="copyPendingLink('${inv.id}')">Copy link</button>
+    </div>`).join('');
+}
+
+async function refresh() {
+  const sb = window.ecoSupabase;
+  const [users, invitesRes] = await Promise.all([
+    sb.from('portal_users').select('*').order('created_at'),
+    sb.from('portal_invites').select('*').is('used_at', null).order('created_at'),
+  ]);
+  if (users.error) throw new Error(users.error.message);
+  if (invitesRes.error) throw new Error(invitesRes.error.message);
+  renderUsers(users.data || []);
+  renderInvites(invitesRes.data || []);
+}
+
+async function toggleRole(userId) {
+  const errEl = document.getElementById('pageError');
+  errEl.textContent = '';
+  const sb = window.ecoSupabase;
+  try {
+    const { data: row, error: rErr } = await sb.from('portal_users')
+      .select('role').eq('user_id', userId).maybeSingle();
+    if (rErr) throw new Error(rErr.message);
+    if (!row) throw new Error('User not found.');
+    const nextRole = row.role === 'admin' ? 'user' : 'admin';
+    const { error } = await sb.from('portal_users').update({ role: nextRole }).eq('user_id', userId);
+    if (error) throw new Error(error.message);
+    await refresh();
+  } catch (err) {
+    errEl.textContent = 'Could not change role. ' + err.message;
+  }
+}
+
+async function setActive(userId, active) {
+  const errEl = document.getElementById('pageError');
+  errEl.textContent = '';
+  const sb = window.ecoSupabase;
+  try {
+    const { error } = await sb.from('portal_users').update({ active }).eq('user_id', userId);
+    if (error) throw new Error(error.message);
+    await refresh();
+  } catch (err) {
+    errEl.textContent = 'Could not update status. ' + err.message;
+  }
+}
+
+async function createInvite(email, role) {
+  const sb = window.ecoSupabase;
+  const token = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
+  const { error } = await sb.from('portal_invites').insert({
+    email, role, token,
+    expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),
+  });
+  if (error) throw new Error(error.message);
+  return acceptLinkFor(token);
+}
+
+function openInvite() {
+  document.getElementById('inviteError').textContent = '';
+  document.getElementById('inviteResult').classList.remove('visible');
+  document.getElementById('inviteForm').reset();
+  document.getElementById('inviteModal').classList.add('open');
+}
+function closeInvite() {
+  document.getElementById('inviteModal').classList.remove('open');
+}
+document.getElementById('inviteModal').addEventListener('click', function(e) {
+  if (e.target === this) closeInvite();
+});
+
+document.getElementById('inviteForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const email = document.getElementById('inv_email').value.trim();
+  const role = document.getElementById('inv_role').value;
+  const errEl = document.getElementById('inviteError');
+  errEl.textContent = '';
+  if (!email) { errEl.textContent = 'Email is required.'; return; }
+  try {
+    const link = await createInvite(email, role);
+    document.getElementById('inviteLink').value = link;
+    document.getElementById('inviteResult').classList.add('visible');
+    document.getElementById('inviteForm').reset();
+    await refresh();
+  } catch (err) {
+    errEl.textContent = 'Could not create invite. ' + err.message;
+  }
+});
+
+function copyInviteLink() {
+  const input = document.getElementById('inviteLink');
+  input.select();
+  if (navigator.clipboard) navigator.clipboard.writeText(input.value).catch(() => {});
+  else document.execCommand('copy');
+}
+
+function copyPendingLink(id) {
+  const inv = invites.find(x => x.id === id);
+  if (!inv) return;
+  const link = acceptLinkFor(inv.token);
+  if (navigator.clipboard) navigator.clipboard.writeText(link).catch(() => {});
+}
+
+(async function init() {
+  try {
+    await AuthManager.requireAuth();
+    Nav.render();
+    if ((await AuthManager.getRole()) !== 'admin') { location.replace('dashboard.html'); return; }
+    const { data } = await window.ecoSupabase.auth.getSession();
+    currentUserId = data && data.session ? data.session.user.id : null;
+    await refresh();
+  } catch (err) {
+    document.getElementById('usersCard').innerHTML =
+      '<div class="empty">Could not load users (' + esc(err.message) + '). <a href="javascript:location.reload()">Retry</a></div>';
+  }
+})();
+</script>
+</body>
+</html>
