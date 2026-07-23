@@ -1,5 +1,5 @@
 /**
- * Ecotopia Portal — Nav
+ * Ecotopia Portal - Nav
  * Injects sidebar (desktop) + bottom nav (mobile) into protected pages.
  */
 const Nav = (() => {
@@ -155,7 +155,7 @@ const Nav = (() => {
           </a>`).join('')}
       </nav>
       <div class="sidebar-footer">
-        <button onclick="AuthManager.signOut()">Sign out (Jordan)</button>
+        <button id="eco-signout-btn" onclick="AuthManager.signOut()">Sign out</button>
       </div>
     `;
     document.body.insertBefore(sidebar, document.body.firstChild);
@@ -201,6 +201,15 @@ const Nav = (() => {
       moreDrawer.classList.toggle('open');
     });
     document.addEventListener('click', () => moreDrawer.classList.remove('open'));
+
+    // ── Personalize sign-out label with the signed-in user (async) ───────────
+    if (typeof AuthManager !== 'undefined' && AuthManager.getUser) {
+      AuthManager.getUser().then((email) => {
+        if (!email) return;
+        const btn = document.getElementById('eco-signout-btn');
+        if (btn) btn.textContent = 'Sign out (' + email.split('@')[0] + ')';
+      }).catch(() => {});
+    }
 
     // ── Admin-only Users link (async: role fetch) ────────────────────────────
     if (typeof AuthManager !== 'undefined' && AuthManager.getRole) {

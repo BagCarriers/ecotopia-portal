@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Volunteer — Ecotopia</title>
+<title>Volunteer - Ecotopia</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="assets/supabase.js"></script>
 <script src="assets/config.js"></script>
@@ -104,7 +104,7 @@ const esc = DataStore.esc;
 
 function dueCls(d) { return d === null ? 'due-green' : d <= 0 ? 'due-red' : d <= 3 ? 'due-amber' : 'due-green'; }
 function dueLabel(d) {
-  if (d === null) return '—';
+  if (d === null) return '-';
   if (d < 0) return `${Math.abs(d)}d overdue`;
   if (d === 0) return 'Today';
   return `In ${d}d`;
@@ -116,7 +116,7 @@ function renderPage(volunteer, vTasks, vCheckins, gardens) {
     el.innerHTML = '<p style="color:var(--text-dim)">Volunteer not found.</p>';
     return;
   }
-  document.title = `${volunteer.name} — Ecotopia`;
+  document.title = `${volunteer.name} - Ecotopia`;
 
   const initials = volunteer.name.split(' ').map(w => w[0]).join('').slice(0, 2);
   const allCheckins = vCheckins.slice()
@@ -174,7 +174,7 @@ function renderPage(volunteer, vTasks, vCheckins, gardens) {
               t.cadenceDays <= 14 ? 'Biweekly' : t.cadenceDays <= 30 ? 'Monthly' : `Every ${t.cadenceDays}d`;
             return `<tr>
               <td>${esc(t.title)}</td>
-              <td>${g ? esc(g.name) : '—'}</td>
+              <td>${g ? esc(g.name) : '-'}</td>
               <td>${cadLabel}</td>
               <td><span class="due-text ${dueCls(d)}">${dueLabel(d)}</span></td>
             </tr>`;
@@ -217,7 +217,7 @@ function renderPage(volunteer, vTasks, vCheckins, gardens) {
               <td>${esc(ci.taskTitle)}</td>
               <td>${ci.hoursLogged}</td>
               <td><span class="type-badge type-${ci.type || 'manual'}">${esc(ci.type || 'manual')}</span></td>
-              <td style="color:var(--text-dim)">${ci.notes ? esc(ci.notes) : '—'}</td>
+              <td style="color:var(--text-dim)">${ci.notes ? esc(ci.notes) : '-'}</td>
             </tr>`).join('')}
           </tbody>
         </table>`}

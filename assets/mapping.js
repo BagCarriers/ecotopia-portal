@@ -1,5 +1,5 @@
 /**
- * Ecotopia Portal — key mapping between DB rows (snake_case) and page objects (camelCase).
+ * Ecotopia Portal - key mapping between DB rows (snake_case) and page objects (camelCase).
  * Top-level keys only; values (including jsonb arrays/objects) pass through untouched.
  * Loadable in the browser (script tag) and in Node (require) for tests.
  */

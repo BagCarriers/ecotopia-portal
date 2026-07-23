@@ -36,13 +36,24 @@ await check('anon sees zero invoices rows', async () => {
 });
 await check('anon reads volunteers_public (200)', async () => {
   const r = await get('volunteers_public?select=name'); assert(r.status === 200, `status ${r.status}`);
+  // The public view must not expose PII columns like phone.
+  const p = await get('volunteers_public?select=phone');
+  assert(p.status >= 400, `phone column readable (status ${p.status})`);
 });
 await check('anon CANNOT insert clients', async () => {
   const r = await post('clients', { name: 'RLS-TEST' }); assert(r.status >= 400, `status ${r.status}`);
 });
 await check('anon CANNOT update gardens', async () => {
-  const r = await fetch(`${URL_}/rest/v1/gardens?name=eq.x`, {
-    method: 'PATCH', headers: H, body: JSON.stringify({ name: 'y' }),
+  // Prefer targeting a real row so the policy is genuinely exercised; fall back
+  // to a no-match filter when the DB is empty (passes vacuously in that case).
+  const list = await get('gardens?select=id&limit=1');
+  const rows = await list.json().catch(() => []);
+  const id = Array.isArray(rows) && rows.length ? rows[0].id : null;
+  const path = id ? `gardens?id=eq.${id}` : 'gardens?name=eq.__nomatch__';
+  const r = await fetch(`${URL_}/rest/v1/${path}`, {
+    method: 'PATCH',
+    headers: { ...H, Prefer: 'return=representation' },
+    body: JSON.stringify({ name: 'y' }),
   });
   const body = await r.json().catch(() => []);
   assert(r.status >= 400 || (Array.isArray(body) && body.length === 0), `status ${r.status}`);

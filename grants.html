@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Grants — Ecotopia</title>
+<title>Grants - Ecotopia</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="assets/supabase.js"></script>
 <script src="assets/config.js"></script>
@@ -225,7 +225,7 @@ const STATUS_LABELS = {
 function populateJobsDropdown() {
   document.getElementById('gr_job').innerHTML =
     '<option value="">None</option>' +
-    jobs.map(j => `<option value="${j.id}">${esc(j.clientName)} — ${esc(j.title)}</option>`).join('');
+    jobs.map(j => `<option value="${j.id}">${esc(j.clientName)} - ${esc(j.title)}</option>`).join('');
 }
 
 function renderGrants() {
@@ -261,7 +261,7 @@ function renderGrants() {
           </div>
           ${job ? `<div class="grant-info-item">
             <div class="label">Linked Job</div>
-            <div class="val"><a href="job-detail.html?id=${job.id}" style="color:var(--forest-mid)">${esc(job.clientName)} — ${esc(job.title)}</a></div>
+            <div class="val"><a href="job-detail.html?id=${job.id}" style="color:var(--forest-mid)">${esc(job.clientName)} - ${esc(job.title)}</a></div>
           </div>` : ''}
           ${g.deadline ? `<div class="grant-info-item">
             <div class="label">Deadline</div>
@@ -360,7 +360,7 @@ document.getElementById('grantFormEl').addEventListener('submit', async function
       amount: parseFloat(document.getElementById('gr_amount').value) || 0,
       status: document.getElementById('gr_status').value,
       jobId: jobId || null,
-      jobTitle: job ? `${job.clientName} — ${job.title}` : '',
+      jobTitle: job ? `${job.clientName} - ${job.title}` : '',
       deadline: document.getElementById('gr_deadline').value || null,
       appliedDate: new Date().toISOString().slice(0, 10),
       notes: document.getElementById('gr_notes').value.trim()

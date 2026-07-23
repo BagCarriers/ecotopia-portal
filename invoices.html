@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Invoices — Ecotopia</title>
+<title>Invoices - Ecotopia</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="assets/supabase.js"></script>
 <script src="assets/config.js"></script>
@@ -192,10 +192,10 @@ function renderTable() {
   document.getElementById('invBody').innerHTML = sorted.map(inv => `
     <tr>
       <td><strong>${esc(inv.clientName)}</strong></td>
-      <td>${inv.jobTitle ? esc(inv.jobTitle) : '—'}</td>
+      <td>${inv.jobTitle ? esc(inv.jobTitle) : '-'}</td>
       <td><strong>$${inv.amount?.toFixed(2)}</strong></td>
       <td><span class="status-pill pill-${esc(inv.status)}">${esc(inv.status.charAt(0).toUpperCase() + inv.status.slice(1))}</span></td>
-      <td>${inv.dueDate ? DataStore.formatDate(inv.dueDate + 'T00:00:00') : '—'}</td>
+      <td>${inv.dueDate ? DataStore.formatDate(inv.dueDate + 'T00:00:00') : '-'}</td>
       <td>
         <div class="actions-cell">
           <button class="btn-edit" onclick="openEditInv('${inv.id}')">✏️ Edit</button>

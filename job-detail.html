@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Job Detail — Ecotopia</title>
+<title>Job Detail - Ecotopia</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="assets/supabase.js"></script>
 <script src="assets/config.js"></script>
@@ -223,7 +223,7 @@ function render() {
     el.innerHTML = '<p style="color:var(--text-dim)">Job not found. <a href="jobs.html">Back to jobs</a></p>';
     return;
   }
-  document.title = `${job.title} — Ecotopia`;
+  document.title = `${job.title} - Ecotopia`;
   const currentIdx = STATUS_ORDER.indexOf(job.status);
   const nextStatus = STATUS_ORDER[currentIdx + 1];
 
@@ -269,7 +269,7 @@ function render() {
       <div class="card">
         <h2>Job Details</h2>
         <div class="info-row"><span class="info-label">Type</span><span class="info-value">${esc(job.type?.replace(/_/g,' '))}</span></div>
-        <div class="info-row"><span class="info-label">Status</span><span class="info-value"><span class="status-pill pill-${job.status}">${STATUS_LABELS[job.status]}</span></span></div>
+        <div class="info-row"><span class="info-label">Status</span><span class="info-value"><span class="status-pill pill-${esc(job.status)}">${esc(STATUS_LABELS[job.status] || job.status)}</span></span></div>
         ${job.sqft ? `<div class="info-row"><span class="info-label">Size</span><span class="info-value">${esc(job.sqft)}</span></div>` : ''}
         ${job.price ? `<div class="info-row"><span class="info-label">Price</span><span class="info-value">$${job.price.toLocaleString()}</span></div>` : ''}
         <div class="info-row"><span class="info-label">Created</span><span class="info-value">${DataStore.formatDate(job.createdAt)}</span></div>

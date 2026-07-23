@@ -1,5 +1,5 @@
 /**
- * Ecotopia Portal — Supabase config. The anon key is public-safe by design;
+ * Ecotopia Portal - Supabase config. The anon key is public-safe by design;
  * all protection comes from RLS. Never put any other key in this repo.
  */
 window.ECO_CONFIG = {

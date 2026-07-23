@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Check In — Ecotopia</title>
+<title>Check In - Ecotopia</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="assets/supabase.js"></script>
 <script src="assets/config.js"></script>
@@ -147,7 +147,6 @@ const todayStr = new Date().toLocaleDateString('en-US', { weekday: 'long', month
 let garden = null;
 let tasks = [];
 let walkins = [];
-let volunteersPublic = [];
 let selectedPath = null;
 let selectedTask = null;
 let checkInStartTime = null;
@@ -163,10 +162,9 @@ let checkInStartTime = null;
         </div>`;
       return;
     }
-    [tasks, walkins, volunteersPublic] = await Promise.all([
+    [tasks, walkins] = await Promise.all([
       DataStore.getTasksByGarden(garden.id),
       DataStore.getWalkinsByGarden(garden.id),
-      DataStore.getVolunteersPublic(),
     ]);
     renderMain();
   } catch (err) {
@@ -382,7 +380,7 @@ function checkInWalkin() {
 
   document.getElementById('panelB').classList.remove('active');
   document.getElementById('panelActive').classList.add('active');
-  document.getElementById('activeTaskTitle').textContent = `${name} — ${selectedTask.title}`;
+  document.getElementById('activeTaskTitle').textContent = `${name} - ${selectedTask.title}`;
   document.getElementById('activeTaskSub').textContent = `Started at ${checkInStartTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} · ${garden.name}`;
 }
 

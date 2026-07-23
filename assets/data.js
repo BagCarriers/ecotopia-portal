@@ -1,5 +1,5 @@
 /**
- * Ecotopia Portal — DataStore (Supabase-backed).
+ * Ecotopia Portal - DataStore (Supabase-backed).
  * Every data method returns a Promise and throws Error on failure.
  * Rows come back camelCase (EcoMapping); writes accept camelCase.
  * submit* methods use return=minimal inserts so anon RLS (no select) works.

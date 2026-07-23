@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Garden Detail — Ecotopia</title>
+<title>Garden Detail - Ecotopia</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="assets/supabase.js"></script>
 <script src="assets/config.js"></script>
@@ -301,7 +301,7 @@ let qrInstance = null;
 
 function dueCls(d) { return d === null ? 'green' : d <= 0 ? 'due-red' : d <= 3 ? 'due-amber' : 'due-green'; }
 function dueLabel(d) {
-  if (d === null) return '—';
+  if (d === null) return '-';
   if (d < 0) return `${Math.abs(d)}d overdue`;
   if (d === 0) return 'Today';
   return `In ${d}d`;
@@ -313,7 +313,7 @@ function renderPage() {
     el.innerHTML = '<p>Garden not found. <a href="gardens.html">Back to gardens</a></p>';
     return;
   }
-  document.title = `${garden.name} — Ecotopia`;
+  document.title = `${garden.name} - Ecotopia`;
   const gTasks = tasks;
   const gCheckins = checkins.slice()
     .sort((a, b) => new Date(b.checkInTime) - new Date(a.checkInTime))
@@ -414,7 +414,7 @@ function renderPage() {
               <td>${esc(ci.taskTitle)}</td>
               <td>${DataStore.formatDate(ci.checkInTime)}</td>
               <td>${ci.hoursLogged}</td>
-              <td style="color:var(--text-dim)">${ci.notes ? esc(ci.notes) : '—'}</td>
+              <td style="color:var(--text-dim)">${ci.notes ? esc(ci.notes) : '-'}</td>
             </tr>`).join('')}
           </tbody>
         </table>`}

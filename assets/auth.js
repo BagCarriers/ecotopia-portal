@@ -1,5 +1,5 @@
 /**
- * Ecotopia Portal — Auth Manager (Supabase Auth).
+ * Ecotopia Portal - Auth Manager (Supabase Auth).
  * All methods async except hasCachedSession(), a cheap sync pre-render guard.
  * requireAuth() is authoritative: valid session AND active portal_users row.
  */

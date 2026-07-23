@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Volunteers — Ecotopia</title>
+<title>Volunteers - Ecotopia</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="assets/supabase.js"></script>
 <script src="assets/config.js"></script>
@@ -239,7 +239,7 @@ function renderTable() {
     return `
       <tr onclick="window.location='volunteer-detail.html?id=${v.id}'">
         <td><span class="vol-name">${esc(v.name)}</span></td>
-        <td>${skillPills || '<span style="color:var(--text-dim)">—</span>'}</td>
+        <td>${skillPills || '<span style="color:var(--text-dim)">-</span>'}</td>
         <td>${vTasks.length}</td>
         <td>${hours.toFixed(1)}</td>
         <td>${lastActive}</td>

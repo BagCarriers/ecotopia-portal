@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Calendar — Ecotopia</title>
+<title>Calendar - Ecotopia</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="assets/supabase.js"></script>
 <script src="assets/config.js"></script>
@@ -164,7 +164,7 @@ function buildDateMap(year, month) {
     addItem(ev.date, { type: 'event', label: ev.title, sub: ev.gardenName || '' });
   });
 
-  // Tasks — mark next due dates
+  // Tasks - mark next due dates
   tasks.forEach(t => {
     if (!t.nextDue) return;
     const d = t.nextDue.slice(0, 10);
@@ -172,7 +172,7 @@ function buildDateMap(year, month) {
     addItem(d, { type: 'task', label: t.title, sub: g ? g.name : '' });
   });
 
-  // Jobs — show active jobs roughly
+  // Jobs - show active jobs roughly
   jobs.filter(j => j.status === 'active').forEach(j => {
     const d = new Date(year, month, 15).toISOString().slice(0, 10);
     addItem(d, { type: 'job', label: j.title, sub: j.clientName });
