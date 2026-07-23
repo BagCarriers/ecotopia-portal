@@ -79,6 +79,16 @@ function unfold(raw: string): string[] {
   return out;
 }
 
+// Allowlist the stored ICS URL: it must be a Google Calendar secret address.
+// Defense-in-depth against SSRF via a maliciously-stored settings value.
+function isGoogleCalendarUrl(raw: string): boolean {
+  let u: URL;
+  try { u = new URL(raw); } catch (_e) { return false; }
+  if (u.protocol !== 'https:') return false;
+  const host = u.hostname.toLowerCase();
+  return host === 'calendar.google.com' || host.endsWith('.googleusercontent.com');
+}
+
 interface ParsedEvent { date: string; title: string; allDay: boolean; }
 
 function parseIcs(raw: string): ParsedEvent[] {
@@ -176,6 +186,9 @@ Deno.serve(async (req) => {
         .eq('key', 'google_calendar_ics_url').maybeSingle();
       const icsUrl = setting && typeof setting.value === 'string' ? setting.value : null;
       if (!icsUrl) return json({ configured: false, events: [] }, 200);
+      if (!isGoogleCalendarUrl(icsUrl)) {
+        return json({ error: 'Calendar URL must be a Google Calendar secret address (https://calendar.google.com/...).' }, 400);
+      }
 
       let res: Response;
       try {

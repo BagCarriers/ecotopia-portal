@@ -400,6 +400,16 @@ function goToday() {
 }
 
 // ── Google Calendar sync ────────────────────────────────────────────────
+// Allowlist the ICS URL to a Google Calendar secret address. Mirrors the
+// server-side check in the calendar-feed edge function.
+function isGoogleCalendarUrl(raw) {
+  let u;
+  try { u = new URL(raw); } catch (e) { return false; }
+  if (u.protocol !== 'https:') return false;
+  const host = u.hostname.toLowerCase();
+  return host === 'calendar.google.com' || host.endsWith('.googleusercontent.com');
+}
+
 async function getSetting(key) {
   const { data, error } = await window.ecoSupabase.from('portal_settings')
     .select('value').eq('key', key).maybeSingle();
@@ -497,6 +507,10 @@ async function saveGcalUrl() {
   const errEl = document.getElementById('syncError');
   errEl.textContent = '';
   if (!url) { errEl.textContent = 'Enter a calendar URL first.'; return; }
+  if (!isGoogleCalendarUrl(url)) {
+    errEl.textContent = 'Calendar URL must be a Google Calendar secret address (https://calendar.google.com/...).';
+    return;
+  }
   try {
     const { error } = await window.ecoSupabase.from('portal_settings')
       .upsert({ key: 'google_calendar_ics_url', value: url });
