@@ -5,8 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Grants — Ecotopia</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/mapping.js"></script>
 <script src="assets/auth.js"></script>
-<script>try { AuthManager.requireAuth(); } catch(e) { throw e; }</script>
+<script>if (!AuthManager.hasCachedSession()) location.replace('login.html');</script>
 <script src="assets/data.js"></script>
 <script src="assets/nav.js"></script>
 <style>
@@ -104,6 +108,8 @@
   .btn-cancel { background: var(--cream-dim); color: var(--text); padding: 10px 18px;
     border-radius: 8px; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; }
 
+  .modal-error { color: #b3261e; font-size: 0.85rem; margin-top: 8px; }
+
   @media (max-width: 600px) {
     .page { padding: 20px 16px; }
     .grant-body { grid-template-columns: 1fr; }
@@ -122,6 +128,7 @@
   <div class="inline-form" id="grantForm">
     <h3>New Grant</h3>
     <div class="success-msg" id="grantSuccess">Grant added!</div>
+    <div class="modal-error" id="grantFormError"></div>
     <form id="grantFormEl" novalidate>
       <div class="form-row">
         <div class="form-group"><label>Funder *</label>
@@ -155,6 +162,8 @@
       </div>
     </form>
   </div>
+
+  <div class="modal-error" id="grantPageError" style="margin-bottom:12px;"></div>
 
   <div class="grant-list" id="grantList"></div>
 </div>
@@ -193,6 +202,7 @@
         <textarea id="eg_notes" rows="3" placeholder="Notes…"
           style="width:100%;padding:9px 11px;border-radius:7px;border:1.5px solid var(--border);font-size:0.875rem;font-family:'DM Sans',sans-serif;"></textarea></div>
       <input type="hidden" id="eg_id">
+      <div class="modal-error" id="editGrantError"></div>
       <div class="modal-actions">
         <button type="button" class="btn-cancel" onclick="closeEditGrant()">Cancel</button>
         <button type="submit" class="btn btn-primary">Save Changes</button>
@@ -202,7 +212,9 @@
 </div>
 
 <script>
-Nav.render();
+const esc = DataStore.esc;
+let grants = [];
+let jobs = [];
 
 const STATUSES = ['applied', 'under_review', 'approved', 'active', 'complete'];
 const STATUS_LABELS = {
@@ -210,14 +222,13 @@ const STATUS_LABELS = {
   active: 'Active', complete: 'Complete'
 };
 
-// Populate jobs dropdown
-const jobs = DataStore.getJobs();
-document.getElementById('gr_job').innerHTML =
-  '<option value="">None</option>' +
-  jobs.map(j => `<option value="${j.id}">${j.clientName} — ${j.title}</option>`).join('');
+function populateJobsDropdown() {
+  document.getElementById('gr_job').innerHTML =
+    '<option value="">None</option>' +
+    jobs.map(j => `<option value="${j.id}">${esc(j.clientName)} — ${esc(j.title)}</option>`).join('');
+}
 
 function renderGrants() {
-  const grants = DataStore.getGrants();
   const el = document.getElementById('grantList');
   if (grants.length === 0) {
     el.innerHTML = '<p style="color:var(--text-dim)">No grants tracked yet.</p>';
@@ -225,13 +236,13 @@ function renderGrants() {
   }
   el.innerHTML = grants.map(g => {
     const idx = STATUSES.indexOf(g.status);
-    const job = g.jobId ? DataStore.getJob(g.jobId) : null;
+    const job = g.jobId ? jobs.find(j => j.id === g.jobId) : null;
     return `
       <div class="grant-card">
         <div class="grant-card-top">
           <div>
-            <div class="grant-funder">${g.funder}</div>
-            <div class="grant-program">${g.program}</div>
+            <div class="grant-funder">${esc(g.funder)}</div>
+            <div class="grant-program">${esc(g.program)}</div>
           </div>
           <div class="grant-amount">$${(g.amount || 0).toLocaleString()}</div>
         </div>
@@ -246,11 +257,11 @@ function renderGrants() {
         <div class="grant-body">
           <div class="grant-info-item">
             <div class="label">Status</div>
-            <div class="val"><span class="status-badge badge-${g.status}">${STATUS_LABELS[g.status]}</span></div>
+            <div class="val"><span class="status-badge badge-${esc(g.status)}">${STATUS_LABELS[g.status] || esc(g.status)}</span></div>
           </div>
           ${job ? `<div class="grant-info-item">
             <div class="label">Linked Job</div>
-            <div class="val"><a href="job-detail.html?id=${job.id}" style="color:var(--forest-mid)">${job.clientName} — ${job.title}</a></div>
+            <div class="val"><a href="job-detail.html?id=${job.id}" style="color:var(--forest-mid)">${esc(job.clientName)} — ${esc(job.title)}</a></div>
           </div>` : ''}
           ${g.deadline ? `<div class="grant-info-item">
             <div class="label">Deadline</div>
@@ -262,7 +273,7 @@ function renderGrants() {
           </div>` : ''}
         </div>
 
-        ${g.notes ? `<div class="grant-notes">${g.notes}</div>` : ''}
+        ${g.notes ? `<div class="grant-notes">${esc(g.notes)}</div>` : ''}
 
         <div class="grant-actions">
           ${idx < STATUSES.length - 1 ? `
@@ -275,14 +286,22 @@ function renderGrants() {
   }).join('');
 }
 
-function advanceGrant(id, newStatus) {
-  DataStore.updateGrant(id, { status: newStatus });
-  renderGrants();
+async function advanceGrant(id, newStatus) {
+  const errEl = document.getElementById('grantPageError');
+  errEl.textContent = '';
+  try {
+    await DataStore.updateGrant(id, { status: newStatus });
+    grants = await DataStore.getGrants();
+    renderGrants();
+  } catch (err) {
+    errEl.textContent = 'Could not update grant status. ' + err.message;
+  }
 }
 
 function openEditGrant(id) {
-  const g = DataStore.getGrant(id);
+  const g = grants.find(x => x.id === id);
   if (!g) return;
+  document.getElementById('editGrantError').textContent = '';
   document.getElementById('eg_id').value = g.id;
   document.getElementById('eg_program').value = g.program || '';
   document.getElementById('eg_funder').value = g.funder || '';
@@ -298,54 +317,80 @@ function closeEditGrant() {
 document.getElementById('editGrantModal').addEventListener('click', function(e) {
   if (e.target === this) closeEditGrant();
 });
-document.getElementById('editGrantForm').addEventListener('submit', function(e) {
+document.getElementById('editGrantForm').addEventListener('submit', async function(e) {
   e.preventDefault();
   const id = document.getElementById('eg_id').value;
   const program = document.getElementById('eg_program').value.trim();
   const funder = document.getElementById('eg_funder').value.trim();
   if (!program || !funder) return;
-  DataStore.updateGrant(id, {
-    program,
-    funder,
-    amount: parseFloat(document.getElementById('eg_amount').value) || 0,
-    status: document.getElementById('eg_status').value,
-    deadline: document.getElementById('eg_deadline').value || null,
-    notes: document.getElementById('eg_notes').value.trim()
-  });
-  closeEditGrant();
-  renderGrants();
+  const errEl = document.getElementById('editGrantError');
+  errEl.textContent = '';
+  try {
+    await DataStore.updateGrant(id, {
+      program,
+      funder,
+      amount: parseFloat(document.getElementById('eg_amount').value) || 0,
+      status: document.getElementById('eg_status').value,
+      deadline: document.getElementById('eg_deadline').value || null,
+      notes: document.getElementById('eg_notes').value.trim()
+    });
+    grants = await DataStore.getGrants();
+    closeEditGrant();
+    renderGrants();
+  } catch (err) {
+    errEl.textContent = 'Could not save changes. ' + err.message;
+  }
 });
-
-renderGrants();
 
 function toggleForm() {
   document.getElementById('grantForm').classList.toggle('open');
 }
-document.getElementById('grantFormEl').addEventListener('submit', function(e) {
+document.getElementById('grantFormEl').addEventListener('submit', async function(e) {
   e.preventDefault();
   const funder = document.getElementById('gr_funder').value.trim();
   const program = document.getElementById('gr_program').value.trim();
   if (!funder || !program) return;
   const jobId = document.getElementById('gr_job').value;
-  const job = jobId ? DataStore.getJob(jobId) : null;
-  DataStore.addGrant({
-    funder, program,
-    amount: parseFloat(document.getElementById('gr_amount').value) || 0,
-    status: document.getElementById('gr_status').value,
-    jobId: jobId || null,
-    jobTitle: job ? `${job.clientName} — ${job.title}` : '',
-    deadline: document.getElementById('gr_deadline').value || null,
-    appliedDate: new Date().toISOString().slice(0, 10),
-    notes: document.getElementById('gr_notes').value.trim()
-  });
-  document.getElementById('grantSuccess').classList.add('visible');
-  renderGrants();
-  setTimeout(() => {
-    document.getElementById('grantForm').classList.remove('open');
-    document.getElementById('grantFormEl').reset();
-    document.getElementById('grantSuccess').classList.remove('visible');
-  }, 1200);
+  const job = jobId ? jobs.find(j => j.id === jobId) : null;
+  const errEl = document.getElementById('grantFormError');
+  errEl.textContent = '';
+  try {
+    await DataStore.addGrant({
+      funder, program,
+      amount: parseFloat(document.getElementById('gr_amount').value) || 0,
+      status: document.getElementById('gr_status').value,
+      jobId: jobId || null,
+      jobTitle: job ? `${job.clientName} — ${job.title}` : '',
+      deadline: document.getElementById('gr_deadline').value || null,
+      appliedDate: new Date().toISOString().slice(0, 10),
+      notes: document.getElementById('gr_notes').value.trim()
+    });
+    grants = await DataStore.getGrants();
+    document.getElementById('grantSuccess').classList.add('visible');
+    renderGrants();
+    setTimeout(() => {
+      document.getElementById('grantForm').classList.remove('open');
+      document.getElementById('grantFormEl').reset();
+      document.getElementById('grantSuccess').classList.remove('visible');
+    }, 1200);
+  } catch (err) {
+    errEl.textContent = 'Could not save grant. ' + err.message;
+  }
 });
+
+(async function init() {
+  try {
+    await AuthManager.requireAuth();
+    Nav.render();
+    [grants, jobs] = await Promise.all([DataStore.getGrants(), DataStore.getJobs()]);
+    populateJobsDropdown();
+    renderGrants();
+  } catch (err) {
+    document.getElementById('grantList').innerHTML =
+      '<p style="color:var(--text-dim)">Could not load data (' + esc(err.message) +
+      '). <a href="javascript:location.reload()">Retry</a></p>';
+  }
+})();
 </script>
 </body>
 </html>

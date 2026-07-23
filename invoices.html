@@ -5,8 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Invoices — Ecotopia</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/mapping.js"></script>
 <script src="assets/auth.js"></script>
-<script>try { AuthManager.requireAuth(); } catch(e) { throw e; }</script>
+<script>if (!AuthManager.hasCachedSession()) location.replace('login.html');</script>
 <script src="assets/data.js"></script>
 <script src="assets/nav.js"></script>
 <style>
@@ -92,6 +96,8 @@
     color: var(--text-dim); font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
   .btn-edit:hover { color: var(--forest); border-color: var(--forest-light); background: var(--sage); }
 
+  .modal-error { color: #b3261e; font-size: 0.85rem; margin-top: 8px; }
+
   @media (max-width: 700px) {
     .page { padding: 20px 16px; }
     .inv-table { font-size: 0.8rem; }
@@ -107,6 +113,8 @@
   </div>
 
   <div class="stats-row" id="statsRow"></div>
+
+  <div class="modal-error" id="invPageError" style="margin-bottom:12px;"></div>
 
   <table class="inv-table">
     <thead><tr>
@@ -135,6 +143,7 @@
           <option value="overdue">Overdue</option>
         </select></div>
       <input type="hidden" id="ei_id">
+      <div class="modal-error" id="editInvError"></div>
       <div class="modal-actions">
         <button type="button" class="btn-cancel" onclick="closeEditInv()">Cancel</button>
         <button type="submit" class="btn btn-primary">Save Changes</button>
@@ -159,10 +168,10 @@
 </div>
 
 <script>
-Nav.render();
+const esc = DataStore.esc;
+let invoices = [];
 
 function renderStats() {
-  const invoices = DataStore.getInvoices();
   const total = invoices.reduce((s, i) => s + (i.amount || 0), 0);
   const paid = invoices.filter(i => i.status === 'paid').reduce((s, i) => s + (i.amount || 0), 0);
   const overdue = invoices.filter(i => i.status === 'overdue').reduce((s, i) => s + (i.amount || 0), 0);
@@ -176,16 +185,16 @@ function renderStats() {
 }
 
 function renderTable() {
-  const invoices = DataStore.getInvoices().sort((a, b) => {
+  const sorted = [...invoices].sort((a, b) => {
     const order = { overdue: 0, sent: 1, draft: 2, paid: 3 };
     return (order[a.status] ?? 9) - (order[b.status] ?? 9);
   });
-  document.getElementById('invBody').innerHTML = invoices.map(inv => `
+  document.getElementById('invBody').innerHTML = sorted.map(inv => `
     <tr>
-      <td><strong>${inv.clientName}</strong></td>
-      <td>${inv.jobTitle || '—'}</td>
+      <td><strong>${esc(inv.clientName)}</strong></td>
+      <td>${inv.jobTitle ? esc(inv.jobTitle) : '—'}</td>
       <td><strong>$${inv.amount?.toFixed(2)}</strong></td>
-      <td><span class="status-pill pill-${inv.status}">${inv.status.charAt(0).toUpperCase() + inv.status.slice(1)}</span></td>
+      <td><span class="status-pill pill-${esc(inv.status)}">${esc(inv.status.charAt(0).toUpperCase() + inv.status.slice(1))}</span></td>
       <td>${inv.dueDate ? DataStore.formatDate(inv.dueDate + 'T00:00:00') : '—'}</td>
       <td>
         <div class="actions-cell">
@@ -199,12 +208,15 @@ function renderTable() {
     </tr>`).join('');
 }
 
-renderStats();
-renderTable();
+function render() {
+  renderStats();
+  renderTable();
+}
 
 function openEditInv(id) {
-  const inv = DataStore.getInvoice(id);
+  const inv = invoices.find(i => i.id === id);
   if (!inv) return;
+  document.getElementById('editInvError').textContent = '';
   document.getElementById('ei_id').value = inv.id;
   document.getElementById('ei_amount').value = inv.amount != null ? inv.amount.toFixed(2) : '';
   document.getElementById('ei_due').value = inv.dueDate || '';
@@ -218,26 +230,38 @@ function closeEditInv() {
 document.getElementById('editInvModal').addEventListener('click', function(e) {
   if (e.target === this) closeEditInv();
 });
-document.getElementById('editInvForm').addEventListener('submit', function(e) {
+document.getElementById('editInvForm').addEventListener('submit', async function(e) {
   e.preventDefault();
   const id = document.getElementById('ei_id').value;
   const amount = parseFloat(document.getElementById('ei_amount').value);
-  DataStore.updateInvoice(id, {
-    amount: isNaN(amount) ? 0 : amount,
-    dueDate: document.getElementById('ei_due').value || null,
-    notes: document.getElementById('ei_notes').value.trim(),
-    status: document.getElementById('ei_status').value
-  });
-  closeEditInv();
-  renderStats();
-  renderTable();
+  const errEl = document.getElementById('editInvError');
+  errEl.textContent = '';
+  try {
+    await DataStore.updateInvoice(id, {
+      amount: isNaN(amount) ? 0 : amount,
+      dueDate: document.getElementById('ei_due').value || null,
+      notes: document.getElementById('ei_notes').value.trim(),
+      status: document.getElementById('ei_status').value
+    });
+    invoices = await DataStore.getInvoices();
+    closeEditInv();
+    render();
+  } catch (err) {
+    errEl.textContent = 'Could not save changes. ' + err.message;
+  }
 });
 
-function markPaid(id) {
+async function markPaid(id) {
   if (!confirm('Mark this invoice as paid?')) return;
-  DataStore.markInvoicePaid(id);
-  renderStats();
-  renderTable();
+  const errEl = document.getElementById('invPageError');
+  errEl.textContent = '';
+  try {
+    await DataStore.markInvoicePaid(id);
+    invoices = await DataStore.getInvoices();
+    render();
+  } catch (err) {
+    errEl.textContent = 'Could not mark invoice paid. ' + err.message;
+  }
 }
 
 function openPayModal() { document.getElementById('payModal').classList.add('open'); }
@@ -245,6 +269,19 @@ function closePayModal() { document.getElementById('payModal').classList.remove(
 document.getElementById('payModal').addEventListener('click', function(e) {
   if (e.target === this) closePayModal();
 });
+
+(async function init() {
+  try {
+    await AuthManager.requireAuth();
+    Nav.render();
+    invoices = await DataStore.getInvoices();
+    render();
+  } catch (err) {
+    document.getElementById('invBody').innerHTML =
+      '<tr><td colspan="6" style="text-align:center;color:var(--text-dim);padding:20px">Could not load data (' +
+      esc(err.message) + '). <a href="javascript:location.reload()">Retry</a></td></tr>';
+  }
+})();
 </script>
 </body>
 </html>

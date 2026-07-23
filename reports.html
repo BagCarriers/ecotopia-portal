@@ -5,8 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Reports — Ecotopia</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/mapping.js"></script>
 <script src="assets/auth.js"></script>
-<script>try { AuthManager.requireAuth(); } catch(e) { throw e; }</script>
+<script>if (!AuthManager.hasCachedSession()) location.replace('login.html');</script>
 <script src="assets/data.js"></script>
 <script src="assets/nav.js"></script>
 <style>
@@ -135,7 +139,10 @@
 </div>
 
 <script>
-Nav.render();
+const esc = DataStore.esc;
+let checkins = [];
+let gardens = [];
+let volunteers = [];
 
 // Set default date range (last 30 days)
 const todayStr = new Date().toISOString().slice(0, 10);
@@ -143,15 +150,14 @@ const thirtyAgo = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10
 document.getElementById('f_from').value = thirtyAgo;
 document.getElementById('f_to').value = todayStr;
 
-// Populate dropdowns
-const vols = DataStore.getVolunteers();
-const gardens = DataStore.getGardens();
-document.getElementById('f_vol').innerHTML =
-  '<option value="">All Volunteers</option>' +
-  vols.map(v => `<option value="${v.id}">${v.name}</option>`).join('');
-document.getElementById('f_garden').innerHTML =
-  '<option value="">All Gardens</option>' +
-  gardens.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
+function populateDropdowns() {
+  document.getElementById('f_vol').innerHTML =
+    '<option value="">All Volunteers</option>' +
+    volunteers.map(v => `<option value="${v.id}">${esc(v.name)}</option>`).join('');
+  document.getElementById('f_garden').innerHTML =
+    '<option value="">All Gardens</option>' +
+    gardens.map(g => `<option value="${g.id}">${esc(g.name)}</option>`).join('');
+}
 
 let filteredCheckins = [];
 
@@ -161,7 +167,7 @@ function applyFilters() {
   const volId = document.getElementById('f_vol').value;
   const gardenId = document.getElementById('f_garden').value;
 
-  const all = DataStore.getCheckins().sort((a, b) => new Date(b.checkInTime) - new Date(a.checkInTime));
+  const all = [...checkins].sort((a, b) => new Date(b.checkInTime) - new Date(a.checkInTime));
   filteredCheckins = all.filter(ci => {
     const d = ci.checkInTime.slice(0, 10);
     if (from && d < from) return false;
@@ -187,12 +193,12 @@ function applyFilters() {
     ? '<tr><td colspan="6" style="text-align:center;color:var(--text-dim);padding:20px">No records found for this period.</td></tr>'
     : filteredCheckins.map(ci => `
       <tr>
-        <td>${ci.volunteerName}</td>
-        <td>${ci.gardenName}</td>
-        <td>${ci.taskTitle}</td>
+        <td>${esc(ci.volunteerName)}</td>
+        <td>${esc(ci.gardenName)}</td>
+        <td>${esc(ci.taskTitle)}</td>
         <td>${DataStore.formatDate(ci.checkInTime)}</td>
         <td>${ci.hoursLogged}</td>
-        <td><span class="type-badge type-${ci.type || 'manual'}">${ci.type || 'manual'}</span></td>
+        <td><span class="type-badge type-${esc(ci.type || 'manual')}">${esc(ci.type || 'manual')}</span></td>
       </tr>`).join('');
 }
 
@@ -221,8 +227,21 @@ function exportCSV() {
   URL.revokeObjectURL(url);
 }
 
-// Auto-apply on load
-applyFilters();
+(async function init() {
+  try {
+    await AuthManager.requireAuth();
+    Nav.render();
+    [checkins, gardens, volunteers] = await Promise.all([
+      DataStore.getCheckins(), DataStore.getGardens(), DataStore.getVolunteers(),
+    ]);
+    populateDropdowns();
+    applyFilters();
+  } catch (err) {
+    document.getElementById('repBody').innerHTML =
+      '<tr><td colspan="6" style="text-align:center;color:var(--text-dim);padding:20px">Could not load data (' +
+      esc(err.message) + '). <a href="javascript:location.reload()">Retry</a></td></tr>';
+  }
+})();
 </script>
 </body>
 </html>
