@@ -3,19 +3,230 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ecotopia Earthcare Portal</title>
+<title>Ecotopian EarthCare - Ecological landscaping in Central Pennsylvania</title>
+<meta name="description" content="Ecotopian EarthCare designs pollinator gardens, food forests, rain gardens, and living willow structures with native plants across Central Pennsylvania's Altoona area and Blair County.">
+<meta property="og:site_name" content="Ecotopian EarthCare">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Ecotopian EarthCare - Ecological landscaping in Central Pennsylvania">
+<meta property="og:description" content="Native-plant landscaping, community gardens, and living willow structures rooted in Central Pennsylvania.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Flamenco:wght@300;400&family=Inter+Tight:wght@400;500;600;700&family=Megrim&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
 <script src="assets/supabase.js"></script>
 <script src="assets/config.js"></script>
 <script src="assets/supabase-client.js"></script>
 <script src="assets/mapping.js"></script>
-<script src="assets/auth.js"></script>
-<script>
-(async () => {
-  window.location.replace((await AuthManager.isAuthenticated()) ? 'dashboard.html' : 'login.html');
-})();
-</script>
+<script src="assets/site.js"></script>
 </head>
 <body>
-<p>Redirecting…</p>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header" id="siteHeader"></header>
+
+<main id="main">
+  <!-- Hero: cream, photo-free layered botanical line work -->
+  <section class="hero">
+    <div class="hero-bg" aria-hidden="true">
+      <svg viewBox="0 0 1200 620" preserveAspectRatio="xMidYMid slice">
+        <g fill="none" stroke-linecap="round">
+          <path d="M120 620 C120 430 60 360 60 250" stroke="hsl(116,18%,36%)" stroke-opacity="0.14" stroke-width="3"/>
+          <path d="M120 470 C120 470 190 430 250 450" stroke="hsl(116,18%,36%)" stroke-opacity="0.12" stroke-width="2.5"/>
+          <path d="M120 390 C120 390 60 350 20 360" stroke="hsl(116,18%,36%)" stroke-opacity="0.12" stroke-width="2.5"/>
+          <circle cx="250" cy="450" r="10" fill="hsl(38.6,100%,45%)" fill-opacity="0.16" stroke="none"/>
+          <circle cx="20" cy="360" r="10" fill="hsl(38.6,100%,45%)" fill-opacity="0.16" stroke="none"/>
+          <path d="M1090 620 C1090 420 1150 350 1150 230" stroke="hsl(116,18%,36%)" stroke-opacity="0.13" stroke-width="3"/>
+          <path d="M1090 460 C1090 460 1010 420 950 440" stroke="hsl(116,18%,36%)" stroke-opacity="0.11" stroke-width="2.5"/>
+          <path d="M1090 380 C1090 380 1150 340 1185 350" stroke="hsl(116,18%,36%)" stroke-opacity="0.11" stroke-width="2.5"/>
+          <circle cx="950" cy="440" r="9" fill="hsl(38.6,100%,45%)" fill-opacity="0.15" stroke="none"/>
+          <g stroke="hsl(116,18%,36%)" stroke-opacity="0.09" stroke-width="2">
+            <path d="M600 620 C600 560 560 540 560 500 C560 540 600 560 600 600"/>
+            <path d="M600 620 C600 560 640 540 640 500 C640 540 600 560 600 600"/>
+          </g>
+        </g>
+      </svg>
+    </div>
+    <div class="hero-inner">
+      <p class="place">Central Pennsylvania · Altoona &amp; Blair County</p>
+      <h1>Ecological landscaping rooted in Central Pennsylvania</h1>
+      <p class="subhead">Native-plant gardens, edible food forests, and living willow structures designed to bring your land back to life, one season at a time.</p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="intake.html">Start a project</a>
+        <a class="btn btn-ghost" href="services.html">Explore our services</a>
+      </div>
+    </div>
+  </section>
+  <div class="willow on-cream" data-opacity="0.4"></div>
+
+  <!-- Services preview (6 of 10) -->
+  <section class="section" aria-labelledby="svc-h">
+    <div class="wrap">
+      <p class="eyebrow">What we do</p>
+      <h2 id="svc-h">Landscapes that give back</h2>
+      <p class="lead">Every design starts with the native plants and living systems that belong here, then layers in beauty, food, and habitat for the pollinators and people who share your land.</p>
+      <div class="card-grid">
+        <article class="svc-card reveal"><div class="ico" aria-hidden="true">🦋</div><h3>Pollinator Garden &amp; Mini Meadow</h3><p>Native perennial wildflowers that bloom across three seasons and draw butterflies, hummingbirds, bees, and beneficial insects.</p></article>
+        <article class="svc-card reveal"><div class="ico" aria-hidden="true">🌳</div><h3>Food Forest Design</h3><p>Edible landscaping designed with permaculture techniques, planted in vertical layers for an abundance of perennial food.</p></article>
+        <article class="svc-card reveal"><div class="ico" aria-hidden="true">🧺</div><h3>Living Willow Fence</h3><p>Willow branches planted and woven in March into living fences, tunnels, domes, and archways.</p></article>
+        <article class="svc-card reveal"><div class="ico" aria-hidden="true">💧</div><h3>Rain Garden</h3><p>A planted depression filled with well-drained soil and deep-rooted perennial flowers that soak up seasonal water.</p></article>
+        <article class="svc-card reveal"><div class="ico" aria-hidden="true">🌿</div><h3>Medicinal Herb Garden</h3><p>Medicinal plants chosen for your land and health needs, with consulting and implementation.</p></article>
+        <article class="svc-card reveal"><div class="ico" aria-hidden="true">🌾</div><h3>Lawn to Meadow Conversion</h3><p>You may qualify for a free conversion through the PA DCNR program we contract for (half acre minimum).</p></article>
+      </div>
+      <div class="cta-row">
+        <a class="btn btn-ghost" href="services.html">See all ten services</a>
+      </div>
+    </div>
+  </section>
+  <div class="willow on-white" data-opacity="0.4"></div>
+
+  <!-- Upcoming events (live) -->
+  <section class="section cream" aria-labelledby="ev-h">
+    <div class="wrap">
+      <p class="eyebrow">Community</p>
+      <h2 id="ev-h">Upcoming events</h2>
+      <p class="lead">We host WildOnes gatherings, native plant sales, and hands-on workdays across Blair County. Come dig in with us.</p>
+      <ul class="event-list" id="homeEvents" aria-live="polite"></ul>
+      <div class="cta-row"><a class="btn btn-ghost" href="happenings.html">View all events</a></div>
+    </div>
+  </section>
+  <div class="willow on-cream" data-opacity="0.4"></div>
+
+  <!-- Community gardens strip (live) -->
+  <section class="section" aria-labelledby="gd-h">
+    <div class="wrap">
+      <p class="eyebrow">Growing together</p>
+      <h2 id="gd-h">Community gardens &amp; food forests</h2>
+      <p class="lead">From the Reciprocity Community Food Forest to neighborhood plots, we steward shared spaces where native plants and food grow side by side.</p>
+      <div class="garden-grid" id="homeGardens" aria-live="polite"></div>
+      <div class="cta-row"><a class="btn btn-ghost" href="community-gardens.html">Explore community gardens</a></div>
+    </div>
+  </section>
+  <div class="willow on-white" data-opacity="0.4"></div>
+
+  <!-- Gallery strip (live staff photos) -->
+  <section class="section cream" aria-labelledby="ph-h">
+    <div class="wrap">
+      <p class="eyebrow">From the field</p>
+      <h2 id="ph-h">Recent work</h2>
+      <div class="photo-grid" id="homePhotos" aria-live="polite"></div>
+      <div class="cta-row"><a class="btn btn-ghost" href="photos.html">See the full gallery</a></div>
+    </div>
+  </section>
+
+  <!-- Volunteer band -->
+  <section class="band" aria-labelledby="vol-h">
+    <div class="willow willow-inline top" data-white data-opacity="0.5" aria-hidden="true"></div>
+    <p class="eyebrow" style="color: var(--cream)">Lend a hand</p>
+    <h2 id="vol-h">Volunteer with us</h2>
+    <p>Join a workday, help plant a food forest, or tend a community garden. No experience needed, just a willingness to get your hands in the soil.</p>
+    <div class="cta-row"><a class="btn btn-onDark" href="volunteer-board.html">See the volunteer board</a></div>
+    <div class="willow willow-inline bot" data-white data-opacity="0.5" aria-hidden="true"></div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div>
+      <p class="fbrand">Ecotopian EarthCare</p>
+      <p>Ecological landscaping, community gardens, and native plants in Central Pennsylvania.</p>
+      <p>Serving the Altoona area &amp; Blair County. Find us at the Reciprocity Community Food Forest, 211 Browning Ave, Altoona, PA 16602.</p>
+    </div>
+    <div>
+      <h4>Explore</h4>
+      <ul>
+        <li><a href="services.html">Services</a></li>
+        <li><a href="happenings.html">Events</a></li>
+        <li><a href="community-gardens.html">Community Gardens</a></li>
+        <li><a href="photos.html">Photos</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Get involved</h4>
+      <ul>
+        <li><a href="intake.html">Client Request Form</a></li>
+        <li><a href="volunteer-board.html">Volunteer board</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>© 2026 Ecotopian EarthCare</span>
+    <a class="staff" href="login.html">Staff sign in</a>
+  </div>
+</footer>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  EcoSite.renderNav('home');
+  loadHomeEvents();
+  loadHomeGardens();
+  loadHomePhotos();
+});
+
+async function loadHomeEvents() {
+  const el = document.getElementById('homeEvents');
+  const esc = EcoSite.esc;
+  try {
+    const all = await EcoSite.getEvents();
+    const today = EcoSite.todayISO();
+    const upcoming = all.filter(e => e.date && e.date >= today).slice(0, 3);
+    if (!upcoming.length) {
+      el.outerHTML = '<p class="empty-line">New events are being planned. Check the <a href="happenings.html">events page</a> for our full calendar.</p>';
+      return;
+    }
+    el.innerHTML = upcoming.map(renderEvent).join('');
+    EcoSite.decorate();
+  } catch (e) {
+    el.outerHTML = '<p class="fallback-line">Events are updating. Check back soon.</p>';
+  }
+}
+
+function renderEvent(e) {
+  const esc = EcoSite.esc;
+  const where = e.location || e.gardenName || '';
+  const type = e.type ? '<span class="chip">' + esc(String(e.type).replace(/_/g, ' ')) + '</span>' : '';
+  return '<li class="event-item reveal">' + EcoSite.eventBadge(e.date, false) +
+    '<div class="event-body"><h3>' + esc(e.title) + '</h3>' +
+    (where ? '<p class="where">' + esc(where) + '</p>' : '') +
+    (e.description ? '<p>' + esc(e.description) + '</p>' : '') +
+    type + '</div></li>';
+}
+
+async function loadHomeGardens() {
+  const el = document.getElementById('homeGardens');
+  const esc = EcoSite.esc;
+  try {
+    const gardens = await EcoSite.getGardens();
+    if (!gardens.length) {
+      el.outerHTML = '<p class="empty-line">Community garden listings are coming soon.</p>';
+      return;
+    }
+    el.innerHTML = gardens.slice(0, 3).map(g =>
+      '<div class="garden-card reveal"><h3>' + esc(g.name) + '</h3>' +
+      (g.address ? '<p class="addr">📍 ' + esc(g.address) + '</p>' : '') +
+      (g.sqft ? '<p class="sqft">' + esc(g.sqft) + ' sq ft</p>' : '') +
+      '</div>').join('');
+    EcoSite.decorate();
+  } catch (e) {
+    el.outerHTML = '<p class="fallback-line">Gardens are updating. Check back soon.</p>';
+  }
+}
+
+async function loadHomePhotos() {
+  const el = document.getElementById('homePhotos');
+  const esc = EcoSite.esc;
+  try {
+    const photos = await EcoSite.getStaffPhotos(8);
+    if (!photos.length) {
+      el.outerHTML = '<p class="empty-line">Photos coming soon.</p>';
+      return;
+    }
+    el.innerHTML = photos.map(p =>
+      '<figure class="ph" style="cursor:default"><img src="' + esc(p.url) + '" loading="lazy" alt="' +
+      esc(p.caption || 'Ecotopian EarthCare project photo') + '">' +
+      (p.caption ? '<figcaption>' + esc(p.caption) + '</figcaption>' : '') + '</figure>').join('');
+  } catch (e) {
+    el.outerHTML = '<p class="fallback-line">Photos are updating. Check back soon.</p>';
+  }
+}
+</script>
 </body>
 </html>

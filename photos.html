@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Photos - Ecotopian EarthCare</title>
+<meta name="description" content="A gallery of native plantings, food forests, living willow structures, and community garden work by Ecotopian EarthCare in Central Pennsylvania.">
+<meta property="og:site_name" content="Ecotopian EarthCare">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Photos - Ecotopian EarthCare">
+<meta property="og:description" content="See our native plantings, food forests, and living willow structures across Blair County.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Flamenco:wght@300;400&family=Inter+Tight:wght@400;500;600;700&family=Megrim&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+<script src="assets/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/mapping.js"></script>
+<script src="assets/site.js"></script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header" id="siteHeader"></header>
+
+<main id="main">
+  <section class="section cream">
+    <div class="wrap">
+      <p class="eyebrow">From the field</p>
+      <h1>Photo gallery</h1>
+      <p class="lead">Native plantings, food forests, living willow structures, and community garden days across Central Pennsylvania.</p>
+    </div>
+  </section>
+  <div class="willow on-cream" data-opacity="0.4"></div>
+
+  <section class="section">
+    <div class="wrap">
+      <div class="photo-grid" id="grid" aria-live="polite"></div>
+    </div>
+  </section>
+</main>
+
+<!-- Lightbox (read-only) -->
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Photo viewer">
+  <button class="lightbox-close" id="lbClose" aria-label="Close photo">✕</button>
+  <div class="lightbox-inner">
+    <img id="lbImg" src="" alt="">
+    <p class="cap" id="lbCap"></p>
+  </div>
+</div>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div>
+      <p class="fbrand">Ecotopian EarthCare</p>
+      <p>Ecological landscaping, community gardens, and native plants in Central Pennsylvania.</p>
+      <p>Serving the Altoona area &amp; Blair County. Find us at the Reciprocity Community Food Forest, 211 Browning Ave, Altoona, PA 16602.</p>
+    </div>
+    <div>
+      <h4>Explore</h4>
+      <ul>
+        <li><a href="services.html">Services</a></li>
+        <li><a href="happenings.html">Events</a></li>
+        <li><a href="community-gardens.html">Community Gardens</a></li>
+        <li><a href="photos.html">Photos</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Get involved</h4>
+      <ul>
+        <li><a href="intake.html">Client Request Form</a></li>
+        <li><a href="volunteer-board.html">Volunteer board</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>© 2026 Ecotopian EarthCare</span>
+    <a class="staff" href="login.html">Staff sign in</a>
+  </div>
+</footer>
+
+<script>
+let PHOTOS = [];
+let lastFocus = null;
+
+document.addEventListener('DOMContentLoaded', () => { EcoSite.renderNav('photos'); loadPhotos(); });
+
+async function loadPhotos() {
+  const grid = document.getElementById('grid');
+  const esc = EcoSite.esc;
+  try {
+    PHOTOS = await EcoSite.getStaffPhotos(60);
+    if (!PHOTOS.length) {
+      grid.outerHTML = '<p class="empty-line">Photos coming soon.</p>';
+      return;
+    }
+    grid.innerHTML = PHOTOS.map((p, i) =>
+      '<button class="ph" type="button" onclick="openLb(' + i + ')" aria-label="' +
+      esc(p.caption || 'View photo') + '">' +
+      '<img src="' + esc(p.url) + '" loading="lazy" alt="' +
+      esc(p.caption || 'Ecotopian EarthCare project photo') + '">' +
+      (p.caption ? '<figcaption>' + esc(p.caption) + '</figcaption>' : '') +
+      '</button>').join('');
+  } catch (e) {
+    grid.outerHTML = '<p class="fallback-line">Photos are updating. Check back soon.</p>';
+  }
+}
+
+function openLb(i) {
+  const p = PHOTOS[i];
+  if (!p) return;
+  lastFocus = document.activeElement;
+  document.getElementById('lbImg').src = p.url;
+  document.getElementById('lbImg').alt = p.caption || 'Ecotopian EarthCare project photo';
+  document.getElementById('lbCap').textContent = p.caption || '';
+  const lb = document.getElementById('lightbox');
+  lb.classList.add('open');
+  document.getElementById('lbClose').focus();
+}
+function closeLb() {
+  document.getElementById('lightbox').classList.remove('open');
+  document.getElementById('lbImg').src = '';
+  if (lastFocus && lastFocus.focus) lastFocus.focus();
+}
+document.getElementById('lbClose').addEventListener('click', closeLb);
+document.getElementById('lightbox').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('lightbox')) closeLb();
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && document.getElementById('lightbox').classList.contains('open')) closeLb();
+});
+</script>
+</body>
+</html>

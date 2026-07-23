@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Events - Ecotopian EarthCare</title>
+<meta name="description" content="Upcoming WildOnes gatherings, native plant sales, and hands-on workdays with Ecotopian EarthCare across Altoona and Blair County, Pennsylvania.">
+<meta property="og:site_name" content="Ecotopian EarthCare">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Events - Ecotopian EarthCare">
+<meta property="og:description" content="Join native plant sales, willow weaving workdays, and community plantings across Central Pennsylvania.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Flamenco:wght@300;400&family=Inter+Tight:wght@400;500;600;700&family=Megrim&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+<script src="assets/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/mapping.js"></script>
+<script src="assets/site.js"></script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header" id="siteHeader"></header>
+
+<main id="main">
+  <section class="section cream">
+    <div class="wrap">
+      <p class="eyebrow">Community</p>
+      <h1>Events &amp; workdays</h1>
+      <p class="lead">Native plant sales, WildOnes gatherings, and hands-on plantings across Blair County. Everyone is welcome, no experience required.</p>
+    </div>
+  </section>
+  <div class="willow on-cream" data-opacity="0.4"></div>
+
+  <section class="section">
+    <div class="wrap">
+      <h2 class="display" style="font-size:1.7rem;color:var(--green-dark);letter-spacing:0.04em">Upcoming</h2>
+      <ul class="event-list" id="upcoming" aria-live="polite"></ul>
+      <div id="pastWrap"></div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div>
+      <p class="fbrand">Ecotopian EarthCare</p>
+      <p>Ecological landscaping, community gardens, and native plants in Central Pennsylvania.</p>
+      <p>Serving the Altoona area &amp; Blair County. Find us at the Reciprocity Community Food Forest, 211 Browning Ave, Altoona, PA 16602.</p>
+    </div>
+    <div>
+      <h4>Explore</h4>
+      <ul>
+        <li><a href="services.html">Services</a></li>
+        <li><a href="happenings.html">Events</a></li>
+        <li><a href="community-gardens.html">Community Gardens</a></li>
+        <li><a href="photos.html">Photos</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Get involved</h4>
+      <ul>
+        <li><a href="intake.html">Client Request Form</a></li>
+        <li><a href="volunteer-board.html">Volunteer board</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>© 2026 Ecotopian EarthCare</span>
+    <a class="staff" href="login.html">Staff sign in</a>
+  </div>
+</footer>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => { EcoSite.renderNav('events'); loadEvents(); });
+
+function renderEvent(e, past) {
+  const esc = EcoSite.esc;
+  const where = e.location || e.gardenName || '';
+  const type = e.type ? '<span class="chip">' + esc(String(e.type).replace(/_/g, ' ')) + '</span>' : '';
+  return '<li class="event-item reveal">' + EcoSite.eventBadge(e.date, !!past) +
+    '<div class="event-body"><h3>' + esc(e.title) + '</h3>' +
+    (where ? '<p class="where">📍 ' + esc(where) + '</p>' : '') +
+    (e.description ? '<p>' + esc(e.description) + '</p>' : '') +
+    type + '</div></li>';
+}
+
+async function loadEvents() {
+  const up = document.getElementById('upcoming');
+  const pastWrap = document.getElementById('pastWrap');
+  try {
+    const all = await EcoSite.getEvents();
+    const today = EcoSite.todayISO();
+    const upcoming = all.filter(e => e.date && e.date >= today); // already asc
+    const past = all.filter(e => e.date && e.date < today).reverse().slice(0, 12); // desc, cap 12
+
+    up.innerHTML = upcoming.length
+      ? upcoming.map(e => renderEvent(e, false)).join('')
+      : '';
+    if (!upcoming.length) {
+      up.outerHTML = '<p class="empty-line">No upcoming events are scheduled right now. Check back soon, or browse past events below.</p>';
+    }
+
+    if (past.length) {
+      pastWrap.innerHTML =
+        '<details class="past-events"><summary>Past events (' + past.length + ')</summary>' +
+        '<ul class="event-list">' + past.map(e => renderEvent(e, true)).join('') + '</ul></details>';
+    }
+    EcoSite.decorate();
+  } catch (e) {
+    up.outerHTML = '<p class="fallback-line">Events are updating. Check back soon.</p>';
+  }
+}
+</script>
+</body>
+</html>

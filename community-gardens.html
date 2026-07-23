@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Community Gardens - Ecotopian EarthCare</title>
+<meta name="description" content="Community gardens and food forests stewarded by Ecotopian EarthCare, including the Reciprocity Community Food Forest in Altoona, Pennsylvania.">
+<meta property="og:site_name" content="Ecotopian EarthCare">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Community Gardens - Ecotopian EarthCare">
+<meta property="og:description" content="Shared spaces where native plants and food grow side by side across Blair County.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Flamenco:wght@300;400&family=Inter+Tight:wght@400;500;600;700&family=Megrim&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+<script src="assets/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/mapping.js"></script>
+<script src="assets/site.js"></script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header" id="siteHeader"></header>
+
+<main id="main">
+  <section class="section cream">
+    <div class="wrap narrow">
+      <p class="eyebrow">Growing together</p>
+      <h1>Community gardens &amp; food forests</h1>
+      <p class="lead">Some of the most rewarding work we do happens on shared ground. Alongside neighbors and volunteers, we build and tend community gardens and food forests, like the Reciprocity Community Food Forest on Browning Avenue, where native plantings feed pollinators and people alike.</p>
+      <p class="lead">These spaces double as living classrooms for native plants, permaculture, and habitat, and they are open to anyone willing to lend a hand.</p>
+    </div>
+  </section>
+  <div class="willow on-cream" data-opacity="0.4"></div>
+
+  <section class="section" aria-labelledby="gardens-h">
+    <div class="wrap">
+      <h2 id="gardens-h" class="display" style="font-size:1.7rem;color:var(--green-dark);letter-spacing:0.04em">Our gardens</h2>
+      <div class="garden-grid" id="gardens" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section class="band" aria-labelledby="lend-h">
+    <div class="willow willow-inline top" data-white data-opacity="0.5" aria-hidden="true"></div>
+    <p class="eyebrow" style="color: var(--cream)">Get involved</p>
+    <h2 id="lend-h">Lend a hand</h2>
+    <p>Community gardens only thrive with community. Grab a spot on an upcoming workday and help something good take root.</p>
+    <div class="cta-row"><a class="btn btn-onDark" href="volunteer-board.html">See the volunteer board</a></div>
+    <div class="willow willow-inline bot" data-white data-opacity="0.5" aria-hidden="true"></div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div>
+      <p class="fbrand">Ecotopian EarthCare</p>
+      <p>Ecological landscaping, community gardens, and native plants in Central Pennsylvania.</p>
+      <p>Serving the Altoona area &amp; Blair County. Find us at the Reciprocity Community Food Forest, 211 Browning Ave, Altoona, PA 16602.</p>
+    </div>
+    <div>
+      <h4>Explore</h4>
+      <ul>
+        <li><a href="services.html">Services</a></li>
+        <li><a href="happenings.html">Events</a></li>
+        <li><a href="community-gardens.html">Community Gardens</a></li>
+        <li><a href="photos.html">Photos</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Get involved</h4>
+      <ul>
+        <li><a href="intake.html">Client Request Form</a></li>
+        <li><a href="volunteer-board.html">Volunteer board</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>© 2026 Ecotopian EarthCare</span>
+    <a class="staff" href="login.html">Staff sign in</a>
+  </div>
+</footer>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => { EcoSite.renderNav('gardens'); loadGardens(); });
+
+async function loadGardens() {
+  const el = document.getElementById('gardens');
+  const esc = EcoSite.esc;
+  try {
+    const gardens = await EcoSite.getGardens();
+    if (!gardens.length) {
+      el.outerHTML = '<p class="empty-line">Community garden listings are coming soon. In the meantime, join us at an <a href="happenings.html">upcoming event</a>.</p>';
+      return;
+    }
+    el.innerHTML = gardens.map(g =>
+      '<div class="garden-card reveal"><h3>' + esc(g.name) + '</h3>' +
+      (g.address ? '<p class="addr">📍 ' + esc(g.address) + '</p>' : '') +
+      (g.sqft ? '<p class="sqft">' + esc(g.sqft) + ' sq ft</p>' : '') +
+      '</div>').join('');
+    EcoSite.decorate();
+  } catch (e) {
+    el.outerHTML = '<p class="fallback-line">Gardens are updating. Check back soon.</p>';
+  }
+}
+</script>
+</body>
+</html>
