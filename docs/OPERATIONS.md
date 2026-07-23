@@ -40,6 +40,44 @@ with an `Authorization: Bearer <token>` header. Never write that token to disk.
   pins `[functions.accept-invite] verify_jwt = false`, so a future redeploy keeps
   JWT verification off instead of silently re-enabling it and breaking the invite flow.
 
+## Calendar sync
+
+Two-way Google Calendar sync for `calendar.html`, backed by the `portal_settings`
+key-value table (migration `0007`) and the `calendar-feed` edge function.
+
+Settings (rows in `public.portal_settings`, RLS: any portal user reads, admins write):
+
+- `calendar_feed_token` - an opaque JSON string. The outbound ICS feed is authed by
+  this token alone (Google's fetcher sends no headers). Generated the first time an
+  admin opens the Calendar sync panel. Treat it like a secret; rotating it means
+  deleting the row and re-opening the panel, then re-subscribing in Google.
+- `google_calendar_ics_url` - the Google "secret address in iCal format" URL an admin
+  pastes to overlay their Google events into the portal calendar (read-only, visible
+  to all portal users).
+
+`calendar-feed` has two modes:
+
+- `GET ?token=<calendar_feed_token>` - outbound. Returns a `text/calendar` ICS of all
+  `events` (one all-day VEVENT each). Token mismatch or missing token returns a generic
+  403. This is the URL staff paste into Google Calendar (Other calendars > + > From URL):
+  `https://wibnryfinfwbwwgsyojr.supabase.co/functions/v1/calendar-feed?token=<token>`
+- `POST {"action":"google_events"}` - inbound. Requires a valid user JWT
+  (`Authorization: Bearer`) AND an active `portal_users` row; otherwise 401/403. Reads
+  `google_calendar_ics_url`, fetches it server-side, parses VEVENT DTSTART/SUMMARY, and
+  returns `{configured, events:[{date, title, allDay}]}`. Google fetch failure returns 502.
+  The parser reads a single DTSTART per VEVENT (no RRULE expansion); results are limited
+  to a two-year lookback / one-year lookahead window and capped at 500 events.
+
+Deploy (JWT verification is done manually in the function for the POST path; the GET
+path is token-authed for Google's headerless fetcher, so the platform check stays off):
+
+```
+supabase functions deploy calendar-feed --no-verify-jwt --project-ref wibnryfinfwbwwgsyojr
+```
+
+`supabase/config.toml` pins `[functions.calendar-feed] verify_jwt = false` so a future
+redeploy keeps JWT verification off instead of silently breaking the token-authed feed.
+
 ## Deploy
 
 The site is a static bundle deployed to Netlify:

@@ -415,3 +415,6 @@ enabled = true
 
 [functions.accept-invite]
 verify_jwt = false
+
+[functions.calendar-feed]
+verify_jwt = false

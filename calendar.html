@@ -40,6 +40,42 @@
     padding: 8px 14px; cursor: pointer; font-size: 0.875rem; font-weight: 600;
     font-family: 'DM Sans', sans-serif; }
 
+  /* Header + sync button */
+  .page-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .btn { padding: 10px 18px; border-radius: 8px; border: none; font-size: 0.875rem;
+    font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif;
+    display: inline-flex; gap: 6px; align-items: center; transition: background 0.15s; }
+  .btn-primary { background: var(--forest); color: #fff; }
+  .btn-primary:hover { background: var(--forest-mid); }
+
+  /* Sync modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+    z-index: 500; align-items: center; justify-content: center; padding: 20px; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: #fff; border-radius: 16px; padding: 28px;
+    width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.25); }
+  .modal h2 { font-family: 'Fraunces', serif; color: var(--forest); margin-bottom: 12px; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+  .modal-error { color: #b3261e; font-size: 0.85rem; margin-top: 8px; }
+  .btn-cancel { background: var(--cream-dim); color: var(--text); padding: 10px 18px;
+    border-radius: 8px; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+  .sync-section { padding: 16px 0; border-bottom: 1px solid var(--border); }
+  .sync-section:last-of-type { border-bottom: none; }
+  .sync-section h4 { font-family: 'Fraunces', serif; color: var(--forest); font-size: 1rem; margin-bottom: 6px; }
+  .sync-help { font-size: 0.8rem; color: var(--text-dim); line-height: 1.5; margin-bottom: 12px; }
+  .copy-row { display: flex; gap: 8px; }
+  .copy-row input, #gcalUrl { width: 100%; padding: 9px 11px; border-radius: 7px;
+    border: 1.5px solid var(--border); font-size: 0.82rem; font-family: 'DM Sans', sans-serif; }
+  .copy-row input:focus, #gcalUrl:focus { outline: none; border-color: var(--forest-light); }
+  .btn-copy { background: var(--sage); color: var(--forest); border: none; border-radius: 7px;
+    padding: 8px 16px; cursor: pointer; font-weight: 600; font-family: 'DM Sans', sans-serif; flex-shrink: 0; }
+  .btn-copy:hover { background: var(--sage-dim); }
+  .sync-actions { display: flex; gap: 10px; margin-top: 12px; align-items: center; }
+  .btn-remove { background: transparent; border: 1px solid var(--border); color: #b3261e;
+    border-radius: 8px; padding: 10px 16px; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+  .btn-remove:hover { border-color: #b3261e; }
+
   /* Legend */
   .cal-legend { display: flex; gap: 16px; margin-bottom: 16px; font-size: 0.8rem; flex-wrap: wrap; }
   .leg-item { display: flex; align-items: center; gap: 5px; }
@@ -47,6 +83,7 @@
   .leg-task { background: var(--forest-light); }
   .leg-event { background: #60a5fa; }
   .leg-job { background: #fb923c; }
+  .leg-gcal { background: #8B5E3C; }
 
   /* Calendar grid */
   .cal-grid { background: #fff; border-radius: 14px; border: 1px solid var(--border); overflow: hidden; }
@@ -72,6 +109,7 @@
   .dot-task { background: var(--forest-light); }
   .dot-event { background: #60a5fa; }
   .dot-job { background: #fb923c; }
+  .dot-gcal { background: #8B5E3C; }
   .cal-dots { display: flex; flex-wrap: wrap; margin-top: 2px; }
 
   /* Day panel */
@@ -113,7 +151,10 @@
 </head>
 <body>
 <div class="page">
-  <h1>Calendar</h1>
+  <div class="page-header">
+    <h1>Calendar</h1>
+    <button class="btn btn-primary" onclick="openSyncModal()">Calendar sync</button>
+  </div>
   <div class="cal-controls">
     <button class="btn-nav" onclick="prevMonth()">‹</button>
     <span class="cal-title" id="calTitle"></span>
@@ -124,6 +165,7 @@
     <div class="leg-item"><div class="leg-dot leg-task"></div> Maintenance Due</div>
     <div class="leg-item"><div class="leg-dot leg-event"></div> Event</div>
     <div class="leg-item"><div class="leg-dot leg-job"></div> Job Scheduled</div>
+    <div class="leg-item"><div class="leg-dot leg-gcal"></div> Google Calendar</div>
   </div>
 
   <!-- Month view -->
@@ -139,9 +181,44 @@
   </div>
 </div>
 
+<!-- Calendar sync modal -->
+<div class="modal-overlay" id="syncModal">
+  <div class="modal">
+    <h2>Calendar sync</h2>
+
+    <div class="sync-section">
+      <h4>Add this calendar to Google Calendar</h4>
+      <p class="sync-help">In Google Calendar: Other calendars, +, From URL, paste this link.</p>
+      <div id="feedRow" style="display:none;">
+        <div class="copy-row">
+          <input type="text" id="feedUrl" readonly>
+          <button type="button" class="btn-copy" onclick="copyFeedUrl()">Copy</button>
+        </div>
+      </div>
+      <p id="feedNotice" class="sync-help" style="margin-bottom:0;"></p>
+    </div>
+
+    <div class="sync-section" id="gcalSection" style="display:none;">
+      <h4>Show my Google Calendar in this view</h4>
+      <p class="sync-help">In Google Calendar settings: Settings for my calendar, Integrate calendar, Secret address in iCal format. Anyone with portal access will see these events.</p>
+      <input type="text" id="gcalUrl" placeholder="https://calendar.google.com/calendar/ical/.../basic.ics">
+      <div class="sync-actions">
+        <button type="button" class="btn btn-primary" onclick="saveGcalUrl()">Save</button>
+        <button type="button" class="btn-remove" id="gcalRemoveBtn" style="display:none;" onclick="removeGcalUrl()">Remove</button>
+      </div>
+    </div>
+
+    <div class="modal-error" id="syncError"></div>
+    <div class="modal-actions">
+      <button type="button" class="btn-cancel" onclick="closeSyncModal()">Close</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const esc = DataStore.esc;
-let events = [], jobs = [], tasks = [], gardens = [];
+let events = [], jobs = [], tasks = [], gardens = [], gcalEvents = [];
+const CAL_FEED_URL = 'https://wibnryfinfwbwwgsyojr.supabase.co/functions/v1/calendar-feed';
 
 let currentYear, currentMonth;
 let selectedDate = null;
@@ -176,6 +253,12 @@ function buildDateMap(year, month) {
   jobs.filter(j => j.status === 'active').forEach(j => {
     const d = new Date(year, month, 15).toISOString().slice(0, 10);
     addItem(d, { type: 'job', label: j.title, sub: j.clientName });
+  });
+
+  // Google Calendar overlay (read-only)
+  gcalEvents.forEach(g => {
+    if (!g.date) return;
+    addItem(g.date, { type: 'gcal', label: g.title || '(no title)', sub: 'Google Calendar' });
   });
 
   return map;
@@ -284,7 +367,7 @@ function selectDate(dateStr) {
   if (items.length === 0) {
     panelContent.innerHTML = '<p style="color:var(--text-dim);font-size:0.875rem;">Nothing scheduled this day.</p>';
   } else {
-    const typeColor = { task: 'dot-task', event: 'dot-event', job: 'dot-job' };
+    const typeColor = { task: 'dot-task', event: 'dot-event', job: 'dot-job', gcal: 'dot-gcal' };
     panelContent.innerHTML = items.map(it => `
       <div class="day-item">
         <div class="day-type-dot cal-dot ${typeColor[it.type]}"></div>
@@ -316,6 +399,133 @@ function goToday() {
   renderWeekView();
 }
 
+// ── Google Calendar sync ────────────────────────────────────────────────
+async function getSetting(key) {
+  const { data, error } = await window.ecoSupabase.from('portal_settings')
+    .select('value').eq('key', key).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? data.value : null;
+}
+
+// Fetch the Google overlay via the edge function and merge into the grid.
+// Non-blocking: failures are logged, surfaced in the modal only if it is open.
+async function loadGoogleOverlay() {
+  try {
+    const { data } = await window.ecoSupabase.auth.getSession();
+    const token = data && data.session ? data.session.access_token : null;
+    if (!token) return;
+    const res = await fetch(CAL_FEED_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token,
+        'apikey': window.ECO_CONFIG.SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({ action: 'google_events' }),
+    });
+    const payload = await res.json();
+    if (!res.ok) throw new Error(payload.error || 'Sync failed.');
+    gcalEvents = (payload.configured && Array.isArray(payload.events)) ? payload.events : [];
+    renderMonth();
+    renderWeekView();
+    if (selectedDate) selectDate(selectedDate);
+  } catch (err) {
+    console.warn('Google Calendar sync failed:', err.message);
+    const syncOpen = document.getElementById('syncModal').classList.contains('open');
+    if (syncOpen) document.getElementById('syncError').textContent = err.message;
+  }
+}
+
+async function openSyncModal() {
+  const errEl = document.getElementById('syncError');
+  errEl.textContent = '';
+  document.getElementById('syncModal').classList.add('open');
+  let isAdmin = false;
+  try { isAdmin = (await AuthManager.getRole()) === 'admin'; } catch (e) { isAdmin = false; }
+  document.getElementById('gcalSection').style.display = isAdmin ? 'block' : 'none';
+
+  // Section a: feed token (generate on first admin open).
+  try {
+    let token = await getSetting('calendar_feed_token');
+    if (!token && isAdmin) {
+      token = crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
+      const { error } = await window.ecoSupabase.from('portal_settings')
+        .insert({ key: 'calendar_feed_token', value: token });
+      if (error) throw new Error(error.message);
+    }
+    if (token) {
+      document.getElementById('feedUrl').value = CAL_FEED_URL + '?token=' + token;
+      document.getElementById('feedRow').style.display = 'block';
+      document.getElementById('feedNotice').textContent = '';
+    } else {
+      document.getElementById('feedRow').style.display = 'none';
+      document.getElementById('feedNotice').textContent =
+        'Ask an admin to open this panel once to enable the feed.';
+    }
+  } catch (err) {
+    errEl.textContent = 'Could not load the calendar feed. ' + err.message;
+  }
+
+  // Section b (admin): existing Google ICS URL.
+  if (isAdmin) {
+    try {
+      const ics = await getSetting('google_calendar_ics_url');
+      document.getElementById('gcalUrl').value = ics || '';
+      document.getElementById('gcalRemoveBtn').style.display = ics ? 'inline-flex' : 'none';
+    } catch (err) {
+      errEl.textContent = 'Could not load calendar settings. ' + err.message;
+    }
+  }
+}
+
+function closeSyncModal() {
+  document.getElementById('syncModal').classList.remove('open');
+}
+document.getElementById('syncModal').addEventListener('click', function(e) {
+  if (e.target === this) closeSyncModal();
+});
+
+function copyFeedUrl() {
+  const inp = document.getElementById('feedUrl');
+  inp.select();
+  try { navigator.clipboard.writeText(inp.value); }
+  catch (e) { try { document.execCommand('copy'); } catch (e2) { /* clipboard blocked */ } }
+}
+
+async function saveGcalUrl() {
+  const url = document.getElementById('gcalUrl').value.trim();
+  const errEl = document.getElementById('syncError');
+  errEl.textContent = '';
+  if (!url) { errEl.textContent = 'Enter a calendar URL first.'; return; }
+  try {
+    const { error } = await window.ecoSupabase.from('portal_settings')
+      .upsert({ key: 'google_calendar_ics_url', value: url });
+    if (error) throw new Error(error.message);
+    document.getElementById('gcalRemoveBtn').style.display = 'inline-flex';
+    await loadGoogleOverlay();
+  } catch (err) {
+    errEl.textContent = 'Could not save. ' + err.message;
+  }
+}
+
+async function removeGcalUrl() {
+  const errEl = document.getElementById('syncError');
+  errEl.textContent = '';
+  try {
+    const { error } = await window.ecoSupabase.from('portal_settings')
+      .delete().eq('key', 'google_calendar_ics_url');
+    if (error) throw new Error(error.message);
+    document.getElementById('gcalUrl').value = '';
+    document.getElementById('gcalRemoveBtn').style.display = 'none';
+    gcalEvents = [];
+    renderMonth();
+    renderWeekView();
+    if (selectedDate) selectDate(selectedDate);
+  } catch (err) {
+    errEl.textContent = 'Could not remove. ' + err.message;
+  }
+}
+
 (async function init() {
   try {
     await AuthManager.requireAuth();
@@ -325,6 +535,8 @@ function goToday() {
     ]);
     renderMonth();
     renderWeekView();
+    // Overlay the Google Calendar after the main render, without blocking it.
+    loadGoogleOverlay();
   } catch (err) {
     document.getElementById('calGrid').innerHTML =
       '<div style="padding:20px;color:var(--text-dim);text-align:center;">Could not load data (' +
