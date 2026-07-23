@@ -71,12 +71,72 @@
 
   .empty { padding: 20px; color: var(--text-dim); font-size: 0.875rem; text-align: center; }
 
-  @media (max-width: 600px) { .page { padding: 20px 16px; } }
+  /* Page header + Add Garden */
+  .page-header { display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; margin-bottom: 24px; }
+  .page-header h1 { margin-bottom: 0; }
+  .btn-sm {
+    padding: 7px 14px; border-radius: 7px; border: none; font-size: 0.8rem;
+    font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif;
+    background: var(--forest); color: #fff; text-decoration: none; display: inline-block;
+    transition: background 0.15s;
+  }
+  .btn-sm:hover { background: var(--forest-mid); }
+  .btn-outline-sm { background: #fff; color: var(--forest); border: 1.5px solid var(--forest-light); }
+  .btn-outline-sm:hover { background: var(--sage); }
+
+  /* Add Garden Form */
+  .add-garden-form { background: #fff; border-radius: 12px; border: 1px solid var(--border);
+    padding: 20px; margin-bottom: 24px; display: none; }
+  .add-garden-form.open { display: block; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .form-group { margin-bottom: 12px; }
+  .form-group label { display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-dim);
+    margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .form-group input { width: 100%; padding: 8px 10px; border-radius: 6px;
+    border: 1.5px solid var(--border); font-size: 0.875rem; font-family: 'DM Sans', sans-serif; }
+  .form-group input:focus { outline: none; border-color: var(--forest-light); }
+  .form-hint { font-size: 0.72rem; color: var(--text-dim); margin-top: 4px; }
+  .form-actions { display: flex; gap: 10px; }
+  .modal-error { color: #b3261e; font-size: 0.85rem; margin-top: 8px; }
+
+  @media (max-width: 600px) { .page { padding: 20px 16px; } .form-row { grid-template-columns: 1fr; } }
 </style>
 </head>
 <body>
 <div class="page">
-  <h1>Gardens</h1>
+  <div class="page-header">
+    <h1>Gardens</h1>
+    <button class="btn-sm btn-outline-sm" onclick="toggleAddGarden()">+ Add Garden</button>
+  </div>
+  <div class="add-garden-form" id="addGardenForm">
+    <div class="form-row">
+      <div class="form-group">
+        <label>Name *</label>
+        <input type="text" id="ag_name" placeholder="e.g. Millbrook Community Garden">
+      </div>
+      <div class="form-group">
+        <label>Address</label>
+        <input type="text" id="ag_address" placeholder="123 Main St">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Size (sqft)</label>
+        <input type="number" id="ag_sqft" placeholder="2500" min="0">
+      </div>
+      <div class="form-group">
+        <label>QR Token</label>
+        <input type="text" id="ag_qr" placeholder="auto-generated">
+        <div class="form-hint">Used in the check-in kiosk link. Leave blank to auto-generate.</div>
+      </div>
+    </div>
+    <div class="modal-error" id="addGardenError"></div>
+    <div class="form-actions">
+      <button class="btn-sm btn-outline-sm" onclick="toggleAddGarden()">Cancel</button>
+      <button class="btn-sm" onclick="addGarden()">Add Garden</button>
+    </div>
+  </div>
   <div class="garden-grid" id="gardenGrid"></div>
 </div>
 
@@ -114,7 +174,7 @@ function renderGardens(gardens, tasks) {
         <div class="garden-card-top">
           <div class="garden-name">${esc(g.name)}</div>
           <div class="garden-addr">📍 ${esc(g.address)}</div>
-          <div class="garden-sqft">${g.sqft.toLocaleString()} sqft</div>
+          <div class="garden-sqft">${g.sqft != null ? g.sqft.toLocaleString() + ' sqft' : ''}</div>
         </div>
         <div class="garden-card-body">
           <div class="coverage-label">Task Coverage (${total} tasks)</div>
@@ -135,7 +195,40 @@ function renderGardens(gardens, tasks) {
         </div>
       </a>`;
   }).join('');
-  if (!gardens.length) el.innerHTML = '<div class="empty">No gardens yet. Add your first garden.</div>';
+  if (!gardens.length) el.innerHTML = '<div class="empty">No gardens yet. Use the + Add Garden button to create your first one.</div>';
+}
+
+function toggleAddGarden() {
+  document.getElementById('addGardenForm').classList.toggle('open');
+}
+
+function slugToken(name) {
+  const base = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  const suffix = Math.random().toString(36).slice(2, 6);
+  return (base ? base + '-' : '') + suffix;
+}
+
+async function addGarden() {
+  const name = document.getElementById('ag_name').value.trim();
+  const errEl = document.getElementById('addGardenError');
+  errEl.textContent = '';
+  if (!name) { errEl.textContent = 'Name is required.'; return; }
+  const address = document.getElementById('ag_address').value.trim();
+  const sqftVal = document.getElementById('ag_sqft').value;
+  let qrToken = document.getElementById('ag_qr').value.trim();
+  if (!qrToken) qrToken = slugToken(name);
+  try {
+    await DataStore.addGarden({ name, address, sqft: Number(sqftVal) || null, qrToken });
+    const [gardens, tasks] = await Promise.all([DataStore.getGardens(), DataStore.getTasks()]);
+    renderGardens(gardens, tasks);
+    document.getElementById('ag_name').value = '';
+    document.getElementById('ag_address').value = '';
+    document.getElementById('ag_sqft').value = '';
+    document.getElementById('ag_qr').value = '';
+    document.getElementById('addGardenForm').classList.remove('open');
+  } catch (err) {
+    errEl.textContent = 'Could not add garden. ' + err.message;
+  }
 }
 
 (async function init() {

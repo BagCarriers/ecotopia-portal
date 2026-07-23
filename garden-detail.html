@@ -327,7 +327,7 @@ function renderPage() {
     <div class="garden-header">
       <div>
         <h1>${esc(garden.name)}</h1>
-        <div class="garden-meta">📍 ${esc(garden.address)} · ${garden.sqft.toLocaleString()} sqft</div>
+        <div class="garden-meta">📍 ${esc(garden.address)}${garden.sqft != null ? ' · ' + garden.sqft.toLocaleString() + ' sqft' : ''}</div>
       </div>
       <button class="btn-qr" onclick="openQR()">📱 QR Check-in</button>
     </div>
@@ -422,7 +422,41 @@ function renderPage() {
 
     <!-- Walk-in Tasks -->
     <div class="section">
-      <div class="section-header"><h2>Walk-In Tasks</h2><span style="font-size:0.8rem;color:var(--text-dim)">Toggle on/off for QR page</span></div>
+      <div class="section-header">
+        <h2>Walk-In Tasks</h2>
+        <div style="display:flex;align-items:center;gap:12px;">
+          <span style="font-size:0.8rem;color:var(--text-dim)">Toggle on/off for QR page</span>
+          <button class="btn-sm btn-outline-sm" onclick="toggleAddWalkin()">+ Add Walk-in</button>
+        </div>
+      </div>
+      <div class="add-task-form" id="addWalkinForm">
+        <div class="form-row">
+          <div class="form-group">
+            <label>Title *</label>
+            <input type="text" id="aw_title" placeholder="e.g. Water the raised beds">
+          </div>
+          <div class="form-group">
+            <label>Est. Minutes</label>
+            <input type="number" id="aw_mins" placeholder="20" min="1">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Type</label>
+          <select id="aw_type">
+            <option value="general">General</option>
+            <option value="watering">Watering</option>
+            <option value="weeding">Weeding</option>
+            <option value="inspection">Inspection</option>
+            <option value="cleanup">Cleanup</option>
+            <option value="harvest">Harvest</option>
+          </select>
+        </div>
+        <div class="modal-error" id="addWalkinError"></div>
+        <div class="form-actions">
+          <button class="btn-sm btn-outline-sm" onclick="toggleAddWalkin()">Cancel</button>
+          <button class="btn-sm" onclick="addWalkin()">Add Walk-in</button>
+        </div>
+      </div>
       <div class="walkin-grid" id="walkinGrid">
         ${gWalkins.map(w => `
           <div class="walkin-card">
@@ -581,6 +615,30 @@ async function addTask() {
     renderPage();
   } catch (err) {
     errEl.textContent = 'Could not add task. ' + err.message;
+  }
+}
+
+function toggleAddWalkin() {
+  document.getElementById('addWalkinForm').classList.toggle('open');
+}
+
+async function addWalkin() {
+  const title = document.getElementById('aw_title').value.trim();
+  if (!title) return;
+  const errEl = document.getElementById('addWalkinError');
+  errEl.textContent = '';
+  try {
+    await DataStore.addWalkin({
+      gardenId: garden.id,
+      title,
+      estMinutes: Number(document.getElementById('aw_mins').value) || null,
+      type: document.getElementById('aw_type').value,
+      active: true
+    });
+    walkins = await DataStore.getWalkins();
+    renderPage();
+  } catch (err) {
+    errEl.textContent = 'Could not add walk-in. ' + err.message;
   }
 }
 

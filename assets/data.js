@@ -98,6 +98,7 @@ const DataStore = (() => {
     getWalkins: () => list('walkins'),
     getWalkinsByGarden: async (gId) =>
       fromDbAll(unwrap(await sb.from('walkins').select('*').eq('garden_id', gId).eq('active', true))),
+    addWalkin: (r) => insert('walkins', r),
     updateWalkin: (id, ch) => update('walkins', id, ch),
 
     // Check-ins
