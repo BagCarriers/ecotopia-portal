@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gallery - Ecotopia</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/mapping.js"></script>
+<script src="assets/auth.js"></script>
+<script>if (!AuthManager.hasCachedSession()) location.replace('login.html');</script>
+<script src="assets/data.js"></script>
+<script src="assets/nav.js"></script>
+<style>
+  :root {
+    --forest: #1B4332; --forest-mid: #2D6A4F; --forest-light: #52B788;
+    --sage: #D8F3DC; --sage-dim: #B7E4C7; --earth: #8B5E3C;
+    --earth-light: #C68642; --gold: #F4A261; --cream: #F9F6F0;
+    --cream-dim: #E8E0D5; --text: #1C1C1C; --text-dim: #5A5A5A;
+    --border: rgba(45,106,79,0.2);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--text); }
+  .page { padding: 28px 32px; max-width: 1100px; }
+  h1 { font-family: 'Fraunces', serif; font-size: 1.9rem; color: var(--forest); margin-bottom: 24px; }
+
+  .page-header { display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; margin-bottom: 8px; }
+  .page-header h1 { margin-bottom: 0; }
+  .btn-sm {
+    padding: 7px 14px; border-radius: 7px; border: none; font-size: 0.8rem;
+    font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif;
+    background: var(--forest); color: #fff; text-decoration: none; display: inline-block;
+    transition: background 0.15s;
+  }
+  .btn-sm:hover { background: var(--forest-mid); }
+  .btn-outline-sm { background: #fff; color: var(--forest); border: 1.5px solid var(--forest-light); }
+  .btn-outline-sm:hover { background: var(--sage); }
+  .btn-danger { background: #b3261e; color: #fff; }
+  .btn-danger:hover { background: #8f1e18; }
+
+  .upload-status { font-size: 0.82rem; color: var(--text-dim); margin-bottom: 8px; min-height: 1em; }
+  .modal-error { color: #b3261e; font-size: 0.85rem; margin: 8px 0; }
+
+  /* Filter chips */
+  .chips { display: flex; gap: 8px; margin-bottom: 20px; flex-wrap: wrap; }
+  .chip {
+    padding: 6px 14px; border-radius: 20px; border: 1.5px solid var(--border);
+    background: #fff; color: var(--text-dim); font-size: 0.82rem; font-weight: 600;
+    cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s;
+  }
+  .chip:hover { border-color: var(--forest-light); }
+  .chip.active { background: var(--forest); color: #fff; border-color: var(--forest); }
+
+  /* Masonry-ish grid via CSS columns */
+  .photo-grid { columns: 3 260px; column-gap: 16px; }
+  .photo-card {
+    break-inside: avoid; margin: 0 0 16px; background: #fff; border-radius: 12px;
+    overflow: hidden; border: 1px solid var(--border); cursor: pointer;
+    transition: box-shadow 0.15s, transform 0.1s;
+  }
+  .photo-card:hover { box-shadow: 0 6px 24px rgba(27,67,50,0.13); transform: translateY(-2px); }
+  .photo-card img { width: 100%; display: block; background: var(--cream-dim); }
+  .photo-meta { padding: 12px 14px; }
+  .photo-caption { font-size: 0.9rem; color: var(--text); margin-bottom: 4px; }
+  .photo-caption.empty { color: var(--text-dim); font-style: italic; }
+  .photo-sub { font-size: 0.75rem; color: var(--text-dim); }
+  .photo-garden { font-size: 0.75rem; color: var(--forest-mid); font-weight: 600; margin-top: 4px; }
+  .badge {
+    display: inline-block; font-size: 0.66rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.04em; padding: 1px 7px; border-radius: 10px; margin-right: 6px;
+    vertical-align: middle;
+  }
+  .badge-staff { background: var(--sage); color: var(--forest); }
+  .badge-vol { background: var(--gold); color: #4a2f0a; }
+
+  .empty { padding: 40px 20px; color: var(--text-dim); font-size: 0.9rem; text-align: center; }
+
+  /* Lightbox */
+  .lightbox {
+    display: none; position: fixed; inset: 0; z-index: 500;
+    background: rgba(15,30,22,0.85); padding: 24px; overflow-y: auto;
+  }
+  .lightbox.open { display: flex; align-items: flex-start; justify-content: center; }
+  .lightbox-inner {
+    background: #fff; border-radius: 14px; max-width: 720px; width: 100%;
+    margin: auto; overflow: hidden; position: relative;
+  }
+  .lightbox-close {
+    position: absolute; top: 10px; right: 10px; z-index: 2;
+    width: 34px; height: 34px; border-radius: 50%; border: none; cursor: pointer;
+    background: rgba(0,0,0,0.55); color: #fff; font-size: 1rem; line-height: 1;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .lightbox-close:hover { background: rgba(0,0,0,0.75); }
+  .lightbox-inner img { width: 100%; display: block; max-height: 70vh; object-fit: contain; background: #000; }
+  .lightbox-body { padding: 18px 20px; }
+  .lb-garden { font-size: 0.85rem; color: var(--forest-mid); font-weight: 600; margin-bottom: 4px; }
+  .lb-sub { font-size: 0.8rem; color: var(--text-dim); margin-bottom: 14px; }
+  .lb-edit { display: flex; gap: 8px; margin-bottom: 6px; }
+  .lb-edit input {
+    flex: 1; padding: 8px 10px; border-radius: 6px; border: 1.5px solid var(--border);
+    font-size: 0.875rem; font-family: 'DM Sans', sans-serif;
+  }
+  .lb-edit input:focus { outline: none; border-color: var(--forest-light); }
+  .lb-actions { margin-top: 12px; }
+
+  @media (max-width: 600px) { .page { padding: 20px 16px; } .photo-grid { columns: 2 150px; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="page-header">
+    <h1>Gallery</h1>
+    <button class="btn-sm btn-outline-sm" id="addPhotosBtn" onclick="document.getElementById('photoInput').click()">+ Add Photos</button>
+    <input type="file" id="photoInput" accept="image/*" multiple style="display:none" onchange="onFilesSelected(this)">
+  </div>
+  <div class="upload-status" id="uploadStatus"></div>
+  <div class="modal-error" id="uploadError" style="display:none"></div>
+
+  <div class="chips" id="chips">
+    <button class="chip active" data-filter="all" onclick="setFilter('all')">All</button>
+    <button class="chip" data-filter="staff" onclick="setFilter('staff')">Staff</button>
+    <button class="chip" data-filter="volunteer" onclick="setFilter('volunteer')">Volunteers</button>
+  </div>
+
+  <div class="photo-grid" id="photoGrid"></div>
+</div>
+
+<!-- Lightbox -->
+<div class="lightbox" id="lightbox" onclick="onLightboxClick(event)">
+  <div class="lightbox-inner">
+    <button class="lightbox-close" onclick="closeLightbox()" aria-label="Close">✕</button>
+    <img id="lbImg" src="" alt="Garden photo">
+    <div class="lightbox-body">
+      <div class="lb-garden" id="lbGarden"></div>
+      <div class="lb-sub" id="lbSub"></div>
+      <div class="lb-edit">
+        <input type="text" id="lbCaption" placeholder="Add a caption" maxlength="500">
+        <button class="btn-sm" onclick="saveCaption()">Save</button>
+      </div>
+      <div class="modal-error" id="lbError" style="display:none"></div>
+      <div class="lb-actions">
+        <button class="btn-sm btn-danger" onclick="deletePhoto()">Delete photo</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const esc = DataStore.esc;
+let allPhotos = [];
+let currentFilter = 'all';
+let currentPhotoId = null;
+let currentUserEmail = null;
+
+function extFor(mime) {
+  return ({ 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' })[mime] || 'jpg';
+}
+
+function filtered() {
+  return currentFilter === 'all' ? allPhotos : allPhotos.filter(p => p.source === currentFilter);
+}
+
+function renderGrid() {
+  const grid = document.getElementById('photoGrid');
+  const photos = filtered();
+  if (!photos.length) {
+    grid.innerHTML = currentFilter === 'all'
+      ? '<div class="empty">No photos yet. Add the first one.</div>'
+      : '<div class="empty">No photos in this filter yet.</div>';
+    return;
+  }
+  grid.innerHTML = photos.map(p => {
+    const url = DataStore.galleryPublicUrl(p.storagePath);
+    const badge = p.source === 'volunteer'
+      ? '<span class="badge badge-vol">Volunteer</span>'
+      : '<span class="badge badge-staff">Staff</span>';
+    const who = p.uploadedBy ? ' · ' + esc(p.uploadedBy) : '';
+    const capCls = p.caption ? 'photo-caption' : 'photo-caption empty';
+    const capText = p.caption ? esc(p.caption) : 'No caption';
+    return `
+      <div class="photo-card" onclick="openLightbox('${p.id}')">
+        <img src="${esc(url)}" loading="lazy" alt="${esc(p.caption || 'Garden photo')}">
+        <div class="photo-meta">
+          <div class="${capCls}">${capText}</div>
+          <div class="photo-sub">${badge}${esc(DataStore.formatDate(p.createdAt))}${who}</div>
+          ${p.gardenName ? `<div class="photo-garden">📍 ${esc(p.gardenName)}</div>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function setFilter(f) {
+  currentFilter = f;
+  document.querySelectorAll('#chips .chip').forEach(c =>
+    c.classList.toggle('active', c.dataset.filter === f));
+  renderGrid();
+}
+
+// ── Lightbox ──────────────────────────────────────────────────────────────
+function openLightbox(id) {
+  const p = allPhotos.find(x => x.id === id);
+  if (!p) return;
+  currentPhotoId = id;
+  document.getElementById('lbImg').src = DataStore.galleryPublicUrl(p.storagePath);
+  const badge = p.source === 'volunteer' ? 'Volunteer submission' : 'Staff upload';
+  const who = p.uploadedBy ? ' by ' + p.uploadedBy : '';
+  document.getElementById('lbGarden').textContent = p.gardenName ? '📍 ' + p.gardenName : '';
+  document.getElementById('lbSub').textContent = badge + who + ' · ' + DataStore.formatDate(p.createdAt);
+  document.getElementById('lbCaption').value = p.caption || '';
+  const err = document.getElementById('lbError');
+  err.style.display = 'none'; err.textContent = '';
+  document.getElementById('lightbox').classList.add('open');
+}
+
+function closeLightbox() {
+  document.getElementById('lightbox').classList.remove('open');
+  currentPhotoId = null;
+}
+
+function onLightboxClick(e) {
+  if (e.target === document.getElementById('lightbox')) closeLightbox();
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') closeLightbox();
+});
+
+async function saveCaption() {
+  if (!currentPhotoId) return;
+  const caption = document.getElementById('lbCaption').value.trim();
+  const err = document.getElementById('lbError');
+  err.style.display = 'none';
+  try {
+    await DataStore.updateGalleryPhoto(currentPhotoId, { caption: caption || null });
+    const p = allPhotos.find(x => x.id === currentPhotoId);
+    if (p) p.caption = caption || null;
+    renderGrid();
+  } catch (e) {
+    err.textContent = 'Could not save caption. ' + e.message;
+    err.style.display = 'block';
+  }
+}
+
+async function deletePhoto() {
+  if (!currentPhotoId) return;
+  const p = allPhotos.find(x => x.id === currentPhotoId);
+  if (!p) return;
+  if (!confirm('Delete this photo? This cannot be undone.')) return;
+  const err = document.getElementById('lbError');
+  err.style.display = 'none';
+  try {
+    await DataStore.deleteGalleryPhoto(p.id, p.storagePath);
+    closeLightbox();
+    await loadAndRender();
+  } catch (e) {
+    err.textContent = 'Could not delete photo. ' + e.message;
+    err.style.display = 'block';
+  }
+}
+
+// ── Staff upload ────────────────────────────────────────────────────────────
+async function onFilesSelected(input) {
+  const files = Array.from(input.files || []);
+  input.value = ''; // reset so the same file can be re-selected later
+  if (!files.length) return;
+  const status = document.getElementById('uploadStatus');
+  const errEl = document.getElementById('uploadError');
+  const btn = document.getElementById('addPhotosBtn');
+  errEl.style.display = 'none'; errEl.textContent = '';
+  btn.disabled = true;
+  let ok = 0, failed = 0;
+  for (let i = 0; i < files.length; i++) {
+    status.textContent = `Uploading ${i + 1} of ${files.length}...`;
+    try {
+      const blob = await DataStore.resizeImage(files[i]);
+      const mime = blob.type || files[i].type || 'image/jpeg';
+      const path = `staff/${crypto.randomUUID()}.${extFor(mime)}`;
+      const up = await window.ecoSupabase.storage.from('gallery')
+        .upload(path, blob, { contentType: mime, upsert: false });
+      if (up.error) throw new Error(up.error.message);
+      await DataStore.addGalleryPhoto({
+        storagePath: path, caption: null, uploadedBy: currentUserEmail, source: 'staff'
+      });
+      ok++;
+    } catch (e) {
+      failed++;
+    }
+  }
+  status.textContent = ok ? `Uploaded ${ok} photo${ok !== 1 ? 's' : ''}.` : '';
+  if (failed) {
+    errEl.textContent = `${failed} photo${failed !== 1 ? 's' : ''} failed to upload. Please try again.`;
+    errEl.style.display = 'block';
+  }
+  btn.disabled = false;
+  await loadAndRender();
+}
+
+// ── Load / render ───────────────────────────────────────────────────────────
+async function loadAndRender() {
+  allPhotos = await DataStore.getGalleryPhotos();
+  renderGrid();
+}
+
+(async function init() {
+  try {
+    await AuthManager.requireAuth();
+    Nav.render();
+    currentUserEmail = await AuthManager.getUser();
+    await loadAndRender();
+  } catch (err) {
+    document.getElementById('photoGrid').innerHTML =
+      '<div class="empty">Could not load photos (' + esc(err.message) + '). <a href="javascript:location.reload()">Retry</a></div>';
+  }
+})();
+</script>
+</body>
+</html>

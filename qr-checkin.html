@@ -103,6 +103,13 @@
   .success-title { font-family: 'Fraunces', serif; font-size: 1.8rem; color: var(--forest);
     margin-bottom: 8px; }
   .success-sub { color: var(--text-dim); font-size: 0.9rem; line-height: 1.6; }
+  /* Optional photo share on success screen */
+  .photo-share { margin-top: 28px; background: var(--cream-dim); border-radius: 12px; padding: 18px; }
+  .photo-share-title { font-weight: 700; color: var(--forest); font-size: 1rem; margin-bottom: 4px; }
+  .photo-share-sub { font-size: 0.82rem; color: var(--text-dim); margin-bottom: 12px; }
+  .photo-share-status { font-size: 0.82rem; color: var(--text-dim); margin-top: 8px; }
+  .photo-share-status.error { color: #b3261e; }
+
   .success-links { margin-top: 28px; }
   .success-link { display: block; background: var(--sage); color: var(--forest);
     padding: 14px; border-radius: 10px; text-decoration: none; font-weight: 600;
@@ -411,7 +418,9 @@ async function finishWalkin() {
   }
 }
 
+let photoUploaderName = 'Volunteer';
 function showSuccess(name, task, hours) {
+  photoUploaderName = (name && name.trim()) || 'Volunteer';
   const hoursText = hours ? `You logged ${hours.toFixed(2).replace(/\.?0+$/, '')} hour${hours !== 1 ? 's' : ''}.` : '';
   el.innerHTML = `
     <div class="success-screen">
@@ -422,11 +431,46 @@ function showSuccess(name, task, hours) {
         ${hoursText}<br><br>
         Your contribution helps this community space thrive.
       </div>
+
+      <div class="photo-share" id="photoShare">
+        <p class="photo-share-title">📷 Share a photo of your work</p>
+        <p class="photo-share-sub">Optional. Help us show off this garden.</p>
+        <label class="success-link" for="photoInput" style="cursor:pointer">Choose a photo</label>
+        <input type="file" id="photoInput" accept="image/*" style="display:none" onchange="uploadVolunteerPhoto(this)">
+        <div id="photoStatus" class="photo-share-status"></div>
+      </div>
+
       <div class="success-links">
         <a href="volunteer-board.html" class="success-link">📋 See open responsibilities →</a>
         <a href="qr-checkin.html?garden=${encodeURIComponent(gardenToken)}" class="success-link">↩ New check-in</a>
       </div>
     </div>`;
+}
+
+async function uploadVolunteerPhoto(input) {
+  const file = (input.files || [])[0];
+  if (!file) return;
+  const share = document.getElementById('photoShare');
+  const status = document.getElementById('photoStatus');
+  status.textContent = 'Uploading...';
+  status.className = 'photo-share-status';
+  try {
+    const blob = await DataStore.resizeImage(file);
+    const path = `volunteer/${crypto.randomUUID()}.jpg`;
+    const mime = blob.type || file.type || 'image/jpeg';
+    const up = await window.ecoSupabase.storage.from('gallery')
+      .upload(path, blob, { contentType: mime, upsert: false });
+    if (up.error) throw new Error(up.error.message);
+    await DataStore.submitGalleryPhoto({
+      storagePath: path, caption: null, uploadedBy: photoUploaderName,
+      gardenId: garden.id, gardenName: garden.name
+    });
+    share.innerHTML = '<p class="photo-share-title">✅ Thanks, photo received!</p>';
+  } catch (err) {
+    input.value = '';
+    status.textContent = 'Photo upload failed. Please try again.';
+    status.className = 'photo-share-status error';
+  }
 }
 </script>
 </body>

@@ -10,6 +10,7 @@ const Nav = (() => {
     { href: 'clients.html',    label: 'Clients',     icon: '👤' },
     { href: 'volunteers.html', label: 'Volunteers',  icon: '🤝' },
     { href: 'events.html',     label: 'Events',      icon: '📅' },
+    { href: 'gallery.html',    label: 'Gallery',     icon: '📷' },
     { href: 'calendar.html',   label: 'Calendar',    icon: '🗓'  },
     { href: 'invoices.html',   label: 'Invoices',    icon: '💵' },
     { href: 'grants.html',     label: 'Grants',      icon: '🏛'  },

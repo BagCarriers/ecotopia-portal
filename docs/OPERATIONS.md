@@ -78,6 +78,37 @@ supabase functions deploy calendar-feed --no-verify-jwt --project-ref wibnryfinf
 `supabase/config.toml` pins `[functions.calendar-feed] verify_jwt = false` so a future
 redeploy keeps JWT verification off instead of silently breaking the token-authed feed.
 
+## Gallery (photo library)
+
+Migration `0009_gallery.sql` adds a staff photo library plus volunteer photo
+submissions. It was applied live via the Management API (like the others), so
+register it with `supabase migration repair --status applied 0009` before any
+`supabase db push`.
+
+Storage bucket `gallery`:
+
+- `public = true` (photos are served via public URLs on `gallery.html`),
+  `file_size_limit = 10 MB`, `allowed_mime_types = jpeg/png/webp/gif`.
+- Path convention: staff uploads go under `staff/<uuid>.<ext>`, volunteer
+  submissions under `volunteer/<uuid>.jpg`.
+- Object policies: `gallery_staff_all` gives authenticated portal users full CRUD
+  on the bucket; `gallery_anon_upload` lets anon INSERT only when the first path
+  segment is `volunteer/` (no anon read/update/delete). Public read comes from the
+  bucket being public, not from a policy.
+
+Metadata table `public.gallery_photos` (one row per photo; `storage_path`,
+`caption`, `uploaded_by`, `source` in (`staff`,`volunteer`), optional
+`garden_id`/`garden_name`):
+
+- `gp_staff_all`: authenticated portal users get full CRUD.
+- `gp_anon_ins`: anon may INSERT only rows with `source = 'volunteer'`, and cannot
+  select/update/delete (the kiosk fire-and-forgets via `return=minimal`).
+
+Delete removes the storage object first, then the row (`DataStore.deleteGalleryPhoto`);
+a missing object is ignored so the row is still removed. `DataStore.resizeImage`
+downscales images client-side (canvas, long edge <= 1600px, JPEG q0.85) before
+upload; GIFs and already-small images pass through untouched.
+
 ## Deploy
 
 The site is a static bundle deployed to Netlify:

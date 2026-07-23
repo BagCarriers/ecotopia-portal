@@ -159,6 +159,24 @@ const DataStore = (() => {
     addObservation: (r) => insert('observations', r),
     flagObservation: (id) => update('observations', id, { flagged: true }),
 
+    // Gallery (staff library + volunteer submissions)
+    getGalleryPhotos: async () =>
+      fromDbAll(unwrap(await sb.from('gallery_photos').select('*')
+        .order('created_at', { ascending: false }))),
+    addGalleryPhoto: (r) => insert('gallery_photos', r), // staff path
+    submitGalleryPhoto: (r) => submit('gallery_photos', { ...r, source: 'volunteer' }), // anon
+    updateGalleryPhoto: (id, ch) => update('gallery_photos', id, ch),
+    deleteGalleryPhoto: async (id, storagePath) => {
+      // Remove the storage object first, then the row. A missing object is fine
+      // (already gone): ignore any storage error so the row still gets deleted.
+      if (storagePath) {
+        try { await sb.storage.from('gallery').remove([storagePath]); } catch (e) { /* ignore */ }
+      }
+      unwrap(await sb.from('gallery_photos').delete().eq('id', id));
+    },
+    galleryPublicUrl: (storagePath) =>
+      sb.storage.from('gallery').getPublicUrl(storagePath).data.publicUrl, // sync
+
     // Public form submissions (anon inserts, return=minimal)
     addIntakeSubmission: (r) => submit('intake_submissions', r),
     getIntakeSubmissions: () => list('intake_submissions'),
@@ -173,6 +191,32 @@ const DataStore = (() => {
         .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     },
     uid: () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+    // Client-side downscale, shared by gallery.html + qr-checkin.html. Browser
+    // only: needs createImageBitmap + canvas (NOT available in Node). Returns a
+    // JPEG Blob (q0.85) no larger than maxDim on its long edge. GIFs (may be
+    // animated) and images already within maxDim on both axes pass through as-is.
+    async resizeImage(file, maxDim = 1600) {
+      if (!file || file.type === 'image/gif') return file;
+      let bitmap;
+      try {
+        bitmap = await createImageBitmap(file);
+      } catch (e) {
+        return file; // decode failed: fall back to the original file
+      }
+      const w0 = bitmap.width, h0 = bitmap.height;
+      if (w0 <= maxDim && h0 <= maxDim) {
+        if (bitmap.close) bitmap.close();
+        return file;
+      }
+      const scale = maxDim / Math.max(w0, h0);
+      const w = Math.round(w0 * scale), h = Math.round(h0 * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(bitmap, 0, 0, w, h);
+      if (bitmap.close) bitmap.close();
+      return await new Promise((resolve) =>
+        canvas.toBlob((blob) => resolve(blob || file), 'image/jpeg', 0.85));
+    },
     formatDate(isoStr) {
       if (!isoStr) return '-';
       const d = new Date(isoStr);
