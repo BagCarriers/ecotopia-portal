@@ -199,7 +199,8 @@ const DataStore = (() => {
       if (!file || file.type === 'image/gif') return file;
       let bitmap;
       try {
-        bitmap = await createImageBitmap(file);
+        // from-image: apply EXIF orientation so phone portraits are not stored sideways
+        bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
       } catch (e) {
         return file; // decode failed: fall back to the original file
       }
