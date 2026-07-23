@@ -5,8 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Volunteers — Ecotopia</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/mapping.js"></script>
 <script src="assets/auth.js"></script>
-<script>try { AuthManager.requireAuth(); } catch(e) { throw e; }</script>
+<script>if (!AuthManager.hasCachedSession()) location.replace('login.html');</script>
 <script src="assets/data.js"></script>
 <script src="assets/nav.js"></script>
 <style>
@@ -71,6 +75,7 @@
   .success-msg { background: #d1fae5; border: 1px solid #6ee7b7; color: #065f46;
     padding: 12px; border-radius: 8px; margin-bottom: 16px; display: none; font-size: 0.875rem; }
   .success-msg.visible { display: block; }
+  .modal-error { color: #b3261e; font-size: 0.85rem; margin-top: 8px; }
 
   /* Log hours modal */
   .log-hours-btn {
@@ -135,6 +140,7 @@
         <input type="text" id="av_skills" placeholder="planting, watering, weeding"></div>
       <div class="form-group"><label>Availability</label>
         <input type="text" id="av_avail" placeholder="Weekends only"></div>
+      <div class="modal-error" id="addVolError"></div>
       <div class="modal-actions">
         <button type="button" class="btn-cancel" onclick="closeAddVol()">Cancel</button>
         <button type="submit" class="btn btn-primary">Add Volunteer</button>
@@ -174,6 +180,7 @@
         </label>
       </div>
       <input type="hidden" id="ev_id">
+      <div class="modal-error" id="editVolError"></div>
       <div class="modal-actions">
         <button type="button" class="btn-cancel" onclick="closeEditVol()">Cancel</button>
         <button type="submit" class="btn btn-primary">Save Changes</button>
@@ -200,6 +207,7 @@
         <input type="date" id="lh_date"></div>
       <div class="form-group"><label>Notes</label>
         <textarea id="lh_notes" rows="2" placeholder="Optional notes…"></textarea></div>
+      <div class="modal-error" id="logHoursError"></div>
       <div class="modal-actions">
         <button type="button" class="btn-cancel" onclick="closeLogHours()">Cancel</button>
         <button type="submit" class="btn btn-primary">Log Hours</button>
@@ -209,24 +217,30 @@
 </div>
 
 <script>
-Nav.render();
+const esc = DataStore.esc;
+let volunteers = [], gardens = [], tasks = [], checkins = [];
+
+const hoursLast30 = (vId) => {
+  const cutoff = Date.now() - 30 * 86400000;
+  return checkins.filter(c => c.volunteerId === vId && new Date(c.checkInTime).getTime() >= cutoff)
+    .reduce((s, c) => s + (Number(c.hoursLogged) || 0), 0);
+};
 
 function renderTable() {
-  const vols = DataStore.getVolunteers();
   const tbody = document.getElementById('volBody');
-  tbody.innerHTML = vols.map(v => {
-    const tasks = DataStore.getTasksByVolunteer(v.id);
-    const hours = DataStore.getHoursLast30(v.id);
-    const checkins = DataStore.getCheckinsByVolunteer(v.id);
-    const lastCi = checkins.sort((a, b) => new Date(b.checkInTime) - new Date(a.checkInTime))[0];
+  tbody.innerHTML = volunteers.map(v => {
+    const vTasks = tasks.filter(t => t.volunteerId === v.id);
+    const hours = hoursLast30(v.id);
+    const vCheckins = checkins.filter(c => c.volunteerId === v.id);
+    const lastCi = vCheckins.slice().sort((a, b) => new Date(b.checkInTime) - new Date(a.checkInTime))[0];
     const lastActive = lastCi ? DataStore.formatDate(lastCi.checkInTime) : 'Never';
     const skillPills = (v.skills || []).map(s =>
-      `<span class="skill-pill">${s}</span>`).join('');
+      `<span class="skill-pill">${esc(s)}</span>`).join('');
     return `
       <tr onclick="window.location='volunteer-detail.html?id=${v.id}'">
-        <td><span class="vol-name">${v.name}</span></td>
+        <td><span class="vol-name">${esc(v.name)}</span></td>
         <td>${skillPills || '<span style="color:var(--text-dim)">—</span>'}</td>
-        <td>${tasks.length}</td>
+        <td>${vTasks.length}</td>
         <td>${hours.toFixed(1)}</td>
         <td>${lastActive}</td>
         <td><span class="${v.status === 'active' ? 'status-active' : 'status-inactive'}">
@@ -238,37 +252,44 @@ function renderTable() {
   }).join('');
 }
 
-renderTable();
-
 function openAddVol() { document.getElementById('addVolModal').classList.add('open'); }
 function closeAddVol() {
   document.getElementById('addVolModal').classList.remove('open');
   document.getElementById('addVolForm').reset();
   document.getElementById('volSuccess').classList.remove('visible');
+  document.getElementById('addVolError').textContent = '';
 }
 document.getElementById('addVolModal').addEventListener('click', function(e) {
   if (e.target === this) closeAddVol();
 });
-document.getElementById('addVolForm').addEventListener('submit', function(e) {
+document.getElementById('addVolForm').addEventListener('submit', async function(e) {
   e.preventDefault();
   const name = document.getElementById('av_name').value.trim();
   if (!name) return;
   const skills = document.getElementById('av_skills').value.split(',').map(s => s.trim()).filter(Boolean);
-  DataStore.addVolunteer({
-    name, skills,
-    phone: document.getElementById('av_phone').value.trim(),
-    email: document.getElementById('av_email').value.trim(),
-    availability: document.getElementById('av_avail').value.trim(),
-    status: 'active', joinedAt: new Date().toISOString()
-  });
-  document.getElementById('volSuccess').classList.add('visible');
-  renderTable();
-  setTimeout(closeAddVol, 1000);
+  const errEl = document.getElementById('addVolError');
+  errEl.textContent = '';
+  try {
+    await DataStore.addVolunteer({
+      name, skills,
+      phone: document.getElementById('av_phone').value.trim(),
+      email: document.getElementById('av_email').value.trim(),
+      availability: document.getElementById('av_avail').value.trim(),
+      status: 'active', joinedAt: new Date().toISOString()
+    });
+    volunteers = await DataStore.getVolunteers();
+    document.getElementById('volSuccess').classList.add('visible');
+    renderTable();
+    setTimeout(closeAddVol, 1000);
+  } catch (err) {
+    errEl.textContent = 'Could not add volunteer. ' + err.message;
+  }
 });
 
 function openEditVol(id) {
-  const v = DataStore.getVolunteer(id);
+  const v = volunteers.find(x => x.id === id);
   if (!v) return;
+  document.getElementById('editVolError').textContent = '';
   document.getElementById('ev_id').value = v.id;
   document.getElementById('ev_name').value = v.name || '';
   document.getElementById('ev_phone').value = v.phone || '';
@@ -287,32 +308,38 @@ function closeEditVol() {
 document.getElementById('editVolModal').addEventListener('click', function(e) {
   if (e.target === this) closeEditVol();
 });
-document.getElementById('editVolForm').addEventListener('submit', function(e) {
+document.getElementById('editVolForm').addEventListener('submit', async function(e) {
   e.preventDefault();
   const id = document.getElementById('ev_id').value;
   const name = document.getElementById('ev_name').value.trim();
   if (!name) return;
   const skills = Array.from(document.querySelectorAll('#editVolModal .skill-checks input[type=checkbox]:checked'))
     .map(cb => cb.value);
-  DataStore.updateVolunteer(id, {
-    name,
-    phone: document.getElementById('ev_phone').value.trim(),
-    email: document.getElementById('ev_email').value.trim(),
-    availability: document.getElementById('ev_avail').value.trim(),
-    skills,
-    status: document.getElementById('ev_active').checked ? 'active' : 'inactive'
-  });
-  closeEditVol();
-  renderTable();
+  const errEl = document.getElementById('editVolError');
+  errEl.textContent = '';
+  try {
+    await DataStore.updateVolunteer(id, {
+      name,
+      phone: document.getElementById('ev_phone').value.trim(),
+      email: document.getElementById('ev_email').value.trim(),
+      availability: document.getElementById('ev_avail').value.trim(),
+      skills,
+      status: document.getElementById('ev_active').checked ? 'active' : 'inactive'
+    });
+    volunteers = await DataStore.getVolunteers();
+    closeEditVol();
+    renderTable();
+  } catch (err) {
+    errEl.textContent = 'Could not save changes. ' + err.message;
+  }
 });
 
 function openLogHours() {
-  const vols = DataStore.getVolunteers();
-  const gardens = DataStore.getGardens();
-  document.getElementById('lh_vol').innerHTML = vols.map(v =>
-    `<option value="${v.id}">${v.name}</option>`).join('');
+  document.getElementById('logHoursError').textContent = '';
+  document.getElementById('lh_vol').innerHTML = volunteers.map(v =>
+    `<option value="${v.id}">${esc(v.name)}</option>`).join('');
   document.getElementById('lh_garden').innerHTML = gardens.map(g =>
-    `<option value="${g.id}">${g.name}</option>`).join('');
+    `<option value="${g.id}">${esc(g.name)}</option>`).join('');
   document.getElementById('lh_date').value = new Date().toISOString().slice(0, 10);
   document.getElementById('logHoursModal').classList.add('open');
 }
@@ -320,31 +347,54 @@ function closeLogHours() {
   document.getElementById('logHoursModal').classList.remove('open');
   document.getElementById('logHoursForm').reset();
   document.getElementById('hoursSuccess').classList.remove('visible');
+  document.getElementById('logHoursError').textContent = '';
 }
 document.getElementById('logHoursModal').addEventListener('click', function(e) {
   if (e.target === this) closeLogHours();
 });
-document.getElementById('logHoursForm').addEventListener('submit', function(e) {
+document.getElementById('logHoursForm').addEventListener('submit', async function(e) {
   e.preventDefault();
   const volId = document.getElementById('lh_vol').value;
   const gId = document.getElementById('lh_garden').value;
-  const vol = DataStore.getVolunteer(volId);
-  const garden = DataStore.getGarden(gId);
+  const vol = volunteers.find(v => v.id === volId);
+  const garden = gardens.find(g => g.id === gId);
   const hours = parseFloat(document.getElementById('lh_hours').value) || 0;
   const date = document.getElementById('lh_date').value || new Date().toISOString().slice(0, 10);
   if (!volId || !gId || hours <= 0) return;
-  DataStore.addCheckin({
-    gardenId: gId, gardenName: garden.name,
-    volunteerId: volId, volunteerName: vol.name,
-    taskId: null, taskTitle: document.getElementById('lh_task').value.trim() || 'Manual entry',
-    hoursLogged: hours,
-    checkInTime: date + 'T12:00:00Z', checkOutTime: date + 'T12:00:00Z',
-    type: 'manual', notes: document.getElementById('lh_notes').value.trim()
-  });
-  document.getElementById('hoursSuccess').classList.add('visible');
-  renderTable();
-  setTimeout(closeLogHours, 1000);
+  const errEl = document.getElementById('logHoursError');
+  errEl.textContent = '';
+  try {
+    await DataStore.addCheckin({
+      gardenId: gId, gardenName: garden ? garden.name : '',
+      volunteerId: volId, volunteerName: vol ? vol.name : '',
+      taskId: null, taskTitle: document.getElementById('lh_task').value.trim() || 'Manual entry',
+      hoursLogged: hours,
+      checkInTime: date + 'T12:00:00Z', checkOutTime: date + 'T12:00:00Z',
+      type: 'manual', notes: document.getElementById('lh_notes').value.trim()
+    });
+    checkins = await DataStore.getCheckins();
+    document.getElementById('hoursSuccess').classList.add('visible');
+    renderTable();
+    setTimeout(closeLogHours, 1000);
+  } catch (err) {
+    errEl.textContent = 'Could not log hours. ' + err.message;
+  }
 });
+
+(async function init() {
+  try {
+    await AuthManager.requireAuth();
+    Nav.render();
+    [volunteers, gardens, tasks, checkins] = await Promise.all([
+      DataStore.getVolunteers(), DataStore.getGardens(), DataStore.getTasks(), DataStore.getCheckins(),
+    ]);
+    renderTable();
+  } catch (err) {
+    document.getElementById('volBody').innerHTML =
+      '<tr><td colspan="7" style="padding:20px;color:var(--text-dim);text-align:center;">Could not load data (' +
+      esc(err.message) + '). <a href="javascript:location.reload()">Retry</a></td></tr>';
+  }
+})();
 </script>
 </body>
 </html>

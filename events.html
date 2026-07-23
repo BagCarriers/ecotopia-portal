@@ -5,8 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Events — Ecotopia</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/mapping.js"></script>
 <script src="assets/auth.js"></script>
-<script>try { AuthManager.requireAuth(); } catch(e) { throw e; }</script>
+<script>if (!AuthManager.hasCachedSession()) location.replace('login.html');</script>
 <script src="assets/data.js"></script>
 <script src="assets/nav.js"></script>
 <style>
@@ -103,6 +107,7 @@
   .modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
   .btn-cancel { background: var(--cream-dim); color: var(--text); padding: 10px 18px;
     border-radius: 8px; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+  .modal-error { color: #b3261e; font-size: 0.85rem; margin-top: 8px; }
 
   @media (max-width: 600px) {
     .page { padding: 20px 16px; }
@@ -142,6 +147,7 @@
       </div>
       <div class="form-group"><label>Description</label>
         <textarea id="ev_desc" rows="2" placeholder="Event details…"></textarea></div>
+      <div class="modal-error" id="eventFormError"></div>
       <div class="form-actions">
         <button type="button" class="btn-cancel" onclick="toggleForm()">Cancel</button>
         <button type="submit" class="btn btn-primary">Create Event</button>
@@ -149,6 +155,7 @@
     </form>
   </div>
 
+  <div class="modal-error" id="eventPageError"></div>
   <div id="eventList"></div>
 </div>
 
@@ -179,6 +186,7 @@
         <input type="number" id="ee_vol_count" min="0" placeholder="e.g. 10"
           style="width:100%;padding:9px 11px;border-radius:7px;border:1.5px solid var(--border);font-size:0.875rem;font-family:'DM Sans',sans-serif;"></div>
       <input type="hidden" id="ee_id">
+      <div class="modal-error" id="editEventError"></div>
       <div class="modal-actions">
         <button type="button" class="btn-cancel" onclick="closeEditEvent()">Cancel</button>
         <button type="submit" class="btn btn-primary">Save Changes</button>
@@ -188,19 +196,20 @@
 </div>
 
 <script>
-Nav.render();
+const esc = DataStore.esc;
+let events = [], gardens = [];
 
-// Populate garden dropdown
-const gardens = DataStore.getGardens();
-const gardenSel = document.getElementById('ev_garden');
-gardenSel.innerHTML = `<option value="">None / other</option>` +
-  gardens.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
+function populateGardenDropdown() {
+  const gardenSel = document.getElementById('ev_garden');
+  gardenSel.innerHTML = `<option value="">None / other</option>` +
+    gardens.map(g => `<option value="${g.id}">${esc(g.name)}</option>`).join('');
+}
 
 function renderEvents() {
-  const events = DataStore.getEvents().sort((a, b) => a.date.localeCompare(b.date));
+  const sorted = events.slice().sort((a, b) => a.date.localeCompare(b.date));
   const today = new Date().toISOString().slice(0, 10);
-  const upcoming = events.filter(e => e.date >= today);
-  const past = events.filter(e => e.date < today);
+  const upcoming = sorted.filter(e => e.date >= today);
+  const past = sorted.filter(e => e.date < today);
   const el = document.getElementById('eventList');
 
   function typeLabel(t) {
@@ -212,7 +221,7 @@ function renderEvents() {
     const d = new Date(ev.date + 'T12:00:00');
     const month = d.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
     const day = d.getDate();
-    const garden = ev.gardenId ? DataStore.getGarden(ev.gardenId) : null;
+    const garden = ev.gardenId ? gardens.find(g => g.id === ev.gardenId) : null;
     const loc = ev.location || ev.gardenName || (garden ? garden.name : '') || 'Location TBD';
     const signups = ev.signups || [];
     return `
@@ -223,15 +232,15 @@ function renderEvents() {
         </div>
         <div class="event-info">
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
-            <div class="event-title">${ev.title}</div>
+            <div class="event-title">${esc(ev.title)}</div>
             <button class="btn-edit" onclick="openEditEvent('${ev.id}')">✏️ Edit</button>
           </div>
           <span class="event-type-pill type-${ev.type}">${typeLabel(ev.type)}</span>
-          <div class="event-location">📍 ${loc}</div>
-          ${ev.description ? `<div class="event-desc">${ev.description}</div>` : ''}
+          <div class="event-location">📍 ${esc(loc)}</div>
+          ${ev.description ? `<div class="event-desc">${esc(ev.description)}</div>` : ''}
           <div class="event-meta">
             <span class="signup-count">🤝 ${signups.length} signed up</span>
-            ${signups.length > 0 ? `<span class="signup-names">${signups.slice(0,3).join(', ')}${signups.length > 3 ? ` +${signups.length-3}` : ''}</span>` : ''}
+            ${signups.length > 0 ? `<span class="signup-names">${signups.slice(0,3).map(esc).join(', ')}${signups.length > 3 ? ` +${signups.length-3}` : ''}</span>` : ''}
             ${ev.openSignup ? `<button class="btn-signup" onclick="quickSignup('${ev.id}')">Sign up</button>` : ''}
           </div>
         </div>
@@ -251,39 +260,45 @@ function renderEvents() {
   el.innerHTML = html;
 }
 
-renderEvents();
-
 function toggleForm() {
   document.getElementById('newEventForm').classList.toggle('open');
   document.getElementById('ev_date').value = new Date().toISOString().slice(0, 10);
 }
 
-document.getElementById('eventFormEl').addEventListener('submit', function(e) {
+document.getElementById('eventFormEl').addEventListener('submit', async function(e) {
   e.preventDefault();
   const title = document.getElementById('ev_title').value.trim();
   const date = document.getElementById('ev_date').value;
   if (!title || !date) return;
   const gardenId = document.getElementById('ev_garden').value;
-  const garden = gardenId ? DataStore.getGarden(gardenId) : null;
-  DataStore.addEvent({
-    title, date, gardenId: gardenId || null,
-    gardenName: garden ? garden.name : '',
-    type: document.getElementById('ev_type').value,
-    description: document.getElementById('ev_desc').value.trim(),
-    openSignup: true, signups: []
-  });
-  document.getElementById('eventSuccess').classList.add('visible');
-  renderEvents();
-  setTimeout(() => {
-    document.getElementById('newEventForm').classList.remove('open');
-    document.getElementById('eventFormEl').reset();
-    document.getElementById('eventSuccess').classList.remove('visible');
-  }, 1200);
+  const garden = gardenId ? gardens.find(g => g.id === gardenId) : null;
+  const errEl = document.getElementById('eventFormError');
+  errEl.textContent = '';
+  try {
+    await DataStore.addEvent({
+      title, date, gardenId: gardenId || null,
+      gardenName: garden ? garden.name : '',
+      type: document.getElementById('ev_type').value,
+      description: document.getElementById('ev_desc').value.trim(),
+      openSignup: true, signups: []
+    });
+    events = await DataStore.getEvents();
+    document.getElementById('eventSuccess').classList.add('visible');
+    renderEvents();
+    setTimeout(() => {
+      document.getElementById('newEventForm').classList.remove('open');
+      document.getElementById('eventFormEl').reset();
+      document.getElementById('eventSuccess').classList.remove('visible');
+    }, 1200);
+  } catch (err) {
+    errEl.textContent = 'Could not create event. ' + err.message;
+  }
 });
 
 function openEditEvent(id) {
-  const ev = DataStore.getEvent(id);
+  const ev = events.find(x => x.id === id);
   if (!ev) return;
+  document.getElementById('editEventError').textContent = '';
   document.getElementById('ee_id').value = ev.id;
   document.getElementById('ee_title').value = ev.title || '';
   document.getElementById('ee_type').value = ev.type || 'workday';
@@ -299,31 +314,59 @@ function closeEditEvent() {
 document.getElementById('editEventModal').addEventListener('click', function(e) {
   if (e.target === this) closeEditEvent();
 });
-document.getElementById('editEventForm').addEventListener('submit', function(e) {
+document.getElementById('editEventForm').addEventListener('submit', async function(e) {
   e.preventDefault();
   const id = document.getElementById('ee_id').value;
   const title = document.getElementById('ee_title').value.trim();
   const date = document.getElementById('ee_date').value;
   if (!title || !date) return;
-  DataStore.updateEvent(id, {
-    title,
-    type: document.getElementById('ee_type').value,
-    date,
-    location: document.getElementById('ee_location').value.trim(),
-    gardenName: document.getElementById('ee_location').value.trim(),
-    description: document.getElementById('ee_desc').value.trim(),
-    volunteerCount: parseInt(document.getElementById('ee_vol_count').value) || null
-  });
-  closeEditEvent();
-  renderEvents();
+  const errEl = document.getElementById('editEventError');
+  errEl.textContent = '';
+  try {
+    await DataStore.updateEvent(id, {
+      title,
+      type: document.getElementById('ee_type').value,
+      date,
+      location: document.getElementById('ee_location').value.trim(),
+      gardenName: document.getElementById('ee_location').value.trim(),
+      description: document.getElementById('ee_desc').value.trim(),
+      volunteerCount: parseInt(document.getElementById('ee_vol_count').value) || null
+    });
+    events = await DataStore.getEvents();
+    closeEditEvent();
+    renderEvents();
+  } catch (err) {
+    errEl.textContent = 'Could not save changes. ' + err.message;
+  }
 });
 
-function quickSignup(eventId) {
+async function quickSignup(eventId) {
   const name = prompt('Enter your name to sign up:');
   if (!name || !name.trim()) return;
-  DataStore.signupForEvent(eventId, name.trim());
-  renderEvents();
+  const errEl = document.getElementById('eventPageError');
+  errEl.textContent = '';
+  try {
+    await DataStore.signupForEvent(eventId, name.trim());
+    events = await DataStore.getEvents();
+    renderEvents();
+  } catch (err) {
+    errEl.textContent = 'Could not sign up. ' + err.message;
+  }
 }
+
+(async function init() {
+  try {
+    await AuthManager.requireAuth();
+    Nav.render();
+    [events, gardens] = await Promise.all([DataStore.getEvents(), DataStore.getGardens()]);
+    populateGardenDropdown();
+    renderEvents();
+  } catch (err) {
+    document.getElementById('eventList').innerHTML =
+      '<p style="color:var(--text-dim);font-size:0.875rem;">Could not load data (' +
+      esc(err.message) + '). <a href="javascript:location.reload()">Retry</a></p>';
+  }
+})();
 </script>
 </body>
 </html>

@@ -5,8 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Calendar — Ecotopia</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/mapping.js"></script>
 <script src="assets/auth.js"></script>
-<script>try { AuthManager.requireAuth(); } catch(e) { throw e; }</script>
+<script>if (!AuthManager.hasCachedSession()) location.replace('login.html');</script>
 <script src="assets/data.js"></script>
 <script src="assets/nav.js"></script>
 <style>
@@ -136,7 +140,8 @@
 </div>
 
 <script>
-Nav.render();
+const esc = DataStore.esc;
+let events = [], jobs = [], tasks = [], gardens = [];
 
 let currentYear, currentMonth;
 let selectedDate = null;
@@ -155,20 +160,20 @@ function buildDateMap(year, month) {
   }
 
   // Events
-  DataStore.getEvents().forEach(ev => {
+  events.forEach(ev => {
     addItem(ev.date, { type: 'event', label: ev.title, sub: ev.gardenName || '' });
   });
 
   // Tasks — mark next due dates
-  DataStore.getTasks().forEach(t => {
+  tasks.forEach(t => {
     if (!t.nextDue) return;
     const d = t.nextDue.slice(0, 10);
-    const g = DataStore.getGarden(t.gardenId);
+    const g = gardens.find(x => x.id === t.gardenId);
     addItem(d, { type: 'task', label: t.title, sub: g ? g.name : '' });
   });
 
   // Jobs — show active jobs roughly
-  DataStore.getJobs().filter(j => j.status === 'active').forEach(j => {
+  jobs.filter(j => j.status === 'active').forEach(j => {
     const d = new Date(year, month, 15).toISOString().slice(0, 10);
     addItem(d, { type: 'job', label: j.title, sub: j.clientName });
   });
@@ -284,8 +289,8 @@ function selectDate(dateStr) {
       <div class="day-item">
         <div class="day-type-dot cal-dot ${typeColor[it.type]}"></div>
         <div>
-          <div class="day-item-title">${it.label}</div>
-          ${it.sub ? `<div class="day-item-sub">${it.sub}</div>` : ''}
+          <div class="day-item-title">${esc(it.label)}</div>
+          ${it.sub ? `<div class="day-item-sub">${esc(it.sub)}</div>` : ''}
         </div>
       </div>`).join('');
   }
@@ -311,8 +316,21 @@ function goToday() {
   renderWeekView();
 }
 
-renderMonth();
-renderWeekView();
+(async function init() {
+  try {
+    await AuthManager.requireAuth();
+    Nav.render();
+    [events, jobs, tasks, gardens] = await Promise.all([
+      DataStore.getEvents(), DataStore.getJobs(), DataStore.getTasks(), DataStore.getGardens(),
+    ]);
+    renderMonth();
+    renderWeekView();
+  } catch (err) {
+    document.getElementById('calGrid').innerHTML =
+      '<div style="padding:20px;color:var(--text-dim);text-align:center;">Could not load data (' +
+      esc(err.message) + '). <a href="javascript:location.reload()">Retry</a></div>';
+  }
+})();
 </script>
 </body>
 </html>

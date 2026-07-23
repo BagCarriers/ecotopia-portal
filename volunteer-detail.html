@@ -5,8 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Volunteer — Ecotopia</title>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/mapping.js"></script>
 <script src="assets/auth.js"></script>
-<script>try { AuthManager.requireAuth(); } catch(e) { throw e; }</script>
+<script>if (!AuthManager.hasCachedSession()) location.replace('login.html');</script>
 <script src="assets/data.js"></script>
 <script src="assets/nav.js"></script>
 <style>
@@ -96,11 +100,7 @@
 </div>
 
 <script>
-Nav.render();
-
-const params = new URLSearchParams(window.location.search);
-const volId = params.get('id');
-const vol = volId ? DataStore.getVolunteer(volId) : null;
+const esc = DataStore.esc;
 
 function dueCls(d) { return d === null ? 'due-green' : d <= 0 ? 'due-red' : d <= 3 ? 'due-amber' : 'due-green'; }
 function dueLabel(d) {
@@ -110,18 +110,23 @@ function dueLabel(d) {
   return `In ${d}d`;
 }
 
-function renderPage() {
+function renderPage(volunteer, vTasks, vCheckins, gardens) {
   const el = document.getElementById('pageContent');
-  if (!vol) {
+  if (!volunteer) {
     el.innerHTML = '<p style="color:var(--text-dim)">Volunteer not found.</p>';
     return;
   }
-  document.title = `${vol.name} — Ecotopia`;
+  document.title = `${volunteer.name} — Ecotopia`;
 
-  const initials = vol.name.split(' ').map(w => w[0]).join('').slice(0, 2);
-  const tasks = DataStore.getTasksByVolunteer(vol.id);
-  const allCheckins = DataStore.getCheckinsByVolunteer(vol.id)
+  const initials = volunteer.name.split(' ').map(w => w[0]).join('').slice(0, 2);
+  const allCheckins = vCheckins.slice()
     .sort((a, b) => new Date(b.checkInTime) - new Date(a.checkInTime));
+
+  // Hours in the last 30 days (from the loaded check-ins)
+  const cutoff = Date.now() - 30 * 86400000;
+  const hoursLast30 = allCheckins
+    .filter(c => new Date(c.checkInTime).getTime() >= cutoff)
+    .reduce((s, c) => s + (Number(c.hoursLogged) || 0), 0);
 
   // Build monthly hours (last 6 months)
   const now = new Date();
@@ -139,18 +144,18 @@ function renderPage() {
   el.innerHTML = `
     <!-- Profile Header -->
     <div class="profile-header">
-      <div class="profile-avatar">${initials}</div>
+      <div class="profile-avatar">${esc(initials)}</div>
       <div style="flex:1">
-        <div class="profile-name">${vol.name}</div>
+        <div class="profile-name">${esc(volunteer.name)}</div>
         <div class="profile-contact">
-          ${vol.phone ? `<a href="tel:${vol.phone}">${vol.phone}</a><br>` : ''}
-          ${vol.email ? `<a href="mailto:${vol.email}">${vol.email}</a>` : ''}
+          ${volunteer.phone ? `<a href="tel:${esc(volunteer.phone)}">${esc(volunteer.phone)}</a><br>` : ''}
+          ${volunteer.email ? `<a href="mailto:${esc(volunteer.email)}">${esc(volunteer.email)}</a>` : ''}
         </div>
         <div class="profile-avail">
-          ${vol.availability ? `🗓 ${vol.availability}` : ''}
+          ${volunteer.availability ? `🗓 ${esc(volunteer.availability)}` : ''}
         </div>
         <div style="margin-top:8px">
-          ${(vol.skills || []).map(s => `<span class="skill-pill">${s}</span>`).join('')}
+          ${(volunteer.skills || []).map(s => `<span class="skill-pill">${esc(s)}</span>`).join('')}
         </div>
       </div>
     </div>
@@ -158,18 +163,18 @@ function renderPage() {
     <!-- Active Commitments -->
     <div class="section">
       <h2>Active Commitments</h2>
-      ${tasks.length === 0
+      ${vTasks.length === 0
         ? '<p style="color:var(--text-dim);font-size:0.875rem;">No assigned tasks.</p>'
         : `<table class="commit-table">
           <thead><tr><th>Task</th><th>Garden</th><th>Cadence</th><th>Next Due</th></tr></thead>
-          <tbody>${tasks.map(t => {
+          <tbody>${vTasks.map(t => {
             const d = DataStore.daysUntil(t.nextDue);
-            const g = DataStore.getGarden(t.gardenId);
+            const g = gardens.find(x => x.id === t.gardenId);
             const cadLabel = t.cadenceDays <= 3 ? `${t.cadenceDays}x/wk` : t.cadenceDays <= 7 ? 'Weekly' :
               t.cadenceDays <= 14 ? 'Biweekly' : t.cadenceDays <= 30 ? 'Monthly' : `Every ${t.cadenceDays}d`;
             return `<tr>
-              <td>${t.title}</td>
-              <td>${g ? g.name : '—'}</td>
+              <td>${esc(t.title)}</td>
+              <td>${g ? esc(g.name) : '—'}</td>
               <td>${cadLabel}</td>
               <td><span class="due-text ${dueCls(d)}">${dueLabel(d)}</span></td>
             </tr>`;
@@ -193,7 +198,7 @@ function renderPage() {
           }).join('')}
         </div>
         <div style="margin-top:8px;font-size:0.8rem;color:var(--text-dim)">
-          Total last 30 days: <strong>${DataStore.getHoursLast30(vol.id).toFixed(1)} hrs</strong>
+          Total last 30 days: <strong>${hoursLast30.toFixed(1)} hrs</strong>
         </div>
       </div>
     </div>
@@ -208,11 +213,11 @@ function renderPage() {
           <tbody>${allCheckins.map(ci => `
             <tr>
               <td>${DataStore.formatDate(ci.checkInTime)}</td>
-              <td>${ci.gardenName}</td>
-              <td>${ci.taskTitle}</td>
+              <td>${esc(ci.gardenName)}</td>
+              <td>${esc(ci.taskTitle)}</td>
               <td>${ci.hoursLogged}</td>
-              <td><span class="type-badge type-${ci.type || 'manual'}">${ci.type || 'manual'}</span></td>
-              <td style="color:var(--text-dim)">${ci.notes || '—'}</td>
+              <td><span class="type-badge type-${ci.type || 'manual'}">${esc(ci.type || 'manual')}</span></td>
+              <td style="color:var(--text-dim)">${ci.notes ? esc(ci.notes) : '—'}</td>
             </tr>`).join('')}
           </tbody>
         </table>`}
@@ -220,7 +225,23 @@ function renderPage() {
   `;
 }
 
-renderPage();
+(async function init() {
+  try {
+    await AuthManager.requireAuth();
+    Nav.render();
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('id');
+    const [volunteer, vTasks, vCheckins, gardens] = await Promise.all([
+      DataStore.getVolunteer(id), DataStore.getTasksByVolunteer(id),
+      DataStore.getCheckinsByVolunteer(id), DataStore.getGardens(),
+    ]);
+    renderPage(volunteer, vTasks, vCheckins, gardens);
+  } catch (err) {
+    document.getElementById('pageContent').innerHTML =
+      '<p style="color:var(--text-dim)">Could not load data (' + esc(err.message) +
+      '). <a href="javascript:location.reload()">Retry</a></p>';
+  }
+})();
 </script>
 </body>
 </html>
