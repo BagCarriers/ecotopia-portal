@@ -177,6 +177,20 @@ const DataStore = (() => {
     galleryPublicUrl: (storagePath) =>
       sb.storage.from('gallery').getPublicUrl(storagePath).data.publicUrl, // sync
 
+    // Service lead-gen settings + waitlist (staff)
+    getServiceSettings: () => list('service_settings', 'name'),
+    updateServiceSetting: async (slug, ch) =>
+      fromDb(unwrap(await sb.from('service_settings').update(toDb(ch)).eq('slug', slug).select().single())),
+    getWaitlist: async () =>
+      fromDbAll(unwrap(await sb.from('service_waitlist').select('*')
+        .order('created_at', { ascending: false }))),
+    getWaitlistByService: async (slug) =>
+      fromDbAll(unwrap(await sb.from('service_waitlist').select('*')
+        .eq('service_slug', slug).order('created_at', { ascending: false }))),
+    deleteWaitlistEntry: async (id) => {
+      unwrap(await sb.from('service_waitlist').delete().eq('id', id));
+    },
+
     // Public form submissions (anon inserts, return=minimal)
     addIntakeSubmission: (r) => submit('intake_submissions', r),
     getIntakeSubmissions: () => list('intake_submissions'),

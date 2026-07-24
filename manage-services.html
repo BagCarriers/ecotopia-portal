@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Services - Ecotopia</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/mapping.js"></script>
+<script src="assets/auth.js"></script>
+<script>if (!AuthManager.hasCachedSession()) location.replace('login.html');</script>
+<script src="assets/data.js"></script>
+<script src="assets/nav.js"></script>
+<style>
+  :root {
+    --forest: #1B4332; --forest-mid: #2D6A4F; --forest-light: #52B788;
+    --sage: #D8F3DC; --sage-dim: #B7E4C7; --earth: #8B5E3C;
+    --earth-light: #C68642; --gold: #F4A261; --cream: #F9F6F0;
+    --cream-dim: #E8E0D5; --text: #1C1C1C; --text-dim: #5A5A5A;
+    --border: rgba(45,106,79,0.2); --amber: #B8730A; --amber-bg: #FDF0DA;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--text); }
+  .page { padding: 28px 32px; max-width: 1000px; }
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  h1 { font-family: 'Fraunces', serif; font-size: 1.9rem; color: var(--forest); }
+  .page-intro { font-size: 0.9rem; color: var(--text-dim); margin-bottom: 24px; max-width: 640px; line-height: 1.6; }
+
+  .card { background: #fff; border-radius: 12px; border: 1px solid var(--border); overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; }
+  thead th { text-align: left; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--text-dim); padding: 12px 16px; border-bottom: 1px solid var(--border); font-weight: 700; }
+  tbody td { padding: 14px 16px; font-size: 0.9rem; border-bottom: 1px solid var(--border);
+    vertical-align: middle; }
+  tbody tr.wl-row td { border-bottom: 1px solid var(--border); }
+  .svc-name { font-weight: 600; color: var(--forest); }
+  .status-pill { display: inline-block; padding: 2px 12px; border-radius: 20px; font-size: 0.72rem;
+    font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+  .status-on { background: var(--sage); color: var(--forest); }
+  .status-off { background: var(--amber-bg); color: var(--amber); }
+  .msg-preview { color: var(--text-dim); font-size: 0.82rem; max-width: 280px; }
+  .muted { color: var(--text-dim); }
+  .row-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .btn { padding: 10px 18px; border-radius: 8px; border: none; font-size: 0.875rem;
+    font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif;
+    text-decoration: none; display: inline-flex; gap: 6px; align-items: center; transition: background 0.15s; }
+  .btn-primary { background: var(--forest); color: #fff; }
+  .btn-primary:hover { background: var(--forest-mid); }
+  .btn-sm { font-size: 0.78rem; padding: 5px 10px; background: transparent; border: 1px solid var(--border);
+    border-radius: 6px; cursor: pointer; color: var(--text-dim); font-family: 'DM Sans', sans-serif;
+    transition: all 0.15s; }
+  .btn-sm:hover { color: var(--forest); border-color: var(--forest-light); background: var(--sage); }
+  .btn-danger { color: #b3261e; }
+  .btn-danger:hover { color: #fff; background: #b3261e; border-color: #b3261e; }
+
+  /* Waitlist expansion */
+  .wl-panel { background: var(--cream); border-radius: 10px; padding: 6px 4px; }
+  .wl-entry { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px;
+    padding: 12px 14px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+  .wl-entry:last-child { border-bottom: none; }
+  .wl-info { font-size: 0.86rem; }
+  .wl-info .wl-nm { font-weight: 600; color: var(--text); }
+  .wl-info .wl-meta { color: var(--text-dim); font-size: 0.8rem; margin-top: 2px; }
+  .wl-info .wl-note { color: var(--text-dim); font-size: 0.82rem; margin-top: 4px; font-style: italic; }
+  .wl-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .wl-empty { padding: 14px; color: var(--text-dim); font-size: 0.85rem; text-align: center; }
+
+  .empty { padding: 20px 16px; color: var(--text-dim); font-size: 0.875rem; text-align: center; }
+  .modal-error { color: #b3261e; font-size: 0.85rem; margin-top: 8px; }
+  #pageError { margin-bottom: 16px; }
+  #pageError:empty { display: none; }
+
+  /* Modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+    z-index: 500; align-items: center; justify-content: center; padding: 20px; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: #fff; border-radius: 16px; padding: 28px;
+    width: 100%; max-width: 460px; box-shadow: 0 20px 60px rgba(0,0,0,0.25); }
+  .modal h2 { font-family: 'Fraunces', serif; color: var(--forest); margin-bottom: 6px; }
+  .modal .modal-sub { font-size: 0.85rem; color: var(--text-dim); margin-bottom: 18px; }
+  .form-group { margin-bottom: 16px; }
+  .form-group label { display: block; font-size: 0.82rem; font-weight: 600;
+    color: var(--text-dim); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .form-group input, .form-group textarea { width: 100%; padding: 10px 12px; border-radius: 7px;
+    border: 1.5px solid var(--border); font-size: 0.9rem; font-family: 'DM Sans', sans-serif;
+    color: var(--text); background: #fff; }
+  .form-group textarea { min-height: 84px; resize: vertical; }
+  .form-group input:focus, .form-group textarea:focus { outline: none; border-color: var(--forest-light); }
+  .field-note { font-size: 0.76rem; color: var(--text-dim); margin-top: 4px; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 4px; }
+  .btn-cancel { background: var(--cream-dim); color: var(--text); padding: 10px 18px;
+    border-radius: 8px; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+
+  @media (max-width: 700px) {
+    .page { padding: 20px 16px; }
+    thead { display: none; }
+    tbody td { display: block; padding: 8px 16px; border-bottom: none; }
+    tbody tr { display: block; border-bottom: 1px solid var(--border); padding: 10px 0; }
+    tbody tr.wl-row { padding: 0; }
+    .msg-preview { max-width: none; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="page-header">
+    <h1>Services</h1>
+  </div>
+  <p class="page-intro">Turn each marketing service on or off. When a service is off, its card on the
+    public site shows your out-of-season message and offers a waitlist. Submitted inquiries and
+    waitlist conversions land in <a href="jobs.html">Jobs</a> as inquiries.</p>
+
+  <div class="modal-error" id="pageError"></div>
+
+  <div class="card" id="servicesCard">
+    <div class="empty">Loading…</div>
+  </div>
+</div>
+
+<!-- Off / edit-message modal -->
+<div class="modal-overlay" id="offModal">
+  <div class="modal">
+    <h2 id="offModalTitle">Turn off service</h2>
+    <p class="modal-sub" id="offModalSub"></p>
+    <form id="offForm" novalidate>
+      <div class="form-group">
+        <label>Out-of-season message</label>
+        <textarea id="off_message" placeholder="This service is out of season."></textarea>
+        <div class="field-note">Shown on the public service card. Leave blank to use the default message.</div>
+      </div>
+      <div class="form-group">
+        <label>Reopen date (optional)</label>
+        <input type="date" id="reopen_date">
+        <div class="field-note">If set, the card adds "We will be starting these again around that date."</div>
+      </div>
+      <div class="modal-error" id="offError"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" onclick="closeOff()">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="offSaveBtn">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+const esc = DataStore.esc;
+let settings = [];
+let waitlistBySlug = {};
+let expanded = {};        // slug -> true when its waitlist panel is open
+let offSlug = null;       // slug currently being edited in the off modal
+
+function fmtDateOnly(s) {
+  if (!s) return '';
+  const p = String(s).split('T')[0].split('-');
+  if (p.length < 3) return esc(s);
+  const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const m = Number(p[1]) - 1, d = Number(p[2]);
+  if (!(m >= 0 && m < 12) || !d) return esc(s);
+  return MO[m] + ' ' + d + ', ' + p[0];
+}
+
+function contactLine(e) {
+  const bits = [];
+  if (e.email) bits.push(esc(e.email));
+  if (e.phone) bits.push(esc(e.phone));
+  return bits.length ? bits.join(' · ') : '<span class="muted">no contact given</span>';
+}
+
+function renderWaitlistPanel(slug) {
+  const entries = waitlistBySlug[slug] || [];
+  if (!entries.length) return '<div class="wl-panel"><div class="wl-empty">No one on the waitlist yet.</div></div>';
+  return '<div class="wl-panel">' + entries.map(e => `
+    <div class="wl-entry">
+      <div class="wl-info">
+        <div class="wl-nm">${esc(e.name)}</div>
+        <div class="wl-meta">${contactLine(e)} · ${fmtDateOnly(e.createdAt)}</div>
+        ${e.note ? `<div class="wl-note">${esc(e.note)}</div>` : ''}
+      </div>
+      <div class="wl-actions">
+        <button class="btn-sm" onclick="convertLead('${esc(e.id)}')">Convert to lead</button>
+        <button class="btn-sm btn-danger" onclick="deleteEntry('${esc(e.id)}')">Delete</button>
+      </div>
+    </div>`).join('') + '</div>';
+}
+
+function render() {
+  const el = document.getElementById('servicesCard');
+  if (!settings.length) { el.innerHTML = '<div class="empty">No services found.</div>'; return; }
+  el.innerHTML = `
+    <table>
+      <thead><tr><th>Service</th><th>Status</th><th>Off message</th><th>Reopen</th><th>Waitlist</th><th>Actions</th></tr></thead>
+      <tbody>
+        ${settings.map(s => {
+          const count = (waitlistBySlug[s.slug] || []).length;
+          const open = !!expanded[s.slug];
+          const main = `
+            <tr>
+              <td><span class="svc-name">${esc(s.name)}</span></td>
+              <td><span class="status-pill ${s.active ? 'status-on' : 'status-off'}">${s.active ? 'Active' : 'Off'}</span></td>
+              <td class="msg-preview">${s.active ? '<span class="muted">n/a</span>' : (s.offMessage ? esc(s.offMessage) : '<span class="muted">Default message</span>')}</td>
+              <td>${(!s.active && s.reopenDate) ? fmtDateOnly(s.reopenDate) : '<span class="muted">n/a</span>'}</td>
+              <td><button class="btn-sm" onclick="toggleWaitlist('${esc(s.slug)}')">${open ? 'Hide' : 'View'} (${count})</button></td>
+              <td>
+                <div class="row-actions">
+                  ${s.active
+                    ? `<button class="btn-sm" onclick="openOff('${esc(s.slug)}')">Turn off</button>`
+                    : `<button class="btn-sm" onclick="turnOn('${esc(s.slug)}')">Turn on</button>
+                       <button class="btn-sm" onclick="openOff('${esc(s.slug)}')">Edit message</button>`}
+                </div>
+              </td>
+            </tr>`;
+          const panel = open
+            ? `<tr class="wl-row"><td colspan="6">${renderWaitlistPanel(s.slug)}</td></tr>`
+            : '';
+          return main + panel;
+        }).join('')}
+      </tbody>
+    </table>`;
+}
+
+function settingBySlug(slug) { return settings.find(s => s.slug === slug); }
+
+async function refresh() {
+  const [ss, wl] = await Promise.all([
+    DataStore.getServiceSettings(),
+    DataStore.getWaitlist(),
+  ]);
+  settings = ss;
+  waitlistBySlug = {};
+  wl.forEach(e => { (waitlistBySlug[e.serviceSlug] = waitlistBySlug[e.serviceSlug] || []).push(e); });
+  render();
+}
+
+function toggleWaitlist(slug) {
+  expanded[slug] = !expanded[slug];
+  render();
+}
+
+async function turnOn(slug) {
+  const errEl = document.getElementById('pageError');
+  errEl.textContent = '';
+  try {
+    await DataStore.updateServiceSetting(slug, { active: true, offMessage: null, reopenDate: null });
+    await refresh();
+  } catch (err) {
+    errEl.textContent = 'Could not turn the service on. ' + err.message;
+  }
+}
+
+function openOff(slug) {
+  offSlug = slug;
+  const s = settingBySlug(slug);
+  document.getElementById('offError').textContent = '';
+  document.getElementById('offModalTitle').textContent = (s && s.active) ? 'Turn off service' : 'Edit off message';
+  document.getElementById('offModalSub').textContent = s ? s.name : '';
+  document.getElementById('off_message').value = (s && s.offMessage) ? s.offMessage : '';
+  document.getElementById('reopen_date').value = (s && s.reopenDate) ? String(s.reopenDate).split('T')[0] : '';
+  document.getElementById('offSaveBtn').textContent = (s && s.active) ? 'Turn off' : 'Save message';
+  document.getElementById('offModal').classList.add('open');
+  document.getElementById('off_message').focus();
+}
+function closeOff() {
+  document.getElementById('offModal').classList.remove('open');
+  offSlug = null;
+}
+document.getElementById('offModal').addEventListener('click', function(e) {
+  if (e.target === this) closeOff();
+});
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeOff();
+});
+
+document.getElementById('offForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  if (!offSlug) return;
+  const errEl = document.getElementById('offError');
+  errEl.textContent = '';
+  const msg = document.getElementById('off_message').value.trim();
+  const reopen = document.getElementById('reopen_date').value;  // yyyy-mm-dd or ''
+  try {
+    await DataStore.updateServiceSetting(offSlug, {
+      active: false,
+      offMessage: msg || null,
+      reopenDate: reopen || null,
+    });
+    closeOff();
+    await refresh();
+  } catch (err) {
+    errEl.textContent = 'Could not save. ' + err.message;
+  }
+});
+
+async function convertLead(id) {
+  const errEl = document.getElementById('pageError');
+  errEl.textContent = '';
+  let entry, slug;
+  for (const s of Object.keys(waitlistBySlug)) {
+    const found = (waitlistBySlug[s] || []).find(e => e.id === id);
+    if (found) { entry = found; slug = s; break; }
+  }
+  if (!entry) { errEl.textContent = 'Waitlist entry not found. Refresh and try again.'; return; }
+  const svc = settingBySlug(slug);
+  const svcName = svc ? svc.name : slug;
+  const contact = [entry.phone, entry.email].filter(Boolean).join(' / ');
+  const notes = `Converted from ${svcName} waitlist.\n\nName: ${entry.name}` +
+    (contact ? `\nContact: ${contact}` : '') +
+    (entry.note ? `\nNote: ${entry.note}` : '');
+  try {
+    await DataStore.addJob({
+      clientName: entry.name,
+      title: svcName + ' Inquiry (from waitlist)',
+      type: slug,
+      status: 'inquiry',
+      notes: notes,
+      activityLog: [{ ts: new Date().toISOString(), note: 'Converted from waitlist.' }],
+    });
+    errEl.style.color = 'var(--forest-mid)';
+    errEl.textContent = 'Created an inquiry for ' + entry.name + '. See it in Jobs.';
+    setTimeout(() => { errEl.style.color = ''; errEl.textContent = ''; }, 4000);
+  } catch (err) {
+    errEl.style.color = '';
+    errEl.textContent = 'Could not create the lead. ' + err.message;
+  }
+}
+
+async function deleteEntry(id) {
+  const errEl = document.getElementById('pageError');
+  errEl.style.color = '';
+  errEl.textContent = '';
+  if (!confirm('Remove this waitlist entry? This cannot be undone.')) return;
+  try {
+    await DataStore.deleteWaitlistEntry(id);
+    await refresh();
+  } catch (err) {
+    errEl.textContent = 'Could not delete the entry. ' + err.message;
+  }
+}
+
+(async function init() {
+  try {
+    await AuthManager.requireAuth();
+    Nav.render();
+    await refresh();
+  } catch (err) {
+    document.getElementById('servicesCard').innerHTML =
+      '<div class="empty">Could not load services (' + esc(err.message) + '). <a href="javascript:location.reload()">Retry</a></div>';
+  }
+})();
+</script>
+</body>
+</html>

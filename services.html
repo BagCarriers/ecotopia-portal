@@ -36,22 +36,22 @@
   <section class="section">
     <div class="wrap">
       <div class="svc-rows">
-        <article class="svc-row reveal"><div class="num">01</div><div><h3>Pollinator Garden / Mini Meadow</h3><p>Planted with a diverse array of native perennial wildflowers that bloom across three seasons. Attracts butterflies, hummingbirds, bees, and beneficial insects.</p></div></article>
-        <article class="svc-row reveal"><div class="num">02</div><div><h3>Food Forest Design</h3><p>Edible landscaping designed with permaculture techniques, planted in vertical layers for an abundance of perennial food.</p></div></article>
-        <article class="svc-row reveal"><div class="num">03</div><div><h3>Rain Garden</h3><p>A planted depression filled with well-drained soil and deep-rooted perennial flowers that soak up seasonal water.</p></div></article>
-        <article class="svc-row reveal"><div class="num">04</div><div><h3>Annual Food Garden</h3><p>Garden planning and design, soil analysis and improvement, plant selection, pest and disease management, sustainable practices.</p></div></article>
-        <article class="svc-row reveal"><div class="num">05</div><div><h3>Living Willow Fence</h3><p>Willow branches planted and woven in March into living fences, tunnels, domes, and archways.</p></div></article>
-        <article class="svc-row reveal"><div class="num">06</div><div><h3>Routine Garden Maintenance</h3><p>Knowledgeable ecological landscapers who know which plant is an invasive weed and which is a native you planted.</p></div></article>
-        <article class="svc-row reveal"><div class="num">07</div><div><h3>Medicinal Herb Garden and Consulting</h3><p>Medicinal plants chosen for your land and health needs, with consulting and implementation.</p></div></article>
-        <article class="svc-row reveal"><div class="num">08</div><div><h3>Forest Habitat Restoration</h3><p>Riparian buffer planting and invasive plant removal for biodiverse habitat.</p></div></article>
-        <article class="svc-row reveal"><div class="num">09</div><div><h3>Woodland Habitat Restoration</h3><p>Thinning canopy trees to bring sunlight to the forest floor, adding understory trees, shrubs, vines, herbs, and woodland flowers.</p></div></article>
+        <article class="svc-row reveal" data-service-slug="pollinator_garden"><div class="num">01</div><div><h3>Pollinator Garden / Mini Meadow</h3><p>Planted with a diverse array of native perennial wildflowers that bloom across three seasons. Attracts butterflies, hummingbirds, bees, and beneficial insects.</p></div></article>
+        <article class="svc-row reveal" data-service-slug="food_forest"><div class="num">02</div><div><h3>Food Forest Design</h3><p>Edible landscaping designed with permaculture techniques, planted in vertical layers for an abundance of perennial food.</p></div></article>
+        <article class="svc-row reveal" data-service-slug="rain_garden"><div class="num">03</div><div><h3>Rain Garden</h3><p>A planted depression filled with well-drained soil and deep-rooted perennial flowers that soak up seasonal water.</p></div></article>
+        <article class="svc-row reveal" data-service-slug="annual_food_garden"><div class="num">04</div><div><h3>Annual Food Garden</h3><p>Garden planning and design, soil analysis and improvement, plant selection, pest and disease management, sustainable practices.</p></div></article>
+        <article class="svc-row reveal" data-service-slug="living_willow"><div class="num">05</div><div><h3>Living Willow Fence</h3><p>Willow branches planted and woven in March into living fences, tunnels, domes, and archways.</p></div></article>
+        <article class="svc-row reveal" data-service-slug="garden_maintenance"><div class="num">06</div><div><h3>Routine Garden Maintenance</h3><p>Knowledgeable ecological landscapers who know which plant is an invasive weed and which is a native you planted.</p></div></article>
+        <article class="svc-row reveal" data-service-slug="medicinal_herb"><div class="num">07</div><div><h3>Medicinal Herb Garden and Consulting</h3><p>Medicinal plants chosen for your land and health needs, with consulting and implementation.</p></div></article>
+        <article class="svc-row reveal" data-service-slug="forest_restoration"><div class="num">08</div><div><h3>Forest Habitat Restoration</h3><p>Riparian buffer planting and invasive plant removal for biodiverse habitat.</p></div></article>
+        <article class="svc-row reveal" data-service-slug="woodland_restoration"><div class="num">09</div><div><h3>Woodland Habitat Restoration</h3><p>Thinning canopy trees to bring sunlight to the forest floor, adding understory trees, shrubs, vines, herbs, and woodland flowers.</p></div></article>
       </div>
 
       <div class="callout reveal">
         <p class="eyebrow" style="color:#fff">10 · Lawn to Meadow Conversion</p>
         <h3>You may qualify for a free meadow</h3>
         <p>We contract for a PA DCNR program that can convert your lawn to native meadow at no cost to you. A half acre minimum applies. Ask us whether your land qualifies.</p>
-        <a class="btn btn-onDark" href="intake.html">Check if you qualify</a>
+        <button type="button" class="btn btn-onDark" onclick="EcoSite.openService('lawn_to_meadow')">Check if you qualify</button>
       </div>
 
       <div class="cta-row">
@@ -93,7 +93,10 @@
 </footer>
 
 <script>
-document.addEventListener('DOMContentLoaded', () => { EcoSite.renderNav('services'); });
+document.addEventListener('DOMContentLoaded', () => {
+  EcoSite.renderNav('services');
+  EcoSite.initServiceLeads();
+});
 </script>
 </body>
 </html>

@@ -109,6 +109,43 @@ a missing object is ignored so the row is still removed. `DataStore.resizeImage`
 downscales images client-side (canvas, long edge <= 1600px, JPEG q0.85) before
 upload; GIFs and already-small images pass through untouched.
 
+## Service lead-gen (per-service toggles + waitlist)
+
+Migration `0011_service_leads.sql` adds two tables (applied live via the Management
+API, so register it with `supabase migration repair --status applied 0011` before any
+`supabase db push`):
+
+- `public.service_settings` - one row per marketing service, keyed by `slug` (the same
+  ten slugs the marketing forms use). Columns: `name`, `active`, `off_message`,
+  `reopen_date`. RLS: anon may SELECT (the public cards read it); authenticated portal
+  users may SELECT and write. Seeded with all ten services active.
+- `public.service_waitlist` - anon-insertable waitlist rows (`service_slug`, `name`,
+  `email`, `phone`, `note`). RLS: anon may INSERT only (no read); portal users get full
+  CRUD. The public modal fire-and-forgets via `return=minimal`.
+
+How it works:
+
+- Public cards on `index.html` (6-card preview) and `services.html` (all ten, incl. the
+  DCNR callout) carry `data-service-slug`. `EcoSite.initServiceLeads()` (in `site.js`)
+  wires each card as a keyboard-operable button and reads `service_settings` once.
+  - Active service -> a brand-styled inquiry modal (service-specific questions from the
+    `SERVICE_FORMS` allowlist in `site.js` + a contact block). On submit it does two anon
+    inserts: an `intake_submissions` row and a `jobs` row with `status = 'inquiry'`
+    (title `"<Service> Inquiry"`, activity log "Received via services page.").
+  - Off service -> an out-of-season message (`off_message` or a default, plus the reopen
+    date if set) and a waitlist mini-form that inserts a `service_waitlist` row.
+  - If the settings fetch fails, cards fall back to linking `intake.html` (fail-soft).
+
+Who can toggle: any active portal user (admin or user), via `manage-services.html`
+(the "Services" nav link). There they turn a service off (setting an off message +
+optional reopen date), turn it back on (which clears the off message/date), view each
+service's waitlist inline, convert a waitlist entry to a `jobs` inquiry
+(title `"<Service> Inquiry (from waitlist)"`, activity log "Converted from waitlist."),
+or delete an entry.
+
+Where leads land: both modal-submitted inquiries and waitlist conversions appear in
+`jobs.html` as `inquiry` jobs. Modal submissions also write an `intake_submissions` row.
+
 ## Deploy
 
 The site is a static bundle deployed to Netlify:

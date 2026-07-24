@@ -64,12 +64,12 @@
       <h2 id="svc-h">Landscapes that give back</h2>
       <p class="lead">Every design starts with the native plants and living systems that belong here, then layers in beauty, food, and habitat for the pollinators and people who share your land.</p>
       <div class="card-grid">
-        <article class="svc-card reveal"><div class="ico" aria-hidden="true">🦋</div><h3>Pollinator Garden &amp; Mini Meadow</h3><p>Native perennial wildflowers that bloom across three seasons and draw butterflies, hummingbirds, bees, and beneficial insects.</p></article>
-        <article class="svc-card reveal"><div class="ico" aria-hidden="true">🌳</div><h3>Food Forest Design</h3><p>Edible landscaping designed with permaculture techniques, planted in vertical layers for an abundance of perennial food.</p></article>
-        <article class="svc-card reveal"><div class="ico" aria-hidden="true">🧺</div><h3>Living Willow Fence</h3><p>Willow branches planted and woven in March into living fences, tunnels, domes, and archways.</p></article>
-        <article class="svc-card reveal"><div class="ico" aria-hidden="true">💧</div><h3>Rain Garden</h3><p>A planted depression filled with well-drained soil and deep-rooted perennial flowers that soak up seasonal water.</p></article>
-        <article class="svc-card reveal"><div class="ico" aria-hidden="true">🌿</div><h3>Medicinal Herb Garden</h3><p>Medicinal plants chosen for your land and health needs, with consulting and implementation.</p></article>
-        <article class="svc-card reveal"><div class="ico" aria-hidden="true">🌾</div><h3>Lawn to Meadow Conversion</h3><p>You may qualify for a free conversion through the PA DCNR program we contract for (half acre minimum).</p></article>
+        <article class="svc-card reveal" data-service-slug="pollinator_garden"><div class="ico" aria-hidden="true">🦋</div><h3>Pollinator Garden &amp; Mini Meadow</h3><p>Native perennial wildflowers that bloom across three seasons and draw butterflies, hummingbirds, bees, and beneficial insects.</p></article>
+        <article class="svc-card reveal" data-service-slug="food_forest"><div class="ico" aria-hidden="true">🌳</div><h3>Food Forest Design</h3><p>Edible landscaping designed with permaculture techniques, planted in vertical layers for an abundance of perennial food.</p></article>
+        <article class="svc-card reveal" data-service-slug="living_willow"><div class="ico" aria-hidden="true">🧺</div><h3>Living Willow Fence</h3><p>Willow branches planted and woven in March into living fences, tunnels, domes, and archways.</p></article>
+        <article class="svc-card reveal" data-service-slug="rain_garden"><div class="ico" aria-hidden="true">💧</div><h3>Rain Garden</h3><p>A planted depression filled with well-drained soil and deep-rooted perennial flowers that soak up seasonal water.</p></article>
+        <article class="svc-card reveal" data-service-slug="medicinal_herb"><div class="ico" aria-hidden="true">🌿</div><h3>Medicinal Herb Garden</h3><p>Medicinal plants chosen for your land and health needs, with consulting and implementation.</p></article>
+        <article class="svc-card reveal" data-service-slug="lawn_to_meadow"><div class="ico" aria-hidden="true">🌾</div><h3>Lawn to Meadow Conversion</h3><p>You may qualify for a free conversion through the PA DCNR program we contract for (half acre minimum).</p></article>
       </div>
       <div class="cta-row">
         <a class="btn btn-ghost" href="services.html">See all ten services</a>
@@ -156,6 +156,7 @@
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   EcoSite.renderNav('home');
+  EcoSite.initServiceLeads();
   loadHomeEvents();
   loadHomeGardens();
   loadHomePhotos();

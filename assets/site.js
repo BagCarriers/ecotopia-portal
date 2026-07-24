@@ -20,6 +20,113 @@
   const sb = () => root.ecoSupabase;
   const map = () => root.EcoMapping;
 
+  // ── Service lead-gen forms ──────────────────────────────────────────────
+  // One entry per marketing service, keyed by the same slug as
+  // public.service_settings. `questions` are the service-specific inputs; a
+  // standard contact block (name/phone/email/address/preferred contact) is
+  // appended by the renderer. `hint` is a non-question display note.
+  // These keys ARE the onclick allowlist: EcoSite.openService(slug) refuses
+  // any slug not present here.
+  const SERVICE_FORMS = {
+    pollinator_garden: {
+      name: 'Pollinator Garden / Mini Meadow',
+      questions: [
+        { id: 'area', label: 'Approximate area', type: 'select',
+          options: ['Under 500 sq ft', '500 to 2000 sq ft', 'Over 2000 sq ft', 'Not sure'] },
+        { id: 'sun', label: 'Sun exposure', type: 'select',
+          options: ['Full sun', 'Part sun', 'Mostly shade', 'Mixed'] },
+        { id: 'attract', label: 'What do you hope to attract?', type: 'text',
+          placeholder: 'Butterflies, songbirds, native bees...' },
+      ],
+    },
+    food_forest: {
+      name: 'Food Forest Design',
+      questions: [
+        { id: 'space', label: 'Approximate space', type: 'select',
+          options: ['Under 1000 sq ft', '1000 to 5000 sq ft', 'Over 5000 sq ft', 'Not sure'] },
+        { id: 'existing_trees', label: 'Any existing trees to work around?', type: 'select',
+          options: ['Yes, several', 'A few', 'None', 'Not sure'] },
+      ],
+    },
+    rain_garden: {
+      name: 'Rain Garden',
+      questions: [
+        { id: 'water', label: 'Where does water collect on your property?', type: 'textarea',
+          placeholder: 'Low spots, near the driveway, by the downspouts...' },
+        { id: 'downspout', label: 'Is a downspout involved?', type: 'select',
+          options: ['Yes', 'No', 'Not sure'] },
+      ],
+    },
+    annual_food_garden: {
+      name: 'Annual Food Garden',
+      questions: [
+        { id: 'bed_type', label: 'Raised beds or in-ground?', type: 'select',
+          options: ['Raised beds', 'In-ground', 'Both', 'Not sure'] },
+        { id: 'experience', label: 'Your gardening experience', type: 'select',
+          options: ['New to gardening', 'Some experience', 'Experienced grower'] },
+      ],
+    },
+    living_willow: {
+      name: 'Living Willow Fence',
+      hint: 'Living willow is planted and woven in March, so we schedule these for late winter.',
+      questions: [
+        { id: 'structure', label: 'What would you like built?', type: 'select',
+          options: ['Fence', 'Tunnel', 'Dome', 'Archway', 'Not sure'] },
+      ],
+    },
+    garden_maintenance: {
+      name: 'Routine Garden Maintenance',
+      questions: [
+        { id: 'property_type', label: 'Property type', type: 'select',
+          options: ['Home', 'Business', 'Community space'] },
+        { id: 'frequency', label: 'How often?', type: 'select',
+          options: ['One-time cleanup', 'Monthly', 'Seasonal'] },
+      ],
+    },
+    medicinal_herb: {
+      name: 'Medicinal Herb Garden and Consulting',
+      questions: [
+        { id: 'scope', label: 'What are you looking for?', type: 'select',
+          options: ['Consulting only', 'Design and install'] },
+        { id: 'goals', label: 'Your health or land goals', type: 'textarea',
+          placeholder: 'Teas, salves, pollinator support, a calming space...' },
+      ],
+    },
+    forest_restoration: {
+      name: 'Forest Habitat Restoration',
+      questions: [
+        { id: 'acreage', label: 'Approximate wooded acreage', type: 'text',
+          placeholder: 'e.g. 2 acres' },
+        { id: 'concern', label: 'Main concern', type: 'select',
+          options: ['Invasives', 'Erosion', 'Habitat', 'Opening canopy', 'Other'] },
+      ],
+    },
+    woodland_restoration: {
+      name: 'Woodland Habitat Restoration',
+      questions: [
+        { id: 'acreage', label: 'Approximate wooded acreage', type: 'text',
+          placeholder: 'e.g. 2 acres' },
+        { id: 'concern', label: 'Main concern', type: 'select',
+          options: ['Invasives', 'Erosion', 'Habitat', 'Opening canopy', 'Other'] },
+      ],
+    },
+    lawn_to_meadow: {
+      name: 'Lawn to Meadow Conversion',
+      hint: 'The free PA DCNR meadow program has a half-acre minimum. Ask us and we will check if your land qualifies.',
+      questions: [
+        { id: 'acreage', label: 'Approximate acreage', type: 'select',
+          options: ['Under half acre', 'Half to 1 acre', '1 to 3 acres', '3+ acres'] },
+        { id: 'dcnr', label: 'Interested in the free DCNR program?', type: 'select',
+          options: ['Yes', 'Tell me more', 'No'] },
+      ],
+    },
+  };
+
+  // Runtime state for the lead modal (browser only).
+  let SERVICE_SETTINGS = {};   // slug -> setting row (camelCase)
+  let SETTINGS_LOADED = false; // false => fetch failed; cards fall back to intake.html
+  let lastFocused = null;      // focus restore target
+
   // ── Data (fail-loud: pages catch and render a quiet fallback line) ──────
   async function getEvents() {
     const { data, error } = await sb().from('events').select('*')
@@ -46,6 +153,14 @@
       ...r,
       url: sb().storage.from('gallery').getPublicUrl(r.storagePath).data.publicUrl,
     }));
+  }
+
+  // Anon read of service_settings. Fail-soft: caller treats a thrown error as
+  // "settings unknown" and falls back to plain intake.html links.
+  async function getServiceSettings() {
+    const { data, error } = await sb().from('service_settings').select('*');
+    if (error) throw new Error(error.message);
+    return map().fromDbAll(data);
   }
 
   // ── Willow weave divider (signature motif). Three interlaced strands,
@@ -155,6 +270,282 @@
       '<span class="yr">' + esc(y) + '</span></div>';
   }
 
+  // ── Service lead modal (browser only) ───────────────────────────────────
+  // Format a yyyy-mm-dd date as "Month D, YYYY" with no timezone shift.
+  function formatLongDate(dateStr) {
+    if (!dateStr) return '';
+    const parts = String(dateStr).split('-');
+    if (parts.length < 3) return '';
+    const MO = ['January', 'February', 'March', 'April', 'May', 'June', 'July',
+      'August', 'September', 'October', 'November', 'December'];
+    const m = Number(parts[1]) - 1, d = Number(parts[2]);
+    if (!(m >= 0 && m < 12) || !d) return '';
+    return MO[m] + ' ' + d + ', ' + parts[0];
+  }
+
+  // Build the modal shell once and append it to <body>.
+  function ensureModal() {
+    if (document.getElementById('ecoLeadOverlay')) return;
+    const overlay = document.createElement('div');
+    overlay.className = 'eco-lead-overlay';
+    overlay.id = 'ecoLeadOverlay';
+    overlay.innerHTML =
+      '<div class="eco-lead-modal" role="dialog" aria-modal="true" aria-labelledby="ecoLeadTitle">' +
+        '<button type="button" class="eco-lead-close" id="ecoLeadClose" aria-label="Close">&times;</button>' +
+        '<div class="eco-lead-body" id="ecoLeadBody"></div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+    document.getElementById('ecoLeadClose').addEventListener('click', closeModal);
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && overlay.classList.contains('open')) closeModal();
+    });
+  }
+
+  function showModal() {
+    const overlay = document.getElementById('ecoLeadOverlay');
+    lastFocused = document.activeElement;
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    const first = overlay.querySelector('input, select, textarea, button.eco-lead-primary');
+    if (first) first.focus();
+  }
+
+  function closeModal() {
+    const overlay = document.getElementById('ecoLeadOverlay');
+    if (!overlay) return;
+    overlay.classList.remove('open');
+    document.body.style.overflow = '';
+    if (lastFocused && lastFocused.focus) { try { lastFocused.focus(); } catch (e) { /* ignore */ } }
+    lastFocused = null;
+  }
+
+  // Render one field (service question). Values are static, esc'd anyway.
+  function fieldHtml(q) {
+    const id = 'eco-lead-q-' + esc(q.id);
+    let control;
+    if (q.type === 'select') {
+      const opts = ['<option value="">Select...</option>'].concat(
+        (q.options || []).map((o) => '<option value="' + esc(o) + '">' + esc(o) + '</option>')
+      ).join('');
+      control = '<select id="' + id + '" data-q="' + esc(q.id) + '" data-label="' + esc(q.label) + '">' + opts + '</select>';
+    } else if (q.type === 'textarea') {
+      control = '<textarea id="' + id + '" data-q="' + esc(q.id) + '" data-label="' + esc(q.label) + '"' +
+        (q.placeholder ? ' placeholder="' + esc(q.placeholder) + '"' : '') + '></textarea>';
+    } else {
+      control = '<input type="text" id="' + id + '" data-q="' + esc(q.id) + '" data-label="' + esc(q.label) + '"' +
+        (q.placeholder ? ' placeholder="' + esc(q.placeholder) + '"' : '') + '>';
+    }
+    return '<div class="eco-lead-field"><label for="' + id + '">' + esc(q.label) + '</label>' + control + '</div>';
+  }
+
+  // Standard contact block (name/phone required, email, address, preferred contact).
+  function contactHtml() {
+    return (
+      '<div class="eco-lead-field"><label for="eco-lead-c-name">Name <span class="req">*</span></label>' +
+        '<input type="text" id="eco-lead-c-name" placeholder="Full name"></div>' +
+      '<div class="eco-lead-field"><label for="eco-lead-c-phone">Phone <span class="req">*</span></label>' +
+        '<input type="tel" id="eco-lead-c-phone" placeholder="(814) 555-0000"></div>' +
+      '<div class="eco-lead-field"><label for="eco-lead-c-email">Email</label>' +
+        '<input type="email" id="eco-lead-c-email" placeholder="email@example.com"></div>' +
+      '<div class="eco-lead-field"><label for="eco-lead-c-address">Property address</label>' +
+        '<input type="text" id="eco-lead-c-address" placeholder="Street, town"></div>' +
+      '<div class="eco-lead-field"><label for="eco-lead-c-pref">Preferred contact</label>' +
+        '<select id="eco-lead-c-pref"><option value="phone">Phone call</option>' +
+        '<option value="text">Text message</option><option value="email">Email</option></select></div>'
+    );
+  }
+
+  // Active service: the inquiry form.
+  function renderInquiry(slug, form) {
+    const body = document.getElementById('ecoLeadBody');
+    const qs = (form.questions || []).map(fieldHtml).join('');
+    const hint = form.hint ? '<p class="eco-lead-hint">' + esc(form.hint) + '</p>' : '';
+    body.innerHTML =
+      '<p class="eco-lead-eyebrow">Start an inquiry</p>' +
+      '<h2 id="ecoLeadTitle">' + esc(form.name) + '</h2>' +
+      hint +
+      '<form id="ecoLeadForm" novalidate>' +
+        '<div class="eco-lead-grid">' + qs + '</div>' +
+        '<p class="eco-lead-sub">How can we reach you?</p>' +
+        '<div class="eco-lead-grid">' + contactHtml() + '</div>' +
+        '<p class="eco-lead-error" id="ecoLeadError"></p>' +
+        '<button type="submit" class="eco-lead-primary">Send inquiry</button>' +
+      '</form>';
+    document.getElementById('ecoLeadForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      submitInquiry(slug, form);
+    });
+  }
+
+  // Inactive service: out-of-season message + waitlist mini form.
+  function renderOff(slug, form, setting) {
+    const body = document.getElementById('ecoLeadBody');
+    let msg = setting && setting.offMessage ? esc(setting.offMessage) : 'This service is out of season.';
+    const reopen = setting && setting.reopenDate ? formatLongDate(setting.reopenDate) : '';
+    if (reopen) msg += ' We will be starting these again around ' + esc(reopen) + '.';
+    body.innerHTML =
+      '<p class="eco-lead-eyebrow">Out of season</p>' +
+      '<h2 id="ecoLeadTitle">' + esc(form.name) + '</h2>' +
+      '<p class="eco-lead-offmsg">' + msg + '</p>' +
+      '<p class="eco-lead-sub">Want to join the waitlist?</p>' +
+      '<form id="ecoLeadForm" novalidate>' +
+        '<div class="eco-lead-grid">' +
+          '<div class="eco-lead-field"><label for="eco-lead-w-name">Name <span class="req">*</span></label>' +
+            '<input type="text" id="eco-lead-w-name" placeholder="Full name"></div>' +
+          '<div class="eco-lead-field"><label for="eco-lead-w-email">Email</label>' +
+            '<input type="email" id="eco-lead-w-email" placeholder="email@example.com"></div>' +
+          '<div class="eco-lead-field"><label for="eco-lead-w-phone">Phone</label>' +
+            '<input type="tel" id="eco-lead-w-phone" placeholder="(814) 555-0000"></div>' +
+          '<div class="eco-lead-field eco-lead-full"><label for="eco-lead-w-note">Anything to add?</label>' +
+            '<textarea id="eco-lead-w-note" placeholder="Optional"></textarea></div>' +
+        '</div>' +
+        '<p class="eco-lead-tinynote">Add an email or a phone number so we can reach you.</p>' +
+        '<p class="eco-lead-error" id="ecoLeadError"></p>' +
+        '<button type="submit" class="eco-lead-primary">Join waitlist</button>' +
+      '</form>';
+    document.getElementById('ecoLeadForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+      submitWaitlist(slug, form);
+    });
+  }
+
+  // Raw label: answer lines for DB storage. NOT esc'd: these are stored as plain
+  // text and the portal esc's them at render time (pre-escaping would double-encode).
+  function collectAnswers() {
+    const rows = [];
+    document.querySelectorAll('#ecoLeadForm [data-q]').forEach((el) => {
+      const v = (el.value || '').trim();
+      if (v) rows.push(el.getAttribute('data-label') + ': ' + v);
+    });
+    return rows;
+  }
+
+  async function submitInquiry(slug, form) {
+    const errEl = document.getElementById('ecoLeadError');
+    errEl.textContent = '';
+    const name = (document.getElementById('eco-lead-c-name').value || '').trim();
+    const phone = (document.getElementById('eco-lead-c-phone').value || '').trim();
+    const email = (document.getElementById('eco-lead-c-email').value || '').trim();
+    const address = (document.getElementById('eco-lead-c-address').value || '').trim();
+    const pref = document.getElementById('eco-lead-c-pref').value;
+    if (!name || !phone) {
+      errEl.textContent = 'Please add your name and a phone number so we can reach you.';
+      return;
+    }
+    const qa = collectAnswers();
+    // Plain-text (raw) blocks for DB storage; the portal esc's them on render.
+    const answersText = qa.length ? qa.join('\n') : 'No additional details provided.';
+    const contactBlock = 'Contact: ' + phone + (email ? ' / ' + email : '') +
+      (address ? '\nAddress: ' + address : '') + '\nPreferred contact: ' + pref + '.';
+    const notes = 'Submitted via services page.\n\n' + answersText + '\n\n' + contactBlock;
+    try {
+      // Anon inserts, return=minimal (no .select()) so no read policy is needed.
+      const ins1 = await sb().from('intake_submissions').insert({
+        name: name, phone: phone, email: email, address: address,
+        service_type: slug, description: answersText, contact_preference: pref,
+        submitted_at: new Date().toISOString(),
+      });
+      if (ins1.error) throw new Error(ins1.error.message);
+      const ins2 = await sb().from('jobs').insert({
+        status: 'inquiry',
+        title: form.name + ' Inquiry',
+        client_name: name,
+        address: address,
+        type: slug,
+        notes: notes,
+        activity_log: [{ ts: new Date().toISOString(), note: 'Received via services page.' }],
+      });
+      if (ins2.error) throw new Error(ins2.error.message);
+      showSuccess('Thanks, we got it.', 'We will reach out within a few days.');
+    } catch (err) {
+      errEl.textContent = 'Something went wrong sending your inquiry. Please try again, or call us directly.';
+    }
+  }
+
+  async function submitWaitlist(slug, form) {
+    const errEl = document.getElementById('ecoLeadError');
+    errEl.textContent = '';
+    const name = (document.getElementById('eco-lead-w-name').value || '').trim();
+    const email = (document.getElementById('eco-lead-w-email').value || '').trim();
+    const phone = (document.getElementById('eco-lead-w-phone').value || '').trim();
+    const note = (document.getElementById('eco-lead-w-note').value || '').trim();
+    if (!name) { errEl.textContent = 'Please add your name.'; return; }
+    if (!email && !phone) { errEl.textContent = 'Please add an email or a phone number so we can reach you.'; return; }
+    try {
+      const ins = await sb().from('service_waitlist').insert({
+        service_slug: slug, name: name, email: email, phone: phone, note: note,
+      });
+      if (ins.error) throw new Error(ins.error.message);
+      showSuccess('You are on the list.', 'We will reach out when ' + form.name + ' season opens.');
+    } catch (err) {
+      errEl.textContent = 'Something went wrong. Please try again, or call us directly.';
+    }
+  }
+
+  function showSuccess(title, sub) {
+    const body = document.getElementById('ecoLeadBody');
+    body.innerHTML =
+      '<div class="eco-lead-success">' +
+        '<div class="eco-lead-check" aria-hidden="true">✓</div>' +
+        '<h2 id="ecoLeadTitle">' + esc(title) + '</h2>' +
+        '<p>' + esc(sub) + '</p>' +
+        '<button type="button" class="eco-lead-primary" id="ecoLeadDone">Close</button>' +
+      '</div>';
+    const done = document.getElementById('ecoLeadDone');
+    done.addEventListener('click', closeModal);
+    done.focus();
+  }
+
+  // Open the modal for a service. Slug is validated against the SERVICE_FORMS
+  // allowlist; anything else is ignored. If settings never loaded, fall back to
+  // the plain intake form instead of blocking.
+  function openService(slug) {
+    const form = SERVICE_FORMS[slug];
+    if (!form) return;
+    ensureModal();
+    if (!SETTINGS_LOADED) { window.location.href = 'intake.html'; return; }
+    const setting = SERVICE_SETTINGS[slug];
+    const active = setting ? setting.active : true;
+    if (active) renderInquiry(slug, form);
+    else renderOff(slug, form, setting);
+    showModal();
+  }
+
+  // Wire every [data-service-slug] card as a keyboard-operable button, then load
+  // settings. Safe to call once per page after renderNav.
+  async function initServiceLeads() {
+    const cards = document.querySelectorAll('[data-service-slug]');
+    if (!cards.length) return;
+    ensureModal();
+    cards.forEach((card) => {
+      const slug = card.getAttribute('data-service-slug');
+      if (!SERVICE_FORMS[slug]) return; // allowlist
+      card.classList.add('svc-lead');
+      card.setAttribute('role', 'button');
+      card.setAttribute('tabindex', '0');
+      card.setAttribute('aria-haspopup', 'dialog');
+      const cue = document.createElement('span');
+      cue.className = 'svc-cue';
+      cue.setAttribute('aria-hidden', 'true');
+      cue.textContent = 'Start an inquiry →';
+      (card.matches('.svc-row') ? (card.lastElementChild || card) : card).appendChild(cue);
+      card.addEventListener('click', () => openService(slug));
+      card.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openService(slug); }
+      });
+    });
+    try {
+      const rows = await getServiceSettings();
+      const m = {};
+      rows.forEach((r) => { m[r.slug] = r; });
+      SERVICE_SETTINGS = m;
+      SETTINGS_LOADED = true;
+    } catch (e) {
+      SETTINGS_LOADED = false; // cards fall back to intake.html
+    }
+  }
+
   root.EcoSite = {
     esc: esc,
     renderNav: renderNav,
@@ -162,6 +553,9 @@
     getEvents: getEvents,
     getGardens: getGardens,
     getStaffPhotos: getStaffPhotos,
+    getServiceSettings: getServiceSettings,
+    initServiceLeads: initServiceLeads,
+    openService: openService,
     willowSvg: willowSvg,
     eventBadge: badge,
     todayISO: function () { return new Date().toISOString().slice(0, 10); },
