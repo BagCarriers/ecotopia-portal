@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quote - Open Sesame Designs LLC</title>
+  <link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Caveat:wght@600;700&display=swap" rel="stylesheet">
+<script src="assets/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/mapping.js"></script>
+<script src="assets/auth.js"></script>
+<script>if (!AuthManager.hasCachedSession()) location.replace('login.html');</script>
+<script src="assets/data.js"></script>
+<style>
+  :root {
+    --gold: #D4A83A;      /* sampled from the reference header band */
+    --gold-dim: #C89B2E;
+    --navy: #1e3a5f;      /* headings + table text */
+    --rust: #9C4A32;      /* accent rule under the table */
+    --olive: #4c5a2e;     /* chevron accent */
+    --paper: #ffffff;
+    --ink-dim: #f7f2e6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Poppins', system-ui, sans-serif; background: #e7e2d6; color: var(--navy);
+    padding: 24px 16px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  /* Screen-only toolbar */
+  .toolbar { max-width: 8.5in; margin: 0 auto 16px; display: flex; gap: 12px; align-items: center;
+    justify-content: space-between; flex-wrap: wrap; }
+  .toolbar a, .toolbar button { font-family: 'Poppins', sans-serif; font-size: 0.85rem; font-weight: 600;
+    padding: 9px 16px; border-radius: 8px; cursor: pointer; text-decoration: none; border: none; }
+  .tb-print { background: var(--navy); color: #fff; }
+  .tb-back { background: #fff; color: var(--navy); border: 1.5px solid var(--navy); }
+
+  /* The document sheet */
+  .sheet { max-width: 8.5in; min-height: 11in; margin: 0 auto; background: var(--paper);
+    box-shadow: 0 10px 40px rgba(0,0,0,0.18); overflow: hidden; }
+
+  /* Header band */
+  .head { background: var(--gold); position: relative; padding: 40px 44px 34px; display: flex;
+    justify-content: space-between; gap: 20px; }
+  .head-left { flex: 1; min-width: 0; }
+  .head h1 { font-size: 4.4rem; font-weight: 800; color: #fff; line-height: 0.9; letter-spacing: 0.01em;
+    margin-bottom: 14px; }
+  .meta { color: #fff; }
+  .meta .line { font-size: 0.98rem; margin-bottom: 7px; display: flex; gap: 8px; align-items: baseline;
+    flex-wrap: wrap; }
+  .meta .k { font-weight: 500; opacity: 0.92; }
+  .meta .v { font-weight: 700; font-size: 1.12rem; }
+  .art { width: 150px; height: 150px; flex-shrink: 0; border-radius: 6px; object-fit: cover;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.22); }
+
+  /* Chevron accent strips (approximated) */
+  .chev { position: absolute; top: 0; bottom: 0; width: 30px;
+    background: repeating-linear-gradient(-45deg,
+      var(--olive) 0 8px, transparent 8px 12px, var(--rust) 12px 20px, transparent 20px 24px); }
+  .chev.left { left: 10px; }
+  .chev.right { right: 10px; }
+
+  /* Body */
+  .body { padding: 30px 44px 40px; }
+  .company { text-align: center; font-size: 1.7rem; font-weight: 800; color: var(--navy);
+    letter-spacing: 0.02em; margin-bottom: 22px; }
+
+  table.items { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+  table.items thead th { background: var(--gold); color: #fff; font-size: 0.82rem; font-weight: 700;
+    letter-spacing: 0.05em; padding: 12px 10px; text-align: center; }
+  table.items thead th.desc { text-align: left; padding-left: 16px; }
+  table.items tbody td { border: 1.5px solid var(--navy); padding: 16px 12px; font-size: 0.92rem;
+    font-weight: 600; color: var(--navy); text-align: center; vertical-align: middle; }
+  table.items tbody td.desc { text-align: left; text-transform: uppercase; letter-spacing: 0.02em; }
+  table.items tbody td.mat { text-transform: uppercase; font-size: 0.82rem; letter-spacing: 0.02em; }
+  table.items tbody td.amt { white-space: nowrap; }
+
+  .rule { height: 8px; background: var(--rust); border-radius: 4px; margin: 4px 0 22px; }
+
+  .totals { margin-left: auto; width: 100%; }
+  .totals .trow { display: flex; justify-content: space-between; align-items: baseline;
+    padding: 5px 2px; }
+  .totals .lbl { font-weight: 700; letter-spacing: 0.03em; }
+  .trow.deposit .lbl, .trow.deposit .val { font-size: 1.35rem; }
+  .trow.admin { color: #7a7259; }
+  .trow.admin .lbl { font-weight: 500; font-size: 0.92rem; letter-spacing: 0.01em; }
+  .trow.admin .val { font-weight: 600; font-size: 0.92rem; }
+  .trow.total .lbl, .trow.total .val { font-size: 1.55rem; font-weight: 800; }
+  .trow.balance { border-top: 2px solid var(--navy); margin-top: 6px; padding-top: 10px; }
+  .trow.balance .lbl, .trow.balance .val { font-size: 1.3rem; font-weight: 800; color: var(--rust); }
+
+  .signoff { text-align: center; margin-top: 34px; }
+  .signoff .thanks { font-family: 'Caveat', cursive; font-size: 2.6rem; font-weight: 700; color: var(--navy);
+    line-height: 1; margin-bottom: 16px; }
+  .signoff .payable { font-size: 1.15rem; font-weight: 600; color: var(--navy); }
+  .signoff .company-name { font-size: 1.25rem; font-weight: 800; color: var(--navy); margin: 2px 0 6px; }
+  .signoff .addr { font-size: 0.92rem; font-weight: 600; letter-spacing: 0.04em; color: var(--navy);
+    text-transform: uppercase; }
+
+  /* Footer chevron strip */
+  .foot-band { height: 44px; background: var(--gold);
+    background-image: repeating-linear-gradient(-45deg,
+      var(--olive) 0 9px, transparent 9px 14px, var(--rust) 14px 23px, transparent 23px 28px);
+    background-position: center; margin-top: 30px; }
+
+  .notfound { max-width: 520px; margin: 60px auto; background: #fff; border-radius: 14px;
+    padding: 40px 32px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.12); }
+  .notfound h2 { color: var(--navy); margin-bottom: 10px; }
+  .notfound a { color: var(--navy); font-weight: 600; }
+
+  @media print {
+    body { background: #fff; padding: 0; }
+    .toolbar { display: none !important; }
+    .sheet { box-shadow: none; max-width: none; min-height: auto; margin: 0; }
+    @page { margin: 0.35in; }
+  }
+</style>
+</head>
+<body>
+<div class="toolbar" id="toolbar">
+  <a class="tb-back" href="quotes.html">← Back to quotes</a>
+  <button class="tb-print" onclick="window.print()">Print / Save as PDF</button>
+</div>
+
+<div id="root"></div>
+
+<script>
+const esc = DataStore.esc;
+function money(n) {
+  return '$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function fmtDate(dateStr) {
+  if (!dateStr) return '';
+  const p = String(dateStr).slice(0, 10).split('-');
+  if (p.length < 3) return esc(dateStr);
+  // m/dd/yy to echo the reference (4/06/26)
+  const yy = p[0].slice(2);
+  return Number(p[1]) + '/' + p[2] + '/' + yy;
+}
+
+function notFound() {
+  document.getElementById('toolbar').style.display = 'none';
+  document.getElementById('root').innerHTML =
+    '<div class="notfound"><h2>Quote not found</h2>' +
+    '<p style="margin-bottom:16px;color:#5A5A5A">That quote could not be loaded. It may have been deleted.</p>' +
+    '<a href="quotes.html">← Back to quotes</a></div>';
+}
+
+function renderQuote(q) {
+  const items = Array.isArray(q.lineItems) ? q.lineItems : [];
+  const rows = items.map(li => `
+    <tr>
+      <td class="desc">${esc(li.description || '')}</td>
+      <td>${esc(li.hours || '')}</td>
+      <td class="mat">${esc(li.material || '')}</td>
+      <td class="amt">${li.amount != null && li.amount !== '' ? money(li.amount) : ''}</td>
+    </tr>`).join('');
+  // A couple of blank ruled rows to echo the reference table feel.
+  const blanks = '<tr><td class="desc">&nbsp;</td><td></td><td></td><td></td></tr>';
+
+  const deposit = Number(q.deposit) || 0;
+  const balanceRow = deposit > 0
+    ? `<div class="trow balance"><span class="lbl">BALANCE DUE:</span><span class="val">${money(q.total - deposit)}</span></div>`
+    : '';
+  const depositRow = deposit > 0
+    ? `<div class="trow deposit"><span class="lbl">DEPOSIT RECEIVED:</span><span class="val">${money(deposit)}</span></div>`
+    : '';
+
+  document.getElementById('root').innerHTML = `
+  <div class="sheet">
+    <div class="head">
+      <div class="chev left"></div>
+      <div class="chev right"></div>
+      <div class="head-left">
+        <h1>QUOTE</h1>
+        <div class="meta">
+          <div class="line"><span class="k">Quote #:</span><span class="v">${esc(q.quoteNumber)} of ${esc(q.quoteYear)}</span></div>
+          <div class="line"><span class="k">Quote to:</span><span class="v">${esc(q.clientName)}</span></div>
+          <div class="line"><span class="k">Invoice Date:</span><span class="v">${esc(fmtDate(q.quoteDate))}</span></div>
+          ${q.clientAddress ? `<div class="line"><span class="k">Address:</span><span class="v">${esc(q.clientAddress)}</span></div>` : ''}
+        </div>
+      </div>
+      <img class="art" src="/assets/img/pawpaw-hands-sm.jpg" alt="Ecotopian Earthcare artwork">
+    </div>
+
+    <div class="body">
+      <div class="company">OPEN SESAME DESIGNS LLC</div>
+      <table class="items">
+        <thead><tr>
+          <th class="desc">DESCRIPTION</th><th>HOURS</th><th>MATERIAL</th><th>TOTAL</th>
+        </tr></thead>
+        <tbody>${rows}${blanks}</tbody>
+      </table>
+      <div class="rule"></div>
+
+      <div class="totals">
+        ${depositRow}
+        <div class="trow admin"><span class="lbl">Processing and administration:</span><span class="val">${money(q.adminFee)}</span></div>
+        <div class="trow total"><span class="lbl">TOTAL ESTIMATE:</span><span class="val">${money(q.total)}</span></div>
+        ${balanceRow}
+      </div>
+
+      <div class="signoff">
+        <div class="thanks">Thanks for caring</div>
+        <div class="payable">Please make checks payable to:</div>
+        <div class="company-name">Open Sesame Designs LLC</div>
+        <div class="addr">1530 Lakeside Dr, Altoona, PA 16601</div>
+      </div>
+    </div>
+
+    <div class="foot-band"></div>
+  </div>`;
+  document.title = 'Quote ' + q.quoteNumber + ' of ' + q.quoteYear + ' - ' + q.clientName;
+}
+
+(async function init() {
+  try {
+    await AuthManager.requireAuth();
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('id');
+    if (!id) { notFound(); return; }
+    const q = await DataStore.getQuote(id);
+    if (!q) { notFound(); return; }
+    renderQuote(q);
+  } catch (err) {
+    document.getElementById('toolbar').style.display = 'none';
+    document.getElementById('root').innerHTML =
+      '<div class="notfound"><h2>Could not load quote</h2>' +
+      '<p style="margin-bottom:16px;color:#5A5A5A">' + esc(err.message) + '</p>' +
+      '<a href="quotes.html">← Back to quotes</a></div>';
+  }
+})();
+</script>
+</body>
+</html>

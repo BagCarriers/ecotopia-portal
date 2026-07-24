@@ -146,6 +146,27 @@ const DataStore = (() => {
     getUnpaidInvoices: async () =>
       fromDbAll(unwrap(await sb.from('invoices').select('*').neq('status', 'paid'))),
 
+    // Quotes (staff only - no anon policy). Each quote stores subtotal, admin_fee
+    // (5 percent, collected by BagCarriers), and total. adminFeesTotal excludes drafts.
+    getQuotes: async () =>
+      fromDbAll(unwrap(await sb.from('quotes').select('*')
+        .order('quote_year', { ascending: false })
+        .order('quote_number', { ascending: false }))),
+    getQuote: (id) => getOne('quotes', id),
+    addQuote: (r) => insert('quotes', r),
+    updateQuote: (id, ch) => update('quotes', id, ch),
+    deleteQuote: async (id) => { unwrap(await sb.from('quotes').delete().eq('id', id)); },
+    nextQuoteNumber: async (year) => {
+      const rows = unwrap(await sb.from('quotes').select('quote_number')
+        .eq('quote_year', year).order('quote_number', { ascending: false }).limit(1));
+      return (rows && rows.length) ? Number(rows[0].quote_number) + 1 : 1;
+    },
+    adminFeesTotal: async (year) => {
+      const rows = unwrap(await sb.from('quotes').select('admin_fee')
+        .eq('quote_year', year).in('status', ['sent', 'accepted', 'invoiced']));
+      return (rows || []).reduce((sum, q) => sum + (Number(q.admin_fee) || 0), 0);
+    },
+
     // Grants
     getGrants: () => list('grants'),
     getGrant: (id) => getOne('grants', id),

@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Quotes - Ecotopia</title>
+  <link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/mapping.js"></script>
+<script src="assets/auth.js"></script>
+<script>if (!AuthManager.hasCachedSession()) location.replace('login.html');</script>
+<script src="assets/data.js"></script>
+<script src="assets/nav.js"></script>
+<style>
+  :root {
+    --forest: #1B4332; --forest-mid: #2D6A4F; --forest-light: #52B788;
+    --sage: #D8F3DC; --sage-dim: #B7E4C7; --earth: #8B5E3C;
+    --earth-light: #C68642; --gold: #F4A261; --cream: #F9F6F0;
+    --cream-dim: #E8E0D5; --text: #1C1C1C; --text-dim: #5A5A5A;
+    --border: rgba(45,106,79,0.2);
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--text); }
+  .page { padding: 28px 32px; max-width: 1000px; }
+  .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; gap: 12px; flex-wrap: wrap; }
+  h1 { font-family: 'Fraunces', serif; font-size: 1.9rem; color: var(--forest); }
+  .header-right { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+  .btn { padding: 9px 16px; border-radius: 8px; border: none; font-size: 0.82rem;
+    font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif;
+    text-decoration: none; display: inline-flex; gap: 5px; align-items: center;
+    transition: background 0.15s; }
+  .btn-primary { background: var(--forest); color: #fff; }
+  .btn-primary:hover { background: var(--forest-mid); }
+  .btn-outline { background: #fff; color: var(--forest); border: 1.5px solid var(--forest-light); }
+  .btn-outline:hover { background: var(--sage); }
+  .btn-sm { padding: 5px 10px; font-size: 0.75rem; }
+
+  .page-intro { font-size: 0.9rem; color: var(--text-dim); margin: 6px 0 22px; max-width: 660px; line-height: 1.6; }
+
+  /* Admin fees YTD chip */
+  .fee-chip { background: #fff; border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 16px; display: flex; flex-direction: column; gap: 2px; }
+  .fee-chip .label { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--text-dim); font-weight: 700; }
+  .fee-chip .value { font-family: 'Fraunces', serif; font-size: 1.35rem; color: var(--forest-mid); }
+
+  /* Table */
+  .q-table { width: 100%; border-collapse: collapse; background: #fff;
+    border-radius: 14px; overflow: hidden; border: 1px solid var(--border); }
+  .q-table th { padding: 11px 16px; text-align: left; font-size: 0.75rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-dim);
+    background: var(--cream-dim); border-bottom: 1px solid var(--border); }
+  .q-table td { padding: 13px 16px; border-bottom: 1px solid var(--border); font-size: 0.875rem;
+    vertical-align: middle; }
+  .q-table tr:last-child td { border-bottom: none; }
+  .q-num { font-weight: 600; color: var(--forest); white-space: nowrap; }
+
+  .status-pill { padding: 3px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+  .pill-draft { background: var(--cream-dim); color: var(--text-dim); }
+  .pill-sent { background: #dbeafe; color: #1e40af; }
+  .pill-accepted { background: #d1fae5; color: #065f46; }
+  .pill-invoiced { background: #ede9fe; color: #6d28d9; }
+
+  .actions-cell { display: flex; gap: 6px; flex-wrap: wrap; }
+  .btn-edit { font-size: 0.75rem; padding: 4px 9px; background: transparent;
+    border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
+    color: var(--text-dim); font-family: 'DM Sans', sans-serif; transition: all 0.15s;
+    text-decoration: none; }
+  .btn-edit:hover { color: var(--forest); border-color: var(--forest-light); background: var(--sage); }
+  .btn-edit.danger:hover { color: #fff; background: #b3261e; border-color: #b3261e; }
+
+  .empty { padding: 22px 16px; color: var(--text-dim); font-size: 0.9rem; text-align: center; }
+  .modal-error { color: #b3261e; font-size: 0.85rem; margin-top: 8px; }
+  #pageError { margin-bottom: 14px; }
+  #pageError:empty { display: none; }
+
+  /* Builder modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+    z-index: 500; align-items: flex-start; justify-content: center; padding: 24px; overflow-y: auto; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: #fff; border-radius: 16px; padding: 26px;
+    width: 100%; max-width: 720px; box-shadow: 0 20px 60px rgba(0,0,0,0.25); }
+  .modal h2 { font-family: 'Fraunces', serif; color: var(--forest); margin-bottom: 4px; }
+  .modal .modal-sub { font-size: 0.85rem; color: var(--text-dim); margin-bottom: 18px; }
+
+  .form-row { display: flex; gap: 14px; flex-wrap: wrap; }
+  .form-group { margin-bottom: 14px; flex: 1; min-width: 180px; }
+  .form-group label { display: block; font-size: 0.78rem; font-weight: 600;
+    color: var(--text-dim); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .form-group input, .form-group select, .form-group textarea {
+    width: 100%; padding: 9px 12px; border-radius: 7px;
+    border: 1.5px solid var(--border); font-size: 0.9rem; font-family: 'DM Sans', sans-serif; color: var(--text);
+    background: #fff;
+  }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+    outline: none; border-color: var(--forest-light);
+  }
+
+  /* Line items */
+  .li-head { font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--text-dim); margin: 8px 0 8px; }
+  .li-table { width: 100%; border-collapse: collapse; }
+  .li-table th { text-align: left; font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.04em;
+    color: var(--text-dim); font-weight: 700; padding: 0 6px 6px; }
+  .li-table td { padding: 3px 6px 3px 0; vertical-align: top; }
+  .li-table input { width: 100%; padding: 7px 9px; border-radius: 6px;
+    border: 1.5px solid var(--border); font-size: 0.85rem; font-family: 'DM Sans', sans-serif; color: var(--text); }
+  .li-table input:focus { outline: none; border-color: var(--forest-light); }
+  .li-desc { width: 34%; }
+  .li-amt { width: 16%; }
+  .li-rm { background: transparent; border: none; cursor: pointer; color: #b3261e;
+    font-size: 1rem; padding: 4px 6px; line-height: 1; }
+  .add-row-btn { margin-top: 8px; font-size: 0.78rem; padding: 6px 12px; background: transparent;
+    border: 1px dashed var(--forest-light); border-radius: 7px; cursor: pointer; color: var(--forest);
+    font-family: 'DM Sans', sans-serif; font-weight: 600; }
+  .add-row-btn:hover { background: var(--sage); }
+
+  /* Live summary */
+  .summary { background: var(--cream); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px; margin-top: 18px; }
+  .summary .srow { display: flex; justify-content: space-between; font-size: 0.9rem; padding: 4px 0; }
+  .summary .srow.muted { color: var(--text-dim); font-size: 0.85rem; }
+  .summary .srow.total { font-weight: 700; color: var(--forest); font-size: 1.05rem;
+    border-top: 1px solid var(--border); margin-top: 6px; padding-top: 8px; }
+  .summary .srow.balance { font-weight: 700; color: var(--earth); }
+
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+  .btn-cancel { background: var(--cream-dim); color: var(--text); padding: 10px 18px;
+    border-radius: 8px; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+
+  @media (max-width: 700px) {
+    .page { padding: 20px 16px; }
+    .q-table { font-size: 0.8rem; }
+    .q-table th, .q-table td { padding: 9px 10px; }
+    .actions-cell { flex-direction: column; }
+    .li-desc, .li-amt { width: auto; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="page-header">
+    <h1>Quotes</h1>
+    <div class="header-right">
+      <div class="fee-chip" title="Administration fees collected year to date">
+        <span class="label">Admin fees YTD</span>
+        <span class="value" id="feeYtd">$0.00</span>
+      </div>
+      <button class="btn btn-primary" onclick="openBuilder()">+ New Quote</button>
+    </div>
+  </div>
+  <p class="page-intro">Generate branded quotes for Open Sesame Designs LLC. A 5 percent
+    processing and administration charge is added to every quote automatically and tracked
+    for BagCarriers. Administration fees collected year to date appear above (drafts excluded).</p>
+
+  <div class="modal-error" id="pageError"></div>
+
+  <table class="q-table">
+    <thead><tr>
+      <th>Quote #</th><th>Client</th><th>Date</th><th>Total</th><th>Status</th><th>Actions</th>
+    </tr></thead>
+    <tbody id="quoteBody"><tr><td colspan="6" class="empty">Loading…</td></tr></tbody>
+  </table>
+</div>
+
+<!-- Builder Modal -->
+<div class="modal-overlay" id="builderModal">
+  <div class="modal">
+    <h2 id="builderTitle">New Quote</h2>
+    <p class="modal-sub" id="builderSub">Open Sesame Designs LLC</p>
+    <form id="builderForm" novalidate>
+      <div class="form-row">
+        <div class="form-group"><label>Quote to (client name) *</label>
+          <input type="text" id="q_client" placeholder="Andrea Young"></div>
+        <div class="form-group"><label>Invoice date</label>
+          <input type="date" id="q_date"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Address</label>
+          <input type="text" id="q_address" placeholder="526 E. Penn Ave Altoona, PA"></div>
+        <div class="form-group"><label>Link to job (optional)</label>
+          <select id="q_job"><option value="">No linked job</option></select></div>
+      </div>
+
+      <div class="li-head">Line items</div>
+      <table class="li-table">
+        <thead><tr>
+          <th class="li-desc">Description *</th><th>Hours</th><th>Material</th>
+          <th class="li-amt">Amount ($) *</th><th></th>
+        </tr></thead>
+        <tbody id="liBody"></tbody>
+      </table>
+      <button type="button" class="add-row-btn" onclick="addLineRow()">+ Add line item</button>
+
+      <div class="form-row" style="margin-top:16px;">
+        <div class="form-group" style="max-width:220px;"><label>Deposit received ($)</label>
+          <input type="number" id="q_deposit" min="0" step="0.01" placeholder="0.00"></div>
+      </div>
+
+      <div class="summary" id="summary">
+        <div class="srow"><span>Subtotal</span><span id="s_subtotal">$0.00</span></div>
+        <div class="srow muted"><span>Processing and administration (5%)</span><span id="s_admin">$0.00</span></div>
+        <div class="srow total"><span>Total</span><span id="s_total">$0.00</span></div>
+        <div class="srow balance" id="s_balance_row"><span>Balance due</span><span id="s_balance">$0.00</span></div>
+      </div>
+
+      <input type="hidden" id="q_id">
+      <div class="modal-error" id="builderError"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" onclick="closeBuilder()">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="builderSaveBtn">Save Quote</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+const esc = DataStore.esc;
+// The administration fee rate lives here and nowhere else.
+const ADMIN_FEE_RATE = 0.05;
+
+let quotes = [];
+let jobs = [];
+
+function money(n) {
+  return '$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function round2(n) { return Math.round((Number(n) || 0) * 100) / 100; }
+function currentYear() { return new Date().getFullYear(); }
+function yearOf(dateStr) {
+  // dateStr is yyyy-mm-dd; parse the year without timezone drift.
+  const y = parseInt(String(dateStr || '').slice(0, 4), 10);
+  return Number.isFinite(y) ? y : currentYear();
+}
+
+// Compute subtotal / admin fee / total from raw line items.
+function computeTotals(lineItems, deposit) {
+  const subtotal = round2((lineItems || []).reduce((s, li) => s + (Number(li.amount) || 0), 0));
+  const adminFee = round2(subtotal * ADMIN_FEE_RATE);
+  const total = round2(subtotal + adminFee);
+  const balance = round2(total - (Number(deposit) || 0));
+  return { subtotal, adminFee, total, balance };
+}
+
+async function refresh() {
+  quotes = await DataStore.getQuotes();
+  const fees = await DataStore.adminFeesTotal(currentYear());
+  document.getElementById('feeYtd').textContent = money(fees);
+  renderTable();
+}
+
+function renderTable() {
+  const body = document.getElementById('quoteBody');
+  if (!quotes.length) {
+    body.innerHTML = '<tr><td colspan="6" class="empty">No quotes yet. Click "+ New Quote" to build one.</td></tr>';
+    return;
+  }
+  body.innerHTML = quotes.map(q => {
+    const label = esc(q.quoteNumber + ' of ' + q.quoteYear);
+    const isInvoiced = q.status === 'invoiced';
+    const nextStatus = q.status === 'draft' ? 'sent' : (q.status === 'sent' ? 'accepted' : null);
+    const advanceLabel = q.status === 'draft' ? 'Mark sent' : (q.status === 'sent' ? 'Mark accepted' : null);
+    return `
+    <tr>
+      <td class="q-num">${label}</td>
+      <td><strong>${esc(q.clientName)}</strong></td>
+      <td>${q.quoteDate ? DataStore.formatDate(q.quoteDate + 'T00:00:00') : '-'}</td>
+      <td><strong>${money(q.total)}</strong></td>
+      <td><span class="status-pill pill-${esc(q.status)}">${esc(q.status.charAt(0).toUpperCase() + q.status.slice(1))}</span></td>
+      <td>
+        <div class="actions-cell">
+          ${nextStatus ? `<button class="btn-edit" onclick="advanceStatus('${q.id}','${nextStatus}')">${advanceLabel}</button>` : ''}
+          <button class="btn-edit" onclick="openBuilder('${q.id}')">Edit</button>
+          <a class="btn-edit" href="quote-print.html?id=${encodeURIComponent(q.id)}" target="_blank" rel="noopener">Print</a>
+          ${isInvoiced ? '' : `<button class="btn-edit" onclick="convertToInvoice('${q.id}')">Convert to invoice</button>`}
+          <button class="btn-edit danger" onclick="deleteQuote('${q.id}')">Delete</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Builder ─────────────────────────────────────────────────────────────────
+function lineRowHtml(li) {
+  li = li || {};
+  return `
+    <tr>
+      <td class="li-desc"><input type="text" class="li-input" data-k="description" value="${esc(li.description || '')}" placeholder="Pollinator garden 375 sq.ft"></td>
+      <td><input type="text" class="li-input" data-k="hours" value="${esc(li.hours || '')}" placeholder="8 hours"></td>
+      <td><input type="text" class="li-input" data-k="material" value="${esc(li.material || '')}" placeholder="101 perennial plugs"></td>
+      <td class="li-amt"><input type="number" class="li-input" data-k="amount" min="0" step="0.01" value="${li.amount != null && li.amount !== '' ? esc(li.amount) : ''}" placeholder="0.00"></td>
+      <td><button type="button" class="li-rm" title="Remove" onclick="removeLineRow(this)">✕</button></td>
+    </tr>`;
+}
+function addLineRow(li) {
+  document.getElementById('liBody').insertAdjacentHTML('beforeend', lineRowHtml(li));
+}
+function removeLineRow(btn) {
+  const rows = document.querySelectorAll('#liBody tr');
+  if (rows.length <= 1) {
+    // Keep at least one row; just clear it.
+    btn.closest('tr').querySelectorAll('input').forEach(i => { i.value = ''; });
+  } else {
+    btn.closest('tr').remove();
+  }
+  recalc();
+}
+
+function readLineItems() {
+  const rows = Array.from(document.querySelectorAll('#liBody tr'));
+  return rows.map(tr => {
+    const item = {};
+    tr.querySelectorAll('.li-input').forEach(inp => {
+      const k = inp.dataset.k;
+      if (k === 'amount') {
+        const v = parseFloat(inp.value);
+        item.amount = isNaN(v) ? 0 : v;
+      } else {
+        item[k] = inp.value.trim();
+      }
+    });
+    return item;
+  });
+}
+// Only rows with a description OR a nonzero amount count as real line items.
+function realLineItems() {
+  return readLineItems().filter(li => (li.description && li.description.length) || (Number(li.amount) || 0) !== 0);
+}
+
+function recalc() {
+  const items = realLineItems();
+  const deposit = parseFloat(document.getElementById('q_deposit').value) || 0;
+  const t = computeTotals(items, deposit);
+  document.getElementById('s_subtotal').textContent = money(t.subtotal);
+  document.getElementById('s_admin').textContent = money(t.adminFee);
+  document.getElementById('s_total').textContent = money(t.total);
+  document.getElementById('s_balance').textContent = money(t.balance);
+  document.getElementById('s_balance_row').style.display = deposit > 0 ? 'flex' : 'none';
+}
+
+function openBuilder(id) {
+  document.getElementById('builderError').textContent = '';
+  const liBody = document.getElementById('liBody');
+  liBody.innerHTML = '';
+  const jobSel = document.getElementById('q_job');
+  jobSel.innerHTML = '<option value="">No linked job</option>' +
+    jobs.map(j => `<option value="${esc(j.id)}">${esc((j.title || 'Untitled') + (j.clientName ? ' - ' + j.clientName : ''))}</option>`).join('');
+
+  if (id) {
+    const q = quotes.find(x => x.id === id);
+    if (!q) return;
+    document.getElementById('builderTitle').textContent = 'Edit Quote ' + q.quoteNumber + ' of ' + q.quoteYear;
+    document.getElementById('q_id').value = q.id;
+    document.getElementById('q_client').value = q.clientName || '';
+    document.getElementById('q_date').value = q.quoteDate || '';
+    document.getElementById('q_address').value = q.clientAddress || '';
+    jobSel.value = q.jobId || '';
+    document.getElementById('q_deposit').value = q.deposit != null ? q.deposit : '';
+    const items = (q.lineItems && q.lineItems.length) ? q.lineItems : [{}];
+    items.forEach(li => addLineRow(li));
+  } else {
+    document.getElementById('builderTitle').textContent = 'New Quote';
+    document.getElementById('q_id').value = '';
+    document.getElementById('q_client').value = '';
+    document.getElementById('q_date').value = new Date().toISOString().slice(0, 10);
+    document.getElementById('q_address').value = '';
+    jobSel.value = '';
+    document.getElementById('q_deposit').value = '';
+    addLineRow();
+    addLineRow();
+  }
+  recalc();
+  document.getElementById('builderModal').classList.add('open');
+  document.getElementById('q_client').focus();
+}
+function closeBuilder() {
+  document.getElementById('builderModal').classList.remove('open');
+}
+document.getElementById('builderModal').addEventListener('click', function(e) {
+  if (e.target === this) closeBuilder();
+});
+document.getElementById('builderModal').addEventListener('input', recalc);
+
+document.getElementById('builderForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const errEl = document.getElementById('builderError');
+  errEl.textContent = '';
+  const client = document.getElementById('q_client').value.trim();
+  if (!client) { errEl.textContent = 'Client name is required.'; return; }
+  const items = realLineItems();
+  if (!items.length) { errEl.textContent = 'Add at least one line item with a description and amount.'; return; }
+  for (const li of items) {
+    if (!li.description) { errEl.textContent = 'Every line item needs a description.'; return; }
+    if (!(Number(li.amount) >= 0) || isNaN(Number(li.amount))) { errEl.textContent = 'Every line item needs a valid amount.'; return; }
+  }
+  const deposit = round2(parseFloat(document.getElementById('q_deposit').value) || 0);
+  const dateStr = document.getElementById('q_date').value || new Date().toISOString().slice(0, 10);
+  const totals = computeTotals(items, deposit);
+  const jobId = document.getElementById('q_job').value || null;
+  const address = document.getElementById('q_address').value.trim() || null;
+
+  const btn = document.getElementById('builderSaveBtn');
+  btn.disabled = true;
+  try {
+    const id = document.getElementById('q_id').value;
+    if (id) {
+      // Editing: recompute money fields, NEVER change the quote number/year.
+      await DataStore.updateQuote(id, {
+        clientName: client, clientAddress: address, jobId,
+        quoteDate: dateStr, lineItems: items, deposit,
+        subtotal: totals.subtotal, adminFee: totals.adminFee, total: totals.total,
+      });
+    } else {
+      const year = yearOf(dateStr);
+      const number = await DataStore.nextQuoteNumber(year);
+      await DataStore.addQuote({
+        quoteYear: year, quoteNumber: number,
+        clientName: client, clientAddress: address, jobId,
+        quoteDate: dateStr, lineItems: items, deposit,
+        subtotal: totals.subtotal, adminFee: totals.adminFee, total: totals.total,
+        status: 'draft',
+      });
+    }
+    closeBuilder();
+    await refresh();
+  } catch (err) {
+    errEl.textContent = 'Could not save the quote. ' + err.message;
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// ── Row actions ─────────────────────────────────────────────────────────────
+async function advanceStatus(id, status) {
+  const errEl = document.getElementById('pageError');
+  errEl.textContent = '';
+  try {
+    await DataStore.updateQuote(id, { status });
+    await refresh();
+  } catch (err) {
+    errEl.textContent = 'Could not update status. ' + err.message;
+  }
+}
+
+async function convertToInvoice(id) {
+  const errEl = document.getElementById('pageError');
+  errEl.style.color = '';
+  errEl.textContent = '';
+  const q = quotes.find(x => x.id === id);
+  if (!q) return;
+  if (q.status === 'invoiced') { errEl.textContent = 'This quote has already been converted to an invoice.'; return; }
+  const label = q.quoteNumber + ' of ' + q.quoteYear;
+  if (!confirm('Create an invoice from quote ' + label + ' for ' + money(q.total) + '?')) return;
+  try {
+    await DataStore.addInvoice({
+      clientName: q.clientName,
+      jobId: q.jobId || null,
+      jobTitle: 'Quote ' + q.quoteNumber + ' of ' + q.quoteYear,
+      amount: q.total,
+      status: 'draft',
+      issuedDate: new Date().toISOString().slice(0, 10),
+      notes: 'From quote ' + q.quoteNumber + ' of ' + q.quoteYear +
+        '. Includes 5 percent administration fee ' + money(q.adminFee) + '.',
+    });
+    await DataStore.updateQuote(id, { status: 'invoiced' });
+    await refresh();
+    errEl.style.color = 'var(--forest-mid)';
+    errEl.textContent = 'Created a draft invoice from quote ' + label + '. See it in Invoices.';
+    setTimeout(() => { errEl.style.color = ''; errEl.textContent = ''; }, 5000);
+  } catch (err) {
+    errEl.style.color = '';
+    errEl.textContent = 'Could not convert to an invoice. ' + err.message;
+  }
+}
+
+async function deleteQuote(id) {
+  const q = quotes.find(x => x.id === id);
+  const label = q ? (q.quoteNumber + ' of ' + q.quoteYear) : 'this quote';
+  if (!confirm('Delete quote ' + label + '? This cannot be undone.')) return;
+  const errEl = document.getElementById('pageError');
+  errEl.textContent = '';
+  try {
+    await DataStore.deleteQuote(id);
+    await refresh();
+  } catch (err) {
+    errEl.textContent = 'Could not delete the quote. ' + err.message;
+  }
+}
+
+document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeBuilder(); });
+
+(async function init() {
+  try {
+    await AuthManager.requireAuth();
+    Nav.render();
+    jobs = await DataStore.getJobs();
+    await refresh();
+  } catch (err) {
+    document.getElementById('quoteBody').innerHTML =
+      '<tr><td colspan="6" class="empty">Could not load quotes (' + esc(err.message) +
+      '). <a href="javascript:location.reload()">Retry</a></td></tr>';
+  }
+})();
+</script>
+</body>
+</html>

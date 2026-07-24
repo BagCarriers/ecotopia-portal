@@ -154,6 +154,50 @@ Management API; register it with `supabase migration repair --status applied 001
 before any `supabase db push`. Its wording is flagged for client review
 (`review: true` in `SERVICE_DETAILS`).
 
+## Quotes and administration fee
+
+Migration `0013_quotes.sql` adds `public.quotes` (applied live via the Management API,
+so register it with `supabase migration repair --status applied 0013` before any
+`supabase db push`). RLS is staff-only: a single `q_staff_all` policy for authenticated
+portal users; there is no anon policy, so the public site cannot read quotes.
+
+Staff build quotes on `quotes.html` (the "Quotes" nav link) and print a branded
+Open Sesame Designs LLC document via `quote-print.html?id=<uuid>`.
+
+The 5 percent administration fee is the core rule:
+
+- Every quote stores `subtotal` (sum of the line-item amounts),
+  `admin_fee = round(subtotal * 0.05, 2)`, and `total = subtotal + admin_fee`.
+- The fee percent lives in ONE place: the `ADMIN_FEE_RATE = 0.05` const in
+  `quotes.html`. Change it there and nowhere else.
+- Client-facing, the fee is a QUIET line ("Processing and administration") just above
+  the total on both the builder summary and the printed quote. It is deliberately NOT a
+  line item in the table.
+- Deposit is display/deduction only: it does not change the subtotal math. When a
+  deposit is present the printed quote shows `DEPOSIT RECEIVED` and a final
+  `BALANCE DUE = total - deposit`.
+
+Quote numbering: `quote_number` is per `quote_year` (shown as "N of YYYY", e.g. "3 of
+2026"). A new quote takes `nextQuoteNumber(year of quote_date)` = max existing number
+for that year + 1 (or 1 when the year is empty). Editing a quote recomputes
+subtotal/admin_fee/total but NEVER changes its number or year. Status flows
+`draft -> sent -> accepted -> invoiced`.
+
+YTD tally: the "Admin fees YTD" chip on `quotes.html` is
+`adminFeesTotal(currentYear)` = the sum of `admin_fee` for the current year across
+quotes in status `sent`, `accepted`, or `invoiced` (drafts are excluded, so unsent
+work-in-progress does not inflate the figure).
+
+Convert to invoice: creates a draft `invoices` row (`amount = total`,
+`jobTitle = "Quote N of YYYY"`, notes recording the included 5 percent fee) and flips
+the quote to `invoiced`. Already-invoiced quotes cannot be converted again (the action
+is hidden).
+
+Reconciliation: the administration fee is collected by BagCarriers (the agency).
+Monthly, BagCarriers invoices the client (Open Sesame Designs LLC / Ecotopian
+EarthCare) for the accumulated fees; the YTD figure on `quotes.html` is the running
+tally. The legal entity printed on quotes is Open Sesame Designs LLC.
+
 ## Deploy
 
 The site is a static bundle deployed to Netlify:
