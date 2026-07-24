@@ -290,14 +290,15 @@
       headline: 'Tree Nets',
       review: true,
       about: [
-        'Hand-woven tree nets, made to order by our team.',
-        'Woven structures in the same craft family as our living willow work, shaped to fit the trees you already have.',
-        'Not sure what a tree net could do for your space? Tell us what you have in mind and we will talk it through on a visit.',
+        'A tree net is a hand woven rope platform suspended between living trees: part hammock, part treehouse floor, part aerial gathering space. Lounge with a book, stargaze, nap in the canopy, or give the kids a place to climb and play above the forest floor.',
+        'Each net is woven on site to fit your trees, with a strong rope perimeter, a tighter inner weave for comfort, and tree friendly rigging that protects bark and leaves room for the trees to grow.',
+        'Our team weaves every net by hand, in the same craft family as our living willow fences, domes, and tunnels. No two nets are the same shape because no two groves are.',
       ],
       expect: [
         'An in-person site visit and a free estimate',
-        'A custom shape and size woven to fit your trees',
-        'Natural materials',
+        'A custom shape and size woven to fit your trees and how you want to use the net',
+        'Weather rated rope with tree friendly, bark protecting rigging',
+        'Care guidance for sun, seasons, and keeping your net safe for years',
       ],
     },
   };
