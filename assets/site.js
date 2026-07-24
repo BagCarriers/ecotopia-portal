@@ -699,7 +699,7 @@
       if (ins2.error) throw new Error(ins2.error.message);
       showSuccess('Thanks, we got it.', 'We will reach out within a few days.');
     } catch (err) {
-      errEl.textContent = 'Something went wrong sending your inquiry. Please try again, or call us directly.';
+      errEl.textContent = 'Something went wrong sending your inquiry. Please try again, or call us at 814-631-5338.';
     }
   }
 
@@ -719,7 +719,7 @@
       if (ins.error) throw new Error(ins.error.message);
       showSuccess('You are on the list.', 'We will reach out when ' + form.name + ' season opens.');
     } catch (err) {
-      errEl.textContent = 'Something went wrong. Please try again, or call us directly.';
+      errEl.textContent = 'Something went wrong. Please try again, or call us at 814-631-5338.';
     }
   }
 
