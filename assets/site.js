@@ -392,6 +392,9 @@
         return '<li><a href="' + l.href + '"' + cur + '>' + esc(l.label) + '</a></li>';
       }).join('');
       header.innerHTML =
+        '<a class="announce-bar" href="https://join.wildones.org/?chapter=2751" target="_blank" rel="noopener">' +
+          'Support our nonprofit: join Wild Ones PA Ridge and Valley <span class="announce-arrow" aria-hidden="true">&rarr;</span>' +
+        '</a>' +
         '<div class="nav-inner">' +
           '<a class="brand" href="index.html"><span class="leaf" aria-hidden="true">❀</span>Ecotopian EarthCare</a>' +
           '<button class="nav-toggle" id="navToggle" aria-label="Menu" aria-expanded="false" aria-controls="navLinks">' +

@@ -73,6 +73,19 @@ h1, h2, h3 { line-height: 1.15; margin: 0 0 0.5em; }
   border-radius: 3px;
 }
 
+/* ── WildOnes announcement bar (chapter membership funds the nonprofit) ── */
+.announce-bar {
+  display: block; text-align: center;
+  background: var(--amber); color: #fff;
+  font-family: var(--font-util); font-weight: 600; font-size: 0.92rem;
+  letter-spacing: 0.02em; padding: 8px 14px;
+  text-decoration: none;
+}
+.announce-bar:hover { background: var(--amber-dark); color: #fff; }
+.announce-bar .announce-arrow { display: inline-block; transition: transform 0.15s ease; }
+.announce-bar:hover .announce-arrow { transform: translateX(3px); }
+@media (prefers-reduced-motion: reduce) { .announce-bar .announce-arrow { transition: none; } }
+
 /* ── Header / nav ──────────────────────────────────────────────────────── */
 .site-header {
   position: sticky; top: 0; z-index: 1000;
@@ -374,6 +387,9 @@ details.past-events[open] > summary::before { transform: rotate(90deg); }
 .band h2 { font-family: var(--font-display); font-weight: 400; letter-spacing: 0.05em; color: #fff; font-size: clamp(1.9rem, 4.5vw, 2.9rem); position: relative; }
 .band p { color: rgba(255,255,255,0.92); font-size: 1.2rem; max-width: 56ch; margin: 0 auto; position: relative; }
 .band .cta-row { justify-content: center; position: relative; }
+.band-amber { background: var(--amber); }
+.band-amber .btn-onDark { color: var(--amber-dark); }
+.band-amber .btn-onDark:hover { background: var(--cream); color: var(--amber-dark); }
 
 /* ── Photos (public gallery) ───────────────────────────────────────────── */
 .photo-grid { columns: 4 240px; column-gap: 18px; margin-top: 36px; }
