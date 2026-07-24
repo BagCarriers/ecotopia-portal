@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Native Plants - Ecotopian EarthCare</title>
   <link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png">
-<meta name="description" content="Nursery-grown native perennial wildflowers and habitat kits for Central Pennsylvania. Browse 50 species and 9 habitat kits, then request the plants you want to reserve for pickup.">
+<meta name="description" content="Nursery-grown native perennial wildflowers and habitat kits for Central Pennsylvania. Browse 50 species and 11 habitat kits, then request the plants you want to reserve for pickup.">
 <meta property="og:site_name" content="Ecotopian EarthCare">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Native Plants - Ecotopian EarthCare">
-<meta property="og:description" content="Fifty native perennial wildflowers and nine habitat kits, nursery-grown for Central Pennsylvania. Reserve plants for pickup, nothing charged online.">
+<meta property="og:description" content="Fifty native perennial wildflowers and eleven habitat kits, nursery-grown for Central Pennsylvania. Reserve plants for pickup, nothing charged online.">
   <meta property="og:image" content="https://ecotopia.bagcarriers.dev/assets/img/og-pawpaw.jpg">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
@@ -42,6 +42,12 @@
   display: flex; flex-direction: column;
 }
 .section.cream .kit-card { background: #fff; }
+.kit-photo, .plant-photo {
+  width: calc(100% + 52px); margin: -26px -26px 18px;
+  border-radius: var(--radius) var(--radius) 0 0;
+  height: 190px; object-fit: cover;
+}
+.plant-photo { width: calc(100% + 40px); margin: -20px -20px 14px; height: 150px; }
 .kit-card h3 {
   font-family: var(--font-util); font-weight: 700; font-size: 1.32rem;
   color: var(--green-dark); margin: 0 0 10px;
@@ -310,11 +316,12 @@
 
   var PLANT_PRICE = 5; // dollars, per plant, at the spring sale
 
-  // ── The 9 habitat kits (page-specific data, kept out of site.js) ─────────
+  // ── The 11 habitat kits (page-specific data, kept out of site.js) ─────────
   // Each plant: { name, note } where note is a soil / optional qualifier.
   var KITS = [
     {
       id: 'hummingbird',
+      img: 'kit-hummingbird.jpg',
       name: 'Hummingbird Kit',
       blurb: 'Did you know 80% of a hummingbird’s diet is insects? Too much sugar water can be unhealthy for hummingbirds. Let’s provide them with their favorite native flowers that bloom April through September while they are here.',
       plants: [
@@ -329,6 +336,7 @@
     },
     {
       id: 'monarch',
+      img: 'kit-monarch.jpg',
       name: 'Monarch Butterfly Habitat Kit',
       blurb: 'Provides monarch butterflies with different species of their essential host plant, milkweed, while also providing their favorite native plants to obtain nectar from that aids their great migration to and from Mexico every year.',
       plants: [
@@ -343,6 +351,7 @@
     },
     {
       id: 'bee_pollen',
+      img: 'kit-bee-pollen.jpg',
       name: 'Bee Pollen Kit',
       blurb: 'A variety of wildflowers that produce a copious amount of pollen specifically to attract a wide variety of bees. Numbers of North American bumblebees have fallen nearly 50 percent since 1974, and 80% of our food requires pollinators.',
       plants: [
@@ -371,6 +380,7 @@
     },
     {
       id: 'rain_garden',
+      img: 'kit-rain-garden.jpg',
       name: 'Rain Garden Kit',
       blurb: 'Deep-rooted wetland native plants excel at reducing water runoff and filtering out pollutants.',
       plants: [
@@ -400,6 +410,7 @@
     },
     {
       id: 'bird_feeder',
+      img: 'kit-bird-feeder.jpg',
       name: 'Bird Feeder Kit',
       blurb: 'Provides seeds straight from the wildflowers themselves to feed the birds from summer through winter.',
       plants: [
@@ -438,6 +449,34 @@
         { name: 'Turtlehead', note: 'wet soil only' },
         { name: 'Magnolia or Persimmon', note: 'optional tree' }
       ]
+    },
+    {
+      id: 'essentials',
+      name: 'Essentials Kit',
+      blurb: 'Keeping it simple, this kit offers a balanced, diverse, colorful team of seven important species, with each species featuring at least once in all of the other kits. Blended together to fit any garden scenario with average soil and sun exposure.',
+      plants: [
+        { name: 'Bradbury’s Monarda' },
+        { name: 'Milkweed species', note: 'variety depending on soil type' },
+        { name: 'Early Sunflower' },
+        { name: 'Scarlet Beebalm' },
+        { name: 'Echinacea' },
+        { name: 'Blazing Star' },
+        { name: 'Aromatic Aster' }
+      ]
+    },
+    {
+      id: 'insectopia',
+      name: 'Insectopia Kit',
+      blurb: 'A variety of native wildflowers chosen specifically to attract beneficial insects like beetles, dragonflies, and predatory bees that help protect gardens from invasive bugs and help pollinate garden plants.',
+      plants: [
+        { name: 'Yarrow' },
+        { name: 'Milkweed species', note: 'variety depending on soil type' },
+        { name: 'Mountain Mint' },
+        { name: 'Wild Bergamot' },
+        { name: 'Rattlesnake Master' },
+        { name: 'Showy Goldenrod' },
+        { name: 'Wild Rose', note: 'optional shrub' }
+      ]
     }
   ];
   var KIT_BY_ID = {};
@@ -446,18 +485,18 @@
   // ── The 50 wildflower species (canonical index order 1-50) ───────────────
   // tags allowlist: spring, summer, fall, shade, medicinal, edible, bird.
   var PLANTS = [
-    { common: 'Wild Columbine', botanical: 'Aquilegia canadensis', bloom: 'April to July', height: '1 to 3 ft', attracts: 'Hummingbirds and native bees, deer resistant. Host plant for the Columbine Duskywing butterfly and the Pink-Tinted Beauty moth.', fact: 'An important flower for the hummingbirds when they arrive in spring. Keep this nectar source available and they may build a nest nearby. Instead of hummingbird feeders, plant their favorite flowers in abundance!', tags: ['spring', 'summer', 'bird'] },
-    { common: 'Woodland Phlox', botanical: 'Phlox divaricata', bloom: 'May', height: '1 ft', attracts: 'The Hummingbird Sphinx moth. Shade tolerant.', fact: '', tags: ['spring', 'shade'] },
+    { img: 'wild-columbine.jpg', common: 'Wild Columbine', botanical: 'Aquilegia canadensis', bloom: 'April to July', height: '1 to 3 ft', attracts: 'Hummingbirds and native bees, deer resistant. Host plant for the Columbine Duskywing butterfly and the Pink-Tinted Beauty moth.', fact: 'An important flower for the hummingbirds when they arrive in spring. Keep this nectar source available and they may build a nest nearby. Instead of hummingbird feeders, plant their favorite flowers in abundance!', tags: ['spring', 'summer', 'bird'] },
+    { img: 'woodland-phlox.jpg', common: 'Woodland Phlox', botanical: 'Phlox divaricata', bloom: 'May', height: '1 ft', attracts: 'The Hummingbird Sphinx moth. Shade tolerant.', fact: '', tags: ['spring', 'shade'] },
     { common: 'Foam Flower', botanical: 'Tiarella cordifolia', bloom: 'May to June', height: '6 to 12 in', attracts: 'Butterflies, bees, and hummingbirds. A shade lover and a beautiful ground cover.', fact: '', tags: ['spring', 'summer', 'shade', 'bird'] },
-    { common: 'Green & Gold', botanical: 'Chrysogonum virginianum', bloom: 'April to October', height: '6 to 12 in', attracts: 'Butterflies and bees. Thrives in part shade and makes a pretty ground cover.', fact: '', tags: ['spring', 'summer', 'fall', 'shade'] },
-    { common: 'Wild Strawberry', botanical: 'Fragaria virginiana', bloom: 'April to June', height: '4 in', attracts: 'Pollinators, and you: a sweet little snack.', fact: 'A sweet lil snack.', tags: ['spring', 'summer', 'edible'] },
+    { img: 'green-gold.jpg', common: 'Green & Gold', botanical: 'Chrysogonum virginianum', bloom: 'April to October', height: '6 to 12 in', attracts: 'Butterflies and bees. Thrives in part shade and makes a pretty ground cover.', fact: '', tags: ['spring', 'summer', 'fall', 'shade'] },
+    { img: 'wild-strawberry.jpg', common: 'Wild Strawberry', botanical: 'Fragaria virginiana', bloom: 'April to June', height: '4 in', attracts: 'Pollinators, and you: a sweet little snack.', fact: 'A sweet lil snack.', tags: ['spring', 'summer', 'edible'] },
     { common: 'Yarrow', botanical: 'Achillea millefolium', bloom: 'April to September', height: 'about 3 ft', attracts: 'A pollinator haven.', fact: 'A highly cherished medicinal plant. Yarrow is a wonderful wound healer, a go-to first aid herb, with many more health benefits.', tags: ['spring', 'summer', 'fall', 'medicinal'] },
     { common: 'Ohio Spiderwort', botanical: 'Tradescantia ohiensis', bloom: 'May to July', height: '1.5 to 2.5 ft', attracts: 'Butterflies and native bee species. A great border plant.', fact: 'Spiderwort’s leaves are edible and taste like kale!', tags: ['spring', 'summer', 'edible'] },
-    { common: 'Bradbury’s Monarda', botanical: 'Monarda bradburiana', bloom: 'May to June', height: '1 to 2 ft', attracts: 'Bumblebees, butterflies, and hummingbird moths. Deer resistant, a great border plant.', fact: 'Has a wonderful minty, oregano aroma. After it flowers it still looks beautiful through the rest of summer into fall.', tags: ['spring', 'summer'] },
-    { common: 'Sundial Lupine', botanical: 'Lupinus perennis', bloom: 'May to June', height: '12 to 24 in', attracts: 'Butterflies, native bees, hummingbirds, and beneficial insects.', fact: 'The host plant for the endangered Karner Blue butterfly, the only plant in the entire world that this butterfly needs to survive and thrive. Can also be used as a natural dye!', tags: ['spring', 'summer', 'bird'] },
-    { common: 'Wild Blue Indigo', botanical: 'Baptisia australis', bloom: 'May to July', height: '2 to 3 ft', attracts: 'Butterflies and queen bees.', fact: 'Fixes nitrogen into the soil.', tags: ['spring', 'summer'] },
-    { common: 'Foxglove Beardtongue', botanical: 'Penstemon digitalis', bloom: 'May to July', height: '3 ft', attracts: 'Hummingbirds, butterflies, and native bee species. White-pink flowers.', fact: '', tags: ['spring', 'summer', 'bird'] },
-    { common: 'Sand Coreopsis', botanical: 'Coreopsis lanceolata', bloom: 'May to August', height: '2 ft', attracts: 'Native bees and butterflies, plus goldfinches and other seed-eating bird species.', fact: '', tags: ['spring', 'summer', 'bird'] },
+    { img: 'bradburys-monarda.jpg', common: 'Bradbury’s Monarda', botanical: 'Monarda bradburiana', bloom: 'May to June', height: '1 to 2 ft', attracts: 'Bumblebees, butterflies, and hummingbird moths. Deer resistant, a great border plant.', fact: 'Has a wonderful minty, oregano aroma. After it flowers it still looks beautiful through the rest of summer into fall.', tags: ['spring', 'summer'] },
+    { img: 'sundial-lupine.jpg', common: 'Sundial Lupine', botanical: 'Lupinus perennis', bloom: 'May to June', height: '12 to 24 in', attracts: 'Butterflies, native bees, hummingbirds, and beneficial insects.', fact: 'The host plant for the endangered Karner Blue butterfly, the only plant in the entire world that this butterfly needs to survive and thrive. Can also be used as a natural dye!', tags: ['spring', 'summer', 'bird'] },
+    { img: 'wild-blue-indigo.jpg', common: 'Wild Blue Indigo', botanical: 'Baptisia australis', bloom: 'May to July', height: '2 to 3 ft', attracts: 'Butterflies and queen bees.', fact: 'Fixes nitrogen into the soil.', tags: ['spring', 'summer'] },
+    { img: 'foxglove-beardtongue.jpg', common: 'Foxglove Beardtongue', botanical: 'Penstemon digitalis', bloom: 'May to July', height: '3 ft', attracts: 'Hummingbirds, butterflies, and native bee species. White-pink flowers.', fact: '', tags: ['spring', 'summer', 'bird'] },
+    { img: 'sand-coreopsis.jpg', common: 'Sand Coreopsis', botanical: 'Coreopsis lanceolata', bloom: 'May to August', height: '2 ft', attracts: 'Native bees and butterflies, plus goldfinches and other seed-eating bird species.', fact: '', tags: ['spring', 'summer', 'bird'] },
     { common: 'Blue Flag Iris', botanical: 'Iris versicolor', bloom: 'May to July', height: '3 ft', attracts: 'Butterflies, bees, hummingbirds, and beneficial insects. Its seeds feed the birds.', fact: 'The yellow marking on the flower acts as a landing strip to help guide the native bees into the flower.', tags: ['spring', 'summer', 'bird'] },
     { common: 'Nodding Onion', botanical: 'Allium cernuum', bloom: 'June to August', height: '18 in', attracts: 'Pollinators. Deer resistant and a good border plant.', fact: 'Edible, and can be used like chives.', tags: ['summer', 'edible'] },
     { common: 'Scarlet Beebalm', botanical: 'Monarda didyma', bloom: 'June to July', height: '3 to 4 ft', attracts: 'A hummingbird favorite that attracts all the pollinators, and an important nutrient source for monarch butterflies.', fact: 'The petals and leaves are medicinal and can be made into a tea!', tags: ['summer', 'medicinal', 'bird'] },
@@ -534,6 +573,7 @@
         return '<li' + cls + '>' + esc(p.name) + note + '</li>';
       }).join('');
       return '<article class="kit-card reveal">' +
+        (k.img ? '<img class="kit-photo" src="assets/img/plants/' + esc(k.img) + '" alt="' + esc(k.name) + '" loading="lazy" width="640" height="480">' : '') +
         '<h3>' + esc(k.name) + '</h3>' +
         '<p class="kit-blurb">' + esc(k.blurb) + '</p>' +
         '<p class="kit-plants-h">Plants in each kit</p>' +
@@ -575,6 +615,7 @@
     var grid = document.getElementById('plantGrid');
     grid.innerHTML = PLANTS.map(function (p, i) {
       return '<article class="plant-card" data-idx="' + i + '">' +
+        (p.img ? '<img class="plant-photo" src="assets/img/plants/' + esc(p.img) + '" alt="' + esc(p.common) + '" loading="lazy" width="640" height="480">' : '') +
         '<h3>' + esc(p.common) + '</h3>' +
         '<p class="botanical"><em>' + esc(p.botanical) + '</em></p>' +
         '<div class="plant-meta">' +
