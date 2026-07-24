@@ -195,6 +195,7 @@
   const NAV = [
     { href: 'index.html', label: 'Home', key: 'home' },
     { href: 'services.html', label: 'Services', key: 'services' },
+    { href: 'plants.html', label: 'Native Plants', key: 'plants' },
     { href: 'happenings.html', label: 'Events', key: 'events' },
     { href: 'community-gardens.html', label: 'Community Gardens', key: 'gardens' },
     { href: 'photos.html', label: 'Photos', key: 'photos' },

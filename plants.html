@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Native Plants - Ecotopian EarthCare</title>
+<meta name="description" content="Nursery-grown native perennial wildflowers and habitat kits for Central Pennsylvania. Browse 50 species and 9 habitat kits, then request the plants you want to reserve for pickup.">
+<meta property="og:site_name" content="Ecotopian EarthCare">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Native Plants - Ecotopian EarthCare">
+<meta property="og:description" content="Fifty native perennial wildflowers and nine habitat kits, nursery-grown for Central Pennsylvania. Reserve plants for pickup, nothing charged online.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Flamenco:wght@300;400&family=Inter+Tight:wght@400;500;600;700&family=Megrim&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+<script src="assets/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/mapping.js"></script>
+<script src="assets/site.js"></script>
+<style>
+/* ── Native Plants page (marketing) ─────────────────────────────────────── */
+.plants-intro .lead { max-width: 60ch; }
+.plants-crosslink {
+  font-family: var(--font-util); font-size: 1.02rem; color: var(--ink-soft);
+  margin: 18px 0 0;
+}
+.plants-crosslink a { font-weight: 600; }
+
+/* Habitat kit cards */
+.kit-grid {
+  display: grid; gap: 24px; margin-top: 40px;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+}
+.kit-card {
+  background: #fff; border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 26px 26px 28px; box-shadow: var(--shadow);
+  display: flex; flex-direction: column;
+}
+.section.cream .kit-card { background: #fff; }
+.kit-card h3 {
+  font-family: var(--font-util); font-weight: 700; font-size: 1.32rem;
+  color: var(--green-dark); margin: 0 0 10px;
+}
+.kit-card .kit-blurb { margin: 0 0 16px; font-size: 1.04rem; line-height: 1.55; color: var(--ink-soft); }
+.kit-plants-h {
+  font-family: var(--font-util); font-weight: 700; font-size: 0.78rem;
+  text-transform: uppercase; letter-spacing: 0.1em; color: var(--green-dark);
+  margin: 4px 0 8px;
+}
+.kit-plants { list-style: none; margin: 0 0 16px; padding: 0; }
+.kit-plants li {
+  font-family: var(--font-util); font-size: 0.98rem; color: var(--ink);
+  padding: 3px 0 3px 18px; position: relative; line-height: 1.4;
+}
+.kit-plants li::before {
+  content: '❀'; position: absolute; left: 0; top: 3px;
+  color: var(--amber); font-size: 0.72rem;
+}
+.kit-plants li .soil { color: var(--ink-soft); font-size: 0.86rem; }
+.kit-plants li.kit-optional::before { content: '+'; color: var(--green); font-weight: 700; }
+.kit-plants li.kit-optional { color: var(--ink-soft); }
+.kit-price-table {
+  width: 100%; border-collapse: collapse; margin: 0 0 18px;
+  font-family: var(--font-util); font-size: 0.94rem;
+}
+.kit-price-table th, .kit-price-table td {
+  text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--line);
+}
+.kit-price-table th {
+  font-weight: 700; font-size: 0.72rem; text-transform: uppercase;
+  letter-spacing: 0.06em; color: var(--ink-soft);
+}
+.kit-price-table td.price { font-weight: 700; color: var(--amber-dark); text-align: right; }
+.kit-price-table td.plugs { color: var(--ink-soft); text-align: right; }
+.kit-larger {
+  font-family: var(--font-util); font-size: 0.9rem; color: var(--ink-soft);
+  margin: 0 0 18px; line-height: 1.5;
+}
+.kit-card .kit-req {
+  margin-top: auto; width: 100%; padding: 12px; border: 0; border-radius: 999px;
+  background: var(--green); color: #fff; font-family: var(--font-util);
+  font-weight: 600; font-size: 1rem; cursor: pointer; transition: background 0.16s ease;
+}
+.kit-card .kit-req:hover { background: var(--green-dark); }
+
+/* Wildflower filter chips */
+.filter-bar {
+  display: flex; flex-wrap: wrap; gap: 10px; margin: 34px 0 8px;
+}
+.filter-chip {
+  font-family: var(--font-util); font-weight: 600; font-size: 0.9rem;
+  color: var(--green-dark); background: #fff; border: 1.5px solid var(--line);
+  padding: 8px 16px; border-radius: 999px; cursor: pointer;
+  transition: background 0.14s ease, color 0.14s ease, border-color 0.14s ease;
+}
+.section.cream .filter-chip { background: #fff; }
+.filter-chip:hover { border-color: var(--green); }
+.filter-chip[aria-pressed="true"] {
+  background: var(--green); color: #fff; border-color: var(--green);
+}
+.filter-count {
+  font-family: var(--font-util); font-size: 0.92rem; color: var(--ink-soft);
+  margin: 4px 0 0;
+}
+
+/* Wildflower cards */
+.plant-grid {
+  display: grid; gap: 18px; margin-top: 22px;
+  grid-template-columns: repeat(auto-fill, minmax(268px, 1fr));
+}
+.plant-card {
+  background: #fff; border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 20px 20px 18px; box-shadow: var(--shadow);
+  display: flex; flex-direction: column;
+}
+.section.cream .plant-card { background: #fff; }
+.plant-card.hidden { display: none; }
+.plant-card h3 {
+  font-family: var(--font-util); font-weight: 700; font-size: 1.14rem;
+  color: var(--green-dark); margin: 0 0 2px;
+}
+.plant-card .botanical {
+  font-family: var(--font-body); font-style: italic; font-size: 1rem;
+  color: var(--ink-soft); margin: 0 0 10px;
+}
+.plant-meta {
+  font-family: var(--font-util); font-size: 0.9rem; color: var(--ink-soft);
+  margin: 0 0 8px; display: flex; flex-direction: column; gap: 3px;
+}
+.plant-meta .m { display: flex; gap: 6px; }
+.plant-meta .m b { color: var(--green-dark); font-weight: 600; min-width: 62px; }
+.plant-attracts { font-size: 0.98rem; color: var(--ink); margin: 0 0 8px; line-height: 1.45; }
+.plant-fact {
+  font-size: 0.92rem; color: var(--ink-soft); line-height: 1.5; margin: 0 0 14px;
+  padding: 10px 12px; background: var(--cream-soft); border-radius: 10px;
+}
+.plant-price {
+  font-family: var(--font-util); font-weight: 700; font-size: 0.94rem;
+  color: var(--amber-dark); margin: 0 0 12px;
+}
+.plant-card .plant-add {
+  margin-top: auto; width: 100%; padding: 10px; border-radius: 999px;
+  border: 1.5px solid var(--green); background: #fff; color: var(--green-dark);
+  font-family: var(--font-util); font-weight: 600; font-size: 0.96rem;
+  cursor: pointer; transition: background 0.14s ease, color 0.14s ease;
+}
+.plant-card .plant-add:hover { background: var(--cream); }
+.plant-card .plant-add.added { background: var(--green); color: #fff; border-color: var(--green); }
+
+/* Floating request tray button */
+.tray-fab {
+  position: fixed; right: 22px; bottom: 22px; z-index: 3400;
+  display: inline-flex; align-items: center; gap: 10px;
+  background: var(--green); color: #fff; border: 0; cursor: pointer;
+  font-family: var(--font-util); font-weight: 600; font-size: 1rem;
+  padding: 14px 22px; border-radius: 999px;
+  box-shadow: 0 12px 30px -12px rgba(20,40,20,0.7);
+  transition: background 0.16s ease, transform 0.16s ease;
+}
+.tray-fab:hover { background: var(--green-dark); }
+.tray-fab .tray-count {
+  background: var(--amber); color: #fff; border-radius: 999px;
+  min-width: 24px; height: 24px; padding: 0 7px; font-size: 0.86rem;
+  display: inline-flex; align-items: center; justify-content: center; font-weight: 700;
+}
+
+/* Tray modal item rows (reuses .eco-lead-* modal chrome) */
+.tray-items { list-style: none; margin: 4px 0 8px; padding: 0; }
+.tray-item {
+  display: grid; grid-template-columns: 1fr auto auto; gap: 12px;
+  align-items: center; padding: 12px 0; border-bottom: 1px solid var(--line);
+}
+.tray-item .ti-name { font-family: var(--font-util); }
+.tray-item .ti-name b { display: block; color: var(--green-dark); font-weight: 600; }
+.tray-item .ti-name span { font-size: 0.86rem; color: var(--ink-soft); }
+.tray-step { display: inline-flex; align-items: center; gap: 6px; }
+.tray-step button {
+  width: 30px; height: 30px; border-radius: 8px; border: 1.5px solid var(--line);
+  background: #fff; color: var(--green-dark); font-size: 1.1rem; line-height: 1;
+  cursor: pointer; font-family: var(--font-util);
+}
+.tray-step button:hover { border-color: var(--green); }
+.tray-step .ti-qty {
+  font-family: var(--font-util); font-weight: 700; min-width: 22px; text-align: center;
+}
+.tray-item .ti-remove {
+  background: transparent; border: 0; cursor: pointer; color: var(--ink-soft);
+  font-size: 1.3rem; line-height: 1; padding: 4px 6px; border-radius: 6px;
+}
+.tray-item .ti-remove:hover { color: #b3261e; background: var(--cream); }
+.tray-total {
+  font-family: var(--font-util); font-weight: 700; font-size: 1.1rem;
+  color: var(--green-dark); margin: 14px 0 4px; text-align: right;
+}
+.tray-note {
+  font-family: var(--font-util); font-size: 0.9rem; color: var(--ink-soft);
+  margin: 0 0 6px; line-height: 1.5;
+}
+.tray-empty {
+  font-family: var(--font-util); color: var(--ink-soft); font-size: 1rem;
+  padding: 20px 0; text-align: center;
+}
+.eco-lead-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+@media (prefers-reduced-motion: reduce) {
+  .filter-chip, .plant-add, .kit-req, .tray-fab { transition: none !important; }
+}
+@media (max-width: 520px) {
+  .tray-fab { right: 14px; bottom: 14px; padding: 12px 18px; }
+}
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header" id="siteHeader"></header>
+
+<main id="main">
+  <section class="section cream plants-intro">
+    <div class="wrap">
+      <p class="eyebrow">Native plant nursery</p>
+      <h1>Native Plants and Habitat Kits</h1>
+      <p class="lead">Nursery-grown native perennials for Central Pennsylvania, chosen for the pollinators, birds, and people who share this land. Reserve the plants you want here; we confirm availability and arrange pickup or delivery. Nothing is charged online.</p>
+      <p class="plants-crosslink">Prefer we plant it for you? <a href="services.html">See our services.</a></p>
+    </div>
+  </section>
+  <div class="willow on-cream" data-opacity="0.4"></div>
+
+  <section class="section" aria-labelledby="kits-h">
+    <div class="wrap">
+      <p class="eyebrow">Ready-made</p>
+      <h2 id="kits-h">Habitat kits</h2>
+      <p class="lead">Each kit is assembled with potted native perennial flowers that bloom spring through autumn, plus a design for the best planting arrangement. Universal pricing applies to every kit below.</p>
+      <div class="kit-grid" id="kitGrid"></div>
+    </div>
+  </section>
+  <div class="willow on-white" data-opacity="0.4"></div>
+
+  <section class="section cream" aria-labelledby="species-h">
+    <div class="wrap">
+      <p class="eyebrow">Browse the nursery</p>
+      <h2 id="species-h">Wildflower species</h2>
+      <p class="lead">Fifty native perennial wildflowers, each $5 at our plant sale. Build a request below and we will confirm what is ready to reserve.</p>
+      <div class="filter-bar" id="filterBar" role="group" aria-label="Filter wildflowers"></div>
+      <p class="filter-count" id="filterCount" aria-live="polite"></p>
+      <div class="plant-grid" id="plantGrid"></div>
+    </div>
+  </section>
+</main>
+
+<button type="button" class="tray-fab" id="trayFab" aria-haspopup="dialog">
+  Plant request <span class="tray-count" id="trayCount">0</span>
+</button>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div>
+      <p class="fbrand">Ecotopian EarthCare</p>
+      <p>Ecological landscaping, community gardens, and native plants in Central Pennsylvania.</p>
+      <p>Serving the Altoona area &amp; Blair County. Find us at the Reciprocity Community Food Forest, 211 Browning Ave, Altoona, PA 16602.</p>
+    </div>
+    <div>
+      <h4>Explore</h4>
+      <ul>
+        <li><a href="services.html">Services</a></li>
+        <li><a href="plants.html">Native Plants</a></li>
+        <li><a href="happenings.html">Events</a></li>
+        <li><a href="community-gardens.html">Community Gardens</a></li>
+        <li><a href="photos.html">Photos</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Get involved</h4>
+      <ul>
+        <li><a href="intake.html">Client Request Form</a></li>
+        <li><a href="volunteer-board.html">Volunteer board</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>© 2026 Ecotopian EarthCare</span>
+    <a class="staff" href="login.html">Staff sign in</a>
+  </div>
+</footer>
+
+<script>
+/* ==========================================================================
+   Native Plants page runtime. Page-specific data + request-to-reserve flows.
+   Loads AFTER site.js (uses EcoSite.esc / renderNav / decorate / ecoSupabase).
+   Model: anon, fire-and-forget inserts to intake_submissions + jobs (inquiry),
+   mirroring the service lead-gen flow in site.js. No online payment.
+   ========================================================================== */
+(function () {
+  'use strict';
+  var esc = EcoSite.esc;
+  var sb = function () { return window.ecoSupabase; };
+
+  // Universal habitat-kit pricing. plugs = flower plugs included.
+  var KIT_TIERS = [
+    { key: '50',  sqft: '50 sq ft',  plugs: 18, price: 72,  label: '50 sq ft kit - 18 plugs - $72' },
+    { key: '100', sqft: '100 sq ft', plugs: 36, price: 144, label: '100 sq ft kit - 36 plugs - $144' },
+    { key: '150', sqft: '150 sq ft', plugs: 54, price: 200, label: '150 sq ft kit - 54 plugs - $200' },
+    { key: '200', sqft: '200 sq ft', plugs: 72, price: 250, label: '200 sq ft kit - 72 plugs - $250' }
+  ];
+  var TIER_BY_KEY = {};
+  KIT_TIERS.forEach(function (t) { TIER_BY_KEY[t.key] = t; });
+
+  var PLANT_PRICE = 5; // dollars, per plant, at the spring sale
+
+  // ── The 9 habitat kits (page-specific data, kept out of site.js) ─────────
+  // Each plant: { name, note } where note is a soil / optional qualifier.
+  var KITS = [
+    {
+      id: 'hummingbird',
+      name: 'Hummingbird Kit',
+      blurb: 'Did you know 80% of a hummingbird’s diet is insects? Too much sugar water can be unhealthy for hummingbirds. Let’s provide them with their favorite native flowers that bloom April through September while they are here.',
+      plants: [
+        { name: 'Wild Red Columbine' },
+        { name: 'Bradbury’s Monarda' },
+        { name: 'Foxglove Beardtongue' },
+        { name: 'Scarlet Beebalm' },
+        { name: 'Cardinal Flower' },
+        { name: 'Cup Plant' },
+        { name: 'Trumpet Vine or Tulip Poplar', note: 'optional vine or tree' }
+      ]
+    },
+    {
+      id: 'monarch',
+      name: 'Monarch Butterfly Habitat Kit',
+      blurb: 'Provides monarch butterflies with different species of their essential host plant, milkweed, while also providing their favorite native plants to obtain nectar from that aids their great migration to and from Mexico every year.',
+      plants: [
+        { name: 'Common Milkweed' },
+        { name: 'Butterfly Milkweed', note: 'dry to medium soil only' },
+        { name: 'Swamp Rose Milkweed', note: 'wet to medium soil only' },
+        { name: 'Meadow Blazing Star' },
+        { name: 'Blue Mist Flower', note: 'wet to medium soil only' },
+        { name: 'Aromatic Aster', note: 'dry to medium soil only' },
+        { name: 'Summersweet', note: 'optional shrub' }
+      ]
+    },
+    {
+      id: 'bee_pollen',
+      name: 'Bee Pollen Kit',
+      blurb: 'A variety of wildflowers that produce a copious amount of pollen specifically to attract a wide variety of bees. Numbers of North American bumblebees have fallen nearly 50 percent since 1974, and 80% of our food requires pollinators.',
+      plants: [
+        { name: 'Wild Indigo' },
+        { name: 'Anise Hyssop' },
+        { name: 'Mountain Mint' },
+        { name: 'Wild Bergamot' },
+        { name: 'Great Blue Lobelia' },
+        { name: 'Turtlehead (wet soil) or Aromatic Aster (dry soil)', note: 'soil dependent' },
+        { name: 'American Plum', note: 'optional small tree' }
+      ]
+    },
+    {
+      id: 'shade_soft_landing',
+      name: 'Shade Garden Soft Landing Kit',
+      blurb: 'We can enhance declining woodland plant diversity and provide soft landing habitat under trees for insects like lightning bugs, beetles, and caterpillars.',
+      plants: [
+        { name: 'Wild Columbine' },
+        { name: 'Golden Ragwort or Green & Gold' },
+        { name: 'Jacob’s Ladder' },
+        { name: 'Maidenhair Fern or Pennsylvania Sedge' },
+        { name: 'Wild Geranium' },
+        { name: 'Foam Flower' },
+        { name: 'Native Azalea', note: 'optional shrub' }
+      ]
+    },
+    {
+      id: 'rain_garden',
+      name: 'Rain Garden Kit',
+      blurb: 'Deep-rooted wetland native plants excel at reducing water runoff and filtering out pollutants.',
+      plants: [
+        { name: 'Blue Flag Iris' },
+        { name: 'Swamp Rose Milkweed' },
+        { name: 'Great Blue Lobelia and/or Cardinal Flower' },
+        { name: 'Joe Pye Weed' },
+        { name: 'Swamp Rose Hibiscus' },
+        { name: 'New England Aster' },
+        { name: 'Buttonbush', note: 'optional shrub' }
+      ]
+    },
+    {
+      id: 'medicine_garden',
+      name: 'Medicine Garden Kit',
+      blurb: 'Perennial native plant herbs that double as a benefit to the ecosystem while offering medicinal roots, flowers, or leaves that can be made into teas, tinctures, salves, and more.',
+      plants: [
+        { name: 'Scarlet Beebalm' },
+        { name: 'New Jersey Tea', note: 'dry to medium soil only' },
+        { name: 'Echinacea' },
+        { name: 'Blue Vervain', note: 'wet to medium soil only' },
+        { name: 'Sweet Grass', note: 'wet to medium soil only' },
+        { name: 'Blue Sage', note: 'dry to medium soil only' },
+        { name: 'Skullcap' },
+        { name: 'Passion Flower Vine, Elderberry, or Wild Rose', note: 'optional' }
+      ]
+    },
+    {
+      id: 'bird_feeder',
+      name: 'Bird Feeder Kit',
+      blurb: 'Provides seeds straight from the wildflowers themselves to feed the birds from summer through winter.',
+      plants: [
+        { name: 'Purple Giant Hyssop' },
+        { name: 'Early Sunflower' },
+        { name: 'Echinacea' },
+        { name: 'Meadow Blazing Star' },
+        { name: 'Cup Plant or Sawtooth Sunflower' },
+        { name: 'Aster', note: 'species dependent on soil type' },
+        { name: 'Native Dogwood species', note: 'optional shrub' }
+      ]
+    },
+    {
+      id: 'roadside',
+      name: 'Roadside Flower Kit',
+      blurb: 'A variety of wildflowers chosen for their ability to survive and thrive near roadside salt, pollution, and dry rocky soil. This kit’s flowers are short to fit in with city ordinances and are perfect for boulevard strips.',
+      plants: [
+        { name: 'Bradbury’s Monarda' },
+        { name: 'Coreopsis' },
+        { name: 'Butterfly Milkweed or Sundial Lupine' },
+        { name: 'Pink Muhly Grass or Yarrow' },
+        { name: 'Spotted Beebalm' },
+        { name: 'Aromatic Aster' }
+      ]
+    },
+    {
+      id: 'moon_garden',
+      name: 'Moon Garden Kit',
+      blurb: 'A variety of flowers that bloom white or a pastel color that glows in the moonlight to attract lunar moths and other night pollinators.',
+      plants: [
+        { name: 'Foam Flower' },
+        { name: 'Woodland Phlox' },
+        { name: 'Culver’s Root' },
+        { name: 'Black Cohosh' },
+        { name: 'Obedient Plant' },
+        { name: 'Turtlehead', note: 'wet soil only' },
+        { name: 'Magnolia or Persimmon', note: 'optional tree' }
+      ]
+    }
+  ];
+  var KIT_BY_ID = {};
+  KITS.forEach(function (k) { KIT_BY_ID[k.id] = k; });
+
+  // ── The 50 wildflower species (canonical index order 1-50) ───────────────
+  // tags allowlist: spring, summer, fall, shade, medicinal, edible, bird.
+  var PLANTS = [
+    { common: 'Wild Columbine', botanical: 'Aquilegia canadensis', bloom: 'April to July', height: '1 to 3 ft', attracts: 'Hummingbirds and native bees, deer resistant. Host plant for the Columbine Duskywing butterfly and the Pink-Tinted Beauty moth.', fact: 'An important flower for the hummingbirds when they arrive in spring. Keep this nectar source available and they may build a nest nearby. Instead of hummingbird feeders, plant their favorite flowers in abundance!', tags: ['spring', 'summer', 'bird'] },
+    { common: 'Woodland Phlox', botanical: 'Phlox divaricata', bloom: 'May', height: '1 ft', attracts: 'The Hummingbird Sphinx moth. Shade tolerant.', fact: '', tags: ['spring', 'shade'] },
+    { common: 'Foam Flower', botanical: 'Tiarella cordifolia', bloom: 'May to June', height: '6 to 12 in', attracts: 'Butterflies, bees, and hummingbirds. A shade lover and a beautiful ground cover.', fact: '', tags: ['spring', 'summer', 'shade', 'bird'] },
+    { common: 'Green & Gold', botanical: 'Chrysogonum virginianum', bloom: 'April to October', height: '6 to 12 in', attracts: 'Butterflies and bees. Thrives in part shade and makes a pretty ground cover.', fact: '', tags: ['spring', 'summer', 'fall', 'shade'] },
+    { common: 'Wild Strawberry', botanical: 'Fragaria virginiana', bloom: 'April to June', height: '4 in', attracts: 'Pollinators, and you: a sweet little snack.', fact: 'A sweet lil snack.', tags: ['spring', 'summer', 'edible'] },
+    { common: 'Yarrow', botanical: 'Achillea millefolium', bloom: 'April to September', height: 'about 3 ft', attracts: 'A pollinator haven.', fact: 'A highly cherished medicinal plant. Yarrow is a wonderful wound healer, a go-to first aid herb, with many more health benefits.', tags: ['spring', 'summer', 'fall', 'medicinal'] },
+    { common: 'Ohio Spiderwort', botanical: 'Tradescantia ohiensis', bloom: 'May to July', height: '1.5 to 2.5 ft', attracts: 'Butterflies and native bee species. A great border plant.', fact: 'Spiderwort’s leaves are edible and taste like kale!', tags: ['spring', 'summer', 'edible'] },
+    { common: 'Bradbury’s Monarda', botanical: 'Monarda bradburiana', bloom: 'May to June', height: '1 to 2 ft', attracts: 'Bumblebees, butterflies, and hummingbird moths. Deer resistant, a great border plant.', fact: 'Has a wonderful minty, oregano aroma. After it flowers it still looks beautiful through the rest of summer into fall.', tags: ['spring', 'summer'] },
+    { common: 'Sundial Lupine', botanical: 'Lupinus perennis', bloom: 'May to June', height: '12 to 24 in', attracts: 'Butterflies, native bees, hummingbirds, and beneficial insects.', fact: 'The host plant for the endangered Karner Blue butterfly, the only plant in the entire world that this butterfly needs to survive and thrive. Can also be used as a natural dye!', tags: ['spring', 'summer', 'bird'] },
+    { common: 'Wild Blue Indigo', botanical: 'Baptisia australis', bloom: 'May to July', height: '2 to 3 ft', attracts: 'Butterflies and queen bees.', fact: 'Fixes nitrogen into the soil.', tags: ['spring', 'summer'] },
+    { common: 'Foxglove Beardtongue', botanical: 'Penstemon digitalis', bloom: 'May to July', height: '3 ft', attracts: 'Hummingbirds, butterflies, and native bee species. White-pink flowers.', fact: '', tags: ['spring', 'summer', 'bird'] },
+    { common: 'Sand Coreopsis', botanical: 'Coreopsis lanceolata', bloom: 'May to August', height: '2 ft', attracts: 'Native bees and butterflies, plus goldfinches and other seed-eating bird species.', fact: '', tags: ['spring', 'summer', 'bird'] },
+    { common: 'Blue Flag Iris', botanical: 'Iris versicolor', bloom: 'May to July', height: '3 ft', attracts: 'Butterflies, bees, hummingbirds, and beneficial insects. Its seeds feed the birds.', fact: 'The yellow marking on the flower acts as a landing strip to help guide the native bees into the flower.', tags: ['spring', 'summer', 'bird'] },
+    { common: 'Nodding Onion', botanical: 'Allium cernuum', bloom: 'June to August', height: '18 in', attracts: 'Pollinators. Deer resistant and a good border plant.', fact: 'Edible, and can be used like chives.', tags: ['summer', 'edible'] },
+    { common: 'Scarlet Beebalm', botanical: 'Monarda didyma', bloom: 'June to July', height: '3 to 4 ft', attracts: 'A hummingbird favorite that attracts all the pollinators, and an important nutrient source for monarch butterflies.', fact: 'The petals and leaves are medicinal and can be made into a tea!', tags: ['summer', 'medicinal', 'bird'] },
+    { common: 'Passion Flower', botanical: 'Passiflora incarnata', bloom: 'June to August', height: 'vining', attracts: 'Pollinators. The most exotic flower on the east coast, with deliciously sweet and sour fruit.', fact: 'Tropical fruit of the East! The flower is medicinal, used as a highly effective relaxant that is helpful for a restful night’s sleep.', tags: ['summer', 'medicinal', 'edible'] },
+    { common: 'Common Milkweed', botanical: 'Asclepias syriaca', bloom: 'June to August', height: '1 to 4 ft', attracts: 'Many pollinators, and highly beneficial for the monarch butterfly as its host plant.', fact: '', tags: ['summer'] },
+    { common: 'Woodland Sunflower', botanical: 'Heliopsis helianthoides', bloom: 'June to September', height: '2 to 4 ft', attracts: 'Butterflies and bees, deer resistant. A nutrient-dense food source for the birds.', fact: 'Native sunflowers host the most types of caterpillars of all wildflower species!', tags: ['summer', 'fall', 'bird'] },
+    { common: 'Wild Bergamot', botanical: 'Monarda fistulosa', bloom: 'July to August', height: '3.5 ft', attracts: 'The Hummingbird Sphinx moth, hummingbirds, and butterflies. Attracts more bees than any other flower.', fact: 'A mint-family flower with medicinal and culinary uses.', tags: ['summer', 'medicinal', 'edible', 'bird'] },
+    { common: 'Purple Poppy Mallow', botanical: 'Callirhoe involucrata', bloom: 'May to September', height: '8 to 12 in', attracts: 'Butterflies and other beneficial insects.', fact: '', tags: ['spring', 'summer', 'fall'] },
+    { common: 'Culver’s Root', botanical: 'Veronicastrum virginicum', bloom: 'July to September', height: '2.5 to 4 ft', attracts: 'Many native species of bees, butterflies, and moths, bringing in a wide variety of pollinators.', fact: 'Brings in pollinators you have probably never seen before!', tags: ['summer', 'fall'] },
+    { common: 'Spotted Beebalm', botanical: 'Monarda punctata', bloom: 'June to September', height: '6 in to 3 ft', attracts: 'Butterflies. A mint-family flower also known as Horsemint.', fact: 'A medicinal flower well known for carvacrol and thymol, two powerful antiviral, antimicrobial, antifungal, anti-inflammatory, antioxidant-rich compounds (also found in oregano oil). Traditionally, fresh leaves were crushed and steeped in cold water to ease back pain, fever, inflammation, and chills.', tags: ['summer', 'fall', 'medicinal'] },
+    { common: 'New Jersey Tea', botanical: 'Ceanothus americanus', bloom: 'June to July', height: '3 to 4 ft', attracts: 'Hummingbirds. A low, dense, mounding flowering shrub whose little white flowers draw tiny insects that nourish hummingbirds, along with sweet nectar.', fact: 'Traditionally the roots were made into a tea, aka redroot tea, to help with upper respiratory issues like sore throats, coughs, asthma, and bronchitis.', tags: ['summer', 'medicinal', 'bird'] },
+    { common: 'Butterfly Milkweed', botanical: 'Asclepias tuberosa', bloom: 'June to July', height: '1 to 2 ft', attracts: 'Monarchs, swallowtails, grey hairstreaks, and queen butterflies, plus long-tongued bees and hummingbirds!', fact: '', tags: ['summer', 'bird'] },
+    { common: 'Anise Hyssop', botanical: 'Agastache foeniculum', bloom: 'July to August', height: '2 to 4 ft', attracts: 'Bees, butterflies, and hummingbirds. A mint-family flower.', fact: 'Smells amazing!', tags: ['summer', 'bird'] },
+    { common: 'Mountain Mint', botanical: 'Pycnanthemum virginicum & muticum', bloom: 'June to September', height: '2 to 4 ft', attracts: 'Butterflies and bees, deer resistant. A nutrient-dense food source for the birds.', fact: '', tags: ['summer', 'fall', 'bird'] },
+    { common: 'Echinacea', botanical: 'Echinacea purpurea', bloom: 'July to September', height: '3 to 4 ft', attracts: 'A hummingbird magnet that attracts many butterflies and pollinators.', fact: 'The roots are medicinal. Benefits include immune boosting, cold and flu remedy, anti-viral, anti-bacterial, and upper respiratory support.', tags: ['summer', 'fall', 'medicinal', 'bird'] },
+    { common: 'Swamp Rose Milkweed', botanical: 'Asclepias incarnata', bloom: 'June to October', height: '3 to 4 ft', attracts: 'Pollinators. A host plant for the monarch.', fact: '', tags: ['summer', 'fall'] },
+    { common: 'Meadow Blazing Star', botanical: 'Liatris ligulistylis', bloom: 'July to September', height: '3 to 5 ft', attracts: 'A monarch magnet, it is the monarch’s favorite flower for nectar, and also draws other butterflies, bees, hummingbirds, and caterpillars.', fact: 'The monarch’s favorite flower for nectar!', tags: ['summer', 'fall', 'bird'] },
+    { common: 'Dense Blazing Star', botanical: 'Liatris spicata', bloom: 'July to September', height: '3 to 6 ft', attracts: 'Butterflies and hummingbirds. Keeps away unwanted pests and attracts beneficial insects.', fact: 'The roots are edible and medicinal. Where Meadow Blazing Star is the monarch’s favorite, this one is the one with edible and medicinal roots.', tags: ['summer', 'fall', 'edible', 'medicinal', 'bird'] },
+    { common: 'Rattlesnake Master', botanical: 'Eryngium yuccifolium', bloom: 'June to August', height: '2 to 3.5 ft', attracts: 'A large variety of pollinators, from butterflies and moths to bees and hummingbirds. Will attract pollinators you have never seen before!', fact: 'Traditionally the roots were made into an antidote for rattlesnake venom, the leaves were used as weaving material, and the flower stalks were dried and made into a ceremonial rattle.', tags: ['summer', 'medicinal', 'bird'] },
+    { common: 'Cup Plant', botanical: 'Silphium perfoliatum', bloom: 'July to September', height: '4.5 to 8.5 ft', attracts: 'A wide variety of pollinators.', fact: 'The leaves come together to form a cup that retains water after it rains or from heavy morning dew.', tags: ['summer', 'fall'] },
+    { common: 'Cardinal Flower', botanical: 'Lobelia cardinalis', bloom: 'late July to frost', height: '4 to 5 ft', attracts: 'A hummingbird favorite that attracts many species of butterflies.', fact: 'A water-loving plant that loves to be near a stream or pond.', tags: ['summer', 'fall', 'bird'] },
+    { common: 'Blue Vervain', botanical: 'Verbena hastata', bloom: 'July to September', height: '2 to 6 ft', attracts: 'Many pollinators. A wetlands lover.', fact: 'Our favorite medicinal flower. Blue Vervain relaxes and nourishes the nervous system, calming and uplifting. In ancient times the plant was thought to be a cure-all, and the genus name is Latin for sacred plant.', tags: ['summer', 'fall', 'medicinal'] },
+    { common: 'Skullcap', botanical: 'Scutellaria lateriflora', bloom: 'June to September', height: '1 to 3 ft', attracts: 'Pollinators. A mint-family flower.', fact: 'Medicinal. Skullcap deeply relaxes the nervous system, calms muscle spasms, relaxes the mind, strengthens the immune system, detoxifies the body, is an effective treatment for epilepsy, promotes restful sleep, and is anti-inflammatory.', tags: ['summer', 'fall', 'medicinal'] },
+    { common: 'Orange Coneflower', botanical: 'Rudbeckia fulgida', bloom: 'July to September', height: '2 to 4 ft', attracts: 'Butterflies, hummingbirds, bees, and birds. Host plant for the Silvery Checkerspot and the Wavy-Lined Emerald butterflies.', fact: '', tags: ['summer', 'fall', 'bird'] },
+    { common: 'Great Blue Lobelia', botanical: 'Lobelia siphilitica', bloom: 'late July to September', height: '1 to 4 ft', attracts: 'Butterflies, bees, and hummingbirds, and provides nutrient-dense seeds for the birds.', fact: 'A medicinally rich flower that supports the respiratory system, relaxes muscles (anti-spasmodic), expels mucus and phlegm as an expectorant, and has been used to help with tobacco addiction.', tags: ['summer', 'fall', 'medicinal', 'bird'] },
+    { common: 'Swamp Rose Mallow', botanical: 'Hibiscus moscheutos', bloom: 'June to September', height: '3 to 4 ft', attracts: 'Many pollinators, butterflies, hummingbirds, and bees.', fact: 'Shrub-like and absolutely beautiful.', tags: ['summer', 'fall', 'bird'] },
+    { common: 'Cutleaf Coneflower', botanical: 'Rudbeckia laciniata', bloom: 'July to September', height: '4 to 8 ft', attracts: 'Pollinators. Shade tolerant.', fact: 'Also known as Sochan, with edible leaves for salad greens.', tags: ['summer', 'fall', 'shade', 'edible'] },
+    { common: 'Joe Pye Weed', botanical: 'Eutrochium fistulosum', bloom: 'July to August', height: '5 to 9 ft', attracts: 'Many pollinators. A host plant for over 35 species of moths and butterflies.', fact: 'Pennsylvania’s tallest wildflower! Also known as Gravel Root, medicinally used for urinary issues.', tags: ['summer', 'medicinal'] },
+    { common: 'White Turtlehead', botanical: 'Chelone glabra', bloom: 'July to November', height: '3 to 4 ft', attracts: 'The bumblebee’s favorite flower, plus bees, butterflies, and hummingbirds. A host plant for the Baltimore Checkerspot butterfly.', fact: 'Cleans parasites off bees.', tags: ['summer', 'fall', 'bird'] },
+    { common: 'Sunchoke', botanical: 'Helianthus tuberosus', bloom: 'August to October', height: 'up to 10 ft', attracts: 'Pollinators.', fact: 'Edible roots, harvestable December to January.', tags: ['summer', 'fall', 'edible'] },
+    { common: 'Obedient Plant', botanical: 'Physostegia virginiana', bloom: 'August to November', height: '2 to 3 ft', attracts: 'Butterflies, bees, and hummingbirds. A mint-family flower.', fact: 'If you move the flower, it will stay in place, which is where the name came from ;)', tags: ['summer', 'fall', 'bird'] },
+    { common: 'Blue Mist Flower', botanical: 'Conoclinium coelestinum', bloom: 'July to November', height: '3 ft', attracts: 'Bees and butterflies.', fact: 'Medicinal. Traditionally the flowers were made into a tea to strengthen the immune system.', tags: ['summer', 'fall', 'medicinal'] },
+    { common: 'Iron Weed', botanical: 'Vernonia noveboracensis', bloom: 'July to October', height: '4 to 5 ft', attracts: 'Butterflies, hummingbirds, and bees.', fact: 'The roots are medicinal and were traditionally used to prevent and stop postpartum hemorrhages.', tags: ['summer', 'fall', 'medicinal', 'bird'] },
+    { common: 'Sneezeweed', botanical: 'Helenium autumnale', bloom: 'August to October', height: '4 ft', attracts: 'Pollinators. A host plant for the Dainty Sulphur butterfly.', fact: '', tags: ['summer', 'fall'] },
+    { common: 'Blue Sage', botanical: 'Salvia azurea', bloom: 'August to frost', height: '3 to 5 ft', attracts: 'Butterflies, bees, moths, hummingbirds, and more! Salt tolerant.', fact: '', tags: ['summer', 'fall', 'bird'] },
+    { common: 'Sawtooth Sunflower', botanical: 'Helianthus grosseserratus', bloom: 'August to November', height: '3 to 12 ft', attracts: 'Bees and butterflies. The foliage is fed on by caterpillars.', fact: 'May only reach 5 ft in dense plantings.', tags: ['summer', 'fall'] },
+    { common: 'Aromatic Aster', botanical: 'Symphyotrichum oblongifolium', bloom: 'September to November', height: '1 to 2 ft', attracts: 'Late-season pollinators. A daisy-family flower.', fact: 'A late bloomer.', tags: ['fall'] },
+    { common: 'New England Aster', botanical: 'Symphyotrichum novae-angliae', bloom: 'September to November', height: '3 to 4 ft', attracts: 'Butterflies, moths, bees, and hummingbirds. Host plant for the Pearl Crescent and Checkerspot butterflies and the Canadian Conia moth.', fact: 'A late bloomer that is highly beneficial for migrating monarchs, and one of the largest-flowered aster species.', tags: ['fall', 'bird'] }
+  ];
+
+  // Filter chips: label + tag key. 'all' shows everything.
+  var FILTERS = [
+    { key: 'all', label: 'All' },
+    { key: 'spring', label: 'Spring blooms' },
+    { key: 'summer', label: 'Summer' },
+    { key: 'fall', label: 'Fall' },
+    { key: 'shade', label: 'Shade friendly' },
+    { key: 'medicinal', label: 'Medicinal' },
+    { key: 'edible', label: 'Edible' },
+    { key: 'bird', label: 'Bird + hummingbird favorites' }
+  ];
+  var FILTER_KEYS = {};
+  FILTERS.forEach(function (f) { FILTER_KEYS[f.key] = true; });
+
+  // ── Runtime state (in-page only, no persistence) ─────────────────────────
+  var tray = {};        // idx -> qty
+  var activeFilter = 'all';
+
+  // ── Render: habitat kits ─────────────────────────────────────────────────
+  function priceRows() {
+    return KIT_TIERS.map(function (t) {
+      return '<tr><td>' + esc(t.sqft) + '</td>' +
+        '<td class="plugs">' + esc(String(t.plugs)) + ' plugs</td>' +
+        '<td class="price">$' + esc(String(t.price)) + '</td></tr>';
+    }).join('');
+  }
+
+  function renderKits() {
+    var grid = document.getElementById('kitGrid');
+    grid.innerHTML = KITS.map(function (k) {
+      var plants = k.plants.map(function (p) {
+        var cls = p.note && /optional/i.test(p.note) ? ' class="kit-optional"' : '';
+        var note = p.note ? ' <span class="soil">(' + esc(p.note) + ')</span>' : '';
+        return '<li' + cls + '>' + esc(p.name) + note + '</li>';
+      }).join('');
+      return '<article class="kit-card reveal">' +
+        '<h3>' + esc(k.name) + '</h3>' +
+        '<p class="kit-blurb">' + esc(k.blurb) + '</p>' +
+        '<p class="kit-plants-h">Plants in each kit</p>' +
+        '<ul class="kit-plants">' + plants + '</ul>' +
+        '<table class="kit-price-table"><thead><tr><th>Size</th><th>Plugs</th><th>Price</th></tr></thead>' +
+        '<tbody>' + priceRows() + '</tbody></table>' +
+        '<p class="kit-larger">Like to plant a larger space? ' +
+        '<a href="services.html">Inquire about our Ecological Landscaping service</a> and our team can plant the flowers for you.</p>' +
+        '<button type="button" class="kit-req" data-kit="' + esc(k.id) + '">Request this kit</button>' +
+        '</article>';
+    }).join('');
+    grid.querySelectorAll('.kit-req').forEach(function (btn) {
+      btn.addEventListener('click', function () { openKit(btn.getAttribute('data-kit')); });
+    });
+  }
+
+  // ── Render: filter chips + species cards ─────────────────────────────────
+  function renderFilters() {
+    var bar = document.getElementById('filterBar');
+    bar.innerHTML = FILTERS.map(function (f) {
+      var pressed = f.key === activeFilter ? 'true' : 'false';
+      return '<button type="button" class="filter-chip" data-filter="' + esc(f.key) +
+        '" aria-pressed="' + pressed + '">' + esc(f.label) + '</button>';
+    }).join('');
+    bar.querySelectorAll('.filter-chip').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var key = btn.getAttribute('data-filter');
+        if (!FILTER_KEYS[key]) return; // allowlist
+        activeFilter = key;
+        bar.querySelectorAll('.filter-chip').forEach(function (b) {
+          b.setAttribute('aria-pressed', b.getAttribute('data-filter') === key ? 'true' : 'false');
+        });
+        applyFilter();
+      });
+    });
+  }
+
+  function renderPlants() {
+    var grid = document.getElementById('plantGrid');
+    grid.innerHTML = PLANTS.map(function (p, i) {
+      return '<article class="plant-card" data-idx="' + i + '">' +
+        '<h3>' + esc(p.common) + '</h3>' +
+        '<p class="botanical"><em>' + esc(p.botanical) + '</em></p>' +
+        '<div class="plant-meta">' +
+          '<span class="m"><b>Blooms</b> ' + esc(p.bloom) + '</span>' +
+          '<span class="m"><b>Height</b> ' + esc(p.height) + '</span>' +
+        '</div>' +
+        '<p class="plant-attracts">' + esc(p.attracts) + '</p>' +
+        (p.fact ? '<p class="plant-fact">' + esc(p.fact) + '</p>' : '') +
+        '<p class="plant-price">$' + esc(String(PLANT_PRICE)) + ' each</p>' +
+        '<button type="button" class="plant-add" data-idx="' + i + '">+ Add to request</button>' +
+        '</article>';
+    }).join('');
+    grid.querySelectorAll('.plant-add').forEach(function (btn) {
+      btn.addEventListener('click', function () { togglePlant(Number(btn.getAttribute('data-idx')), btn); });
+    });
+    applyFilter();
+  }
+
+  function applyFilter() {
+    var grid = document.getElementById('plantGrid');
+    var shown = 0;
+    grid.querySelectorAll('.plant-card').forEach(function (card) {
+      var i = Number(card.getAttribute('data-idx'));
+      var p = PLANTS[i];
+      var match = activeFilter === 'all' || (p && p.tags.indexOf(activeFilter) !== -1);
+      card.classList.toggle('hidden', !match);
+      if (match) shown++;
+    });
+    var label = FILTERS.filter(function (f) { return f.key === activeFilter; })[0];
+    document.getElementById('filterCount').textContent =
+      'Showing ' + shown + ' of ' + PLANTS.length + ' species' +
+      (activeFilter === 'all' ? '' : ' (' + (label ? label.label : '') + ')') + '.';
+  }
+
+  // ── Tray state ───────────────────────────────────────────────────────────
+  function togglePlant(idx, btn) {
+    if (!(idx >= 0 && idx < PLANTS.length)) return; // allowlist by range
+    if (tray[idx]) { delete tray[idx]; btn.classList.remove('added'); btn.textContent = '+ Add to request'; }
+    else { tray[idx] = 1; btn.classList.add('added'); btn.textContent = '✓ Added'; }
+    updateTrayCount();
+  }
+
+  function trayCount() {
+    var n = 0;
+    Object.keys(tray).forEach(function (k) { n += tray[k]; });
+    return n;
+  }
+  function trayLines() { return Object.keys(tray).length; }
+
+  function updateTrayCount() {
+    document.getElementById('trayCount').textContent = String(trayCount());
+  }
+
+  function setPlantButton(idx, added) {
+    var btn = document.querySelector('.plant-add[data-idx="' + idx + '"]');
+    if (!btn) return;
+    if (added) { btn.classList.add('added'); btn.textContent = '✓ Added'; }
+    else { btn.classList.remove('added'); btn.textContent = '+ Add to request'; }
+  }
+
+  // ── Modal shell (page-local, styled with .eco-lead-* classes) ────────────
+  var lastFocused = null;
+  function ensureModal() {
+    if (document.getElementById('plantOverlay')) return;
+    var overlay = document.createElement('div');
+    overlay.className = 'eco-lead-overlay';
+    overlay.id = 'plantOverlay';
+    overlay.innerHTML =
+      '<div class="eco-lead-modal" role="dialog" aria-modal="true" aria-labelledby="plantModalTitle">' +
+        '<button type="button" class="eco-lead-close" id="plantModalClose" aria-label="Close">&times;</button>' +
+        '<div class="eco-lead-body" id="plantModalBody"></div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) closeModal(); });
+    document.getElementById('plantModalClose').addEventListener('click', closeModal);
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && overlay.classList.contains('open')) closeModal();
+    });
+  }
+  function showModal() {
+    var overlay = document.getElementById('plantOverlay');
+    lastFocused = document.activeElement;
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    var first = overlay.querySelector('input, select, textarea, button.eco-lead-primary, button.ti-remove');
+    if (first) first.focus();
+  }
+  function closeModal() {
+    var overlay = document.getElementById('plantOverlay');
+    if (!overlay) return;
+    overlay.classList.remove('open');
+    document.body.style.overflow = '';
+    if (lastFocused && lastFocused.focus) { try { lastFocused.focus(); } catch (e) { /* ignore */ } }
+    lastFocused = null;
+  }
+
+  // Standard contact block (name/phone required). ids are page-unique.
+  function contactHtml() {
+    return (
+      '<div class="eco-lead-field"><label for="pl-c-name">Name <span class="req">*</span></label>' +
+        '<input type="text" id="pl-c-name" placeholder="Full name"></div>' +
+      '<div class="eco-lead-field"><label for="pl-c-phone">Phone <span class="req">*</span></label>' +
+        '<input type="tel" id="pl-c-phone" placeholder="(814) 555-0000"></div>' +
+      '<div class="eco-lead-field"><label for="pl-c-email">Email</label>' +
+        '<input type="email" id="pl-c-email" placeholder="email@example.com"></div>' +
+      '<div class="eco-lead-field"><label for="pl-c-address">Address for pickup or delivery</label>' +
+        '<input type="text" id="pl-c-address" placeholder="Street, town"></div>' +
+      '<div class="eco-lead-field"><label for="pl-c-pref">Preferred contact</label>' +
+        '<select id="pl-c-pref"><option value="phone">Phone call</option>' +
+        '<option value="text">Text message</option><option value="email">Email</option></select></div>'
+    );
+  }
+
+  function readContact() {
+    return {
+      name: (document.getElementById('pl-c-name').value || '').trim(),
+      phone: (document.getElementById('pl-c-phone').value || '').trim(),
+      email: (document.getElementById('pl-c-email').value || '').trim(),
+      address: (document.getElementById('pl-c-address').value || '').trim(),
+      pref: document.getElementById('pl-c-pref').value
+    };
+  }
+  function contactBlock(c) {
+    return 'Contact: ' + c.phone + (c.email ? ' / ' + c.email : '') +
+      (c.address ? '\nAddress: ' + c.address : '') + '\nPreferred contact: ' + c.pref + '.';
+  }
+
+  // ── Kit request modal ────────────────────────────────────────────────────
+  function openKit(id) {
+    var kit = KIT_BY_ID[id];
+    if (!kit) return; // allowlist
+    ensureModal();
+    var body = document.getElementById('plantModalBody');
+    var sizeOpts = ['<option value="">Select a size...</option>'].concat(
+      KIT_TIERS.map(function (t) { return '<option value="' + esc(t.key) + '">' + esc(t.label) + '</option>'; })
+    ).join('');
+    body.innerHTML =
+      '<p class="eco-lead-eyebrow">Request a habitat kit</p>' +
+      '<h2 id="plantModalTitle">' + esc(kit.name) + '</h2>' +
+      '<form id="kitForm" novalidate>' +
+        '<div class="eco-lead-grid">' +
+          '<div class="eco-lead-field eco-lead-full"><label for="pl-kit-size">Kit size <span class="req">*</span></label>' +
+            '<select id="pl-kit-size">' + sizeOpts + '</select></div>' +
+        '</div>' +
+        '<p class="eco-lead-tinynote">Kits can include an optional shrub, tree, or vine. Mention it in your message and we will include it if it suits your site.</p>' +
+        '<p class="eco-lead-sub">How can we reach you?</p>' +
+        '<div class="eco-lead-grid">' + contactHtml() + '</div>' +
+        '<div class="eco-lead-grid"><div class="eco-lead-field eco-lead-full">' +
+          '<label for="pl-kit-msg">Anything to add?</label>' +
+          '<textarea id="pl-kit-msg" placeholder="Optional. Soil conditions, an optional add-on, a delivery preference..."></textarea></div></div>' +
+        '<p class="eco-lead-tinynote">Kits are reserved and paid when you arrange pickup or delivery. Nothing is charged online.</p>' +
+        '<p class="eco-lead-error" id="plantModalError"></p>' +
+        '<button type="submit" class="eco-lead-primary">Send kit request</button>' +
+      '</form>';
+    document.getElementById('kitForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      submitKit(kit);
+    });
+    showModal();
+  }
+
+  async function submitKit(kit) {
+    var errEl = document.getElementById('plantModalError');
+    errEl.textContent = '';
+    var sizeKey = document.getElementById('pl-kit-size').value;
+    var tier = TIER_BY_KEY[sizeKey];
+    var msg = (document.getElementById('pl-kit-msg').value || '').trim();
+    var c = readContact();
+    if (!tier) { errEl.textContent = 'Please choose a kit size.'; return; }
+    if (!c.name || !c.phone) {
+      errEl.textContent = 'Please add your name and a phone number so we can reach you.';
+      return;
+    }
+    var descr = 'Habitat kit: ' + kit.name + '\nSize: ' + tier.label +
+      (msg ? '\nMessage: ' + msg : '');
+    var notes = 'Submitted via plants page.\n\n' + descr + '\n\n' + contactBlock(c) +
+      '\nReserved and paid at pickup or delivery. Nothing charged online.';
+    try {
+      var ins1 = await sb().from('intake_submissions').insert({
+        name: c.name, phone: c.phone, email: c.email, address: c.address,
+        service_type: 'habitat_kit', size: tier.label, description: descr,
+        contact_preference: c.pref, submitted_at: new Date().toISOString()
+      });
+      if (ins1.error) throw new Error(ins1.error.message);
+      var ins2 = await sb().from('jobs').insert({
+        status: 'inquiry',
+        title: kit.name + ' Kit Request',
+        client_name: c.name,
+        address: c.address,
+        type: 'habitat_kit',
+        notes: notes,
+        activity_log: [{ ts: new Date().toISOString(), note: 'Received via plants page.' }]
+      });
+      if (ins2.error) throw new Error(ins2.error.message);
+      showSuccess('Thanks, we got your kit request.', 'We will confirm availability and arrange pickup or delivery. Nothing is charged online.');
+    } catch (err) {
+      errEl.textContent = 'Something went wrong sending your request. Please try again, or email us at admin@ecotopianearthcare.com.';
+    }
+  }
+
+  // ── Plant request tray modal ─────────────────────────────────────────────
+  function openTray() {
+    ensureModal();
+    renderTrayModal();
+    showModal();
+  }
+
+  function renderTrayModal() {
+    var body = document.getElementById('plantModalBody');
+    var idxs = Object.keys(tray).map(Number).filter(function (i) { return i >= 0 && i < PLANTS.length; });
+    idxs.sort(function (a, b) { return a - b; });
+    if (!idxs.length) {
+      body.innerHTML =
+        '<p class="eco-lead-eyebrow">Your plant request</p>' +
+        '<h2 id="plantModalTitle">Plant request</h2>' +
+        '<p class="tray-empty">No plants selected yet. Add species from the list to start a request.</p>' +
+        '<button type="button" class="eco-lead-primary" id="plantModalDone">Keep browsing</button>';
+      document.getElementById('plantModalDone').addEventListener('click', closeModal);
+      return;
+    }
+    var items = idxs.map(function (i) {
+      var p = PLANTS[i];
+      var qty = tray[i];
+      return '<li class="tray-item" data-idx="' + i + '">' +
+        '<div class="ti-name"><b>' + esc(p.common) + '</b><span><em>' + esc(p.botanical) + '</em> · $' + esc(String(PLANT_PRICE)) + ' each</span></div>' +
+        '<div class="tray-step">' +
+          '<button type="button" class="ti-dec" data-idx="' + i + '" aria-label="Decrease quantity">−</button>' +
+          '<span class="ti-qty">' + esc(String(qty)) + '</span>' +
+          '<button type="button" class="ti-inc" data-idx="' + i + '" aria-label="Increase quantity">+</button>' +
+        '</div>' +
+        '<button type="button" class="ti-remove" data-idx="' + i + '" aria-label="Remove ' + esc(p.common) + '">&times;</button>' +
+        '</li>';
+    }).join('');
+    var total = trayCount() * PLANT_PRICE;
+    body.innerHTML =
+      '<p class="eco-lead-eyebrow">Your plant request</p>' +
+      '<h2 id="plantModalTitle">Plant request</h2>' +
+      '<ul class="tray-items">' + items + '</ul>' +
+      '<p class="tray-total">' + esc(String(trayCount())) + ' plants · $' + esc(String(total)) + '</p>' +
+      '<p class="tray-note">We will confirm availability and arrange pickup. Nothing is charged online.</p>' +
+      '<form id="trayForm" novalidate>' +
+        '<p class="eco-lead-sub">How can we reach you?</p>' +
+        '<div class="eco-lead-grid">' + contactHtml() + '</div>' +
+        '<div class="eco-lead-grid"><div class="eco-lead-field eco-lead-full">' +
+          '<label for="pl-c-msg">Anything to add?</label>' +
+          '<textarea id="pl-c-msg" placeholder="Optional"></textarea></div></div>' +
+        '<p class="eco-lead-error" id="plantModalError"></p>' +
+        '<button type="submit" class="eco-lead-primary" id="traySubmit">Send plant request</button>' +
+      '</form>';
+    // Steppers + remove (event-delegated, validated by range).
+    body.querySelectorAll('.ti-inc').forEach(function (b) {
+      b.addEventListener('click', function () { stepQty(Number(b.getAttribute('data-idx')), 1); });
+    });
+    body.querySelectorAll('.ti-dec').forEach(function (b) {
+      b.addEventListener('click', function () { stepQty(Number(b.getAttribute('data-idx')), -1); });
+    });
+    body.querySelectorAll('.ti-remove').forEach(function (b) {
+      b.addEventListener('click', function () { removeItem(Number(b.getAttribute('data-idx'))); });
+    });
+    document.getElementById('trayForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      submitTray();
+    });
+  }
+
+  function stepQty(idx, delta) {
+    if (!(idx >= 0 && idx < PLANTS.length) || !tray[idx]) return;
+    var q = tray[idx] + delta;
+    if (q < 1) q = 1;
+    if (q > 20) q = 20;
+    tray[idx] = q;
+    updateTrayCount();
+    renderTrayModal();
+  }
+  function removeItem(idx) {
+    if (!tray[idx]) return;
+    delete tray[idx];
+    setPlantButton(idx, false);
+    updateTrayCount();
+    renderTrayModal();
+  }
+
+  async function submitTray() {
+    var errEl = document.getElementById('plantModalError');
+    errEl.textContent = '';
+    var idxs = Object.keys(tray).map(Number).filter(function (i) { return i >= 0 && i < PLANTS.length; });
+    if (!idxs.length) { errEl.textContent = 'Add at least one plant to your request.'; return; }
+    var c = readContact();
+    var msg = (document.getElementById('pl-c-msg').value || '').trim();
+    if (!c.name || !c.phone) {
+      errEl.textContent = 'Please add your name and a phone number so we can reach you.';
+      return;
+    }
+    idxs.sort(function (a, b) { return a - b; });
+    var lines = idxs.map(function (i) {
+      var p = PLANTS[i];
+      var qty = tray[i];
+      return p.common + ' x ' + qty + ' ($' + (qty * PLANT_PRICE) + ')';
+    });
+    var total = trayCount() * PLANT_PRICE;
+    var descr = 'Plant order:\n' + lines.join('\n') +
+      '\nTotal: $' + total + ' (' + trayCount() + ' plants at $' + PLANT_PRICE + ' each)' +
+      (msg ? '\n\nMessage: ' + msg : '');
+    var notes = 'Submitted via plants page.\n\n' + descr + '\n\n' + contactBlock(c) +
+      '\nWe will confirm availability and arrange pickup. Nothing is charged online.';
+    try {
+      var ins1 = await sb().from('intake_submissions').insert({
+        name: c.name, phone: c.phone, email: c.email, address: c.address,
+        service_type: 'plant_order', size: trayCount() + ' plants', description: descr,
+        contact_preference: c.pref, submitted_at: new Date().toISOString()
+      });
+      if (ins1.error) throw new Error(ins1.error.message);
+      var ins2 = await sb().from('jobs').insert({
+        status: 'inquiry',
+        title: 'Plant Order Request',
+        client_name: c.name,
+        address: c.address,
+        type: 'plant_order',
+        notes: notes,
+        activity_log: [{ ts: new Date().toISOString(), note: 'Received via plants page.' }]
+      });
+      if (ins2.error) throw new Error(ins2.error.message);
+      // Clear the tray on success.
+      idxs.forEach(function (i) { setPlantButton(i, false); });
+      tray = {};
+      updateTrayCount();
+      showSuccess('Thanks, we got your plant request.', 'We will confirm availability and arrange pickup. Nothing is charged online.');
+    } catch (err) {
+      errEl.textContent = 'Something went wrong sending your request. Please try again, or email us at admin@ecotopianearthcare.com.';
+    }
+  }
+
+  function showSuccess(title, sub) {
+    var body = document.getElementById('plantModalBody');
+    body.innerHTML =
+      '<div class="eco-lead-success">' +
+        '<div class="eco-lead-check" aria-hidden="true">✓</div>' +
+        '<h2 id="plantModalTitle">' + esc(title) + '</h2>' +
+        '<p>' + esc(sub) + '</p>' +
+        '<button type="button" class="eco-lead-primary" id="plantModalDone">Close</button>' +
+      '</div>';
+    var done = document.getElementById('plantModalDone');
+    done.addEventListener('click', closeModal);
+    done.focus();
+  }
+
+  // ── Init ─────────────────────────────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', function () {
+    EcoSite.renderNav('plants');
+    renderKits();
+    renderFilters();
+    renderPlants();
+    updateTrayCount();
+    document.getElementById('trayFab').addEventListener('click', openTray);
+    EcoSite.decorate();
+  });
+})();
+</script>
+</body>
+</html>
