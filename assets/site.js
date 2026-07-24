@@ -120,6 +120,186 @@
           options: ['Yes', 'Tell me more', 'No'] },
       ],
     },
+    // NEW 2026 service. Hand-woven by the client's team. Questions stay open so
+    // the visit does the discovery rather than the form making claims.
+    tree_nets: {
+      name: 'Tree Nets',
+      questions: [
+        { id: 'use', label: 'What would you use the net for?', type: 'select',
+          options: ['Climbing and play', 'Canopy shade', 'Harvest catching', 'Habitat feature', 'Not sure yet'] },
+        { id: 'span', label: 'Approximate span between trees?', type: 'select',
+          options: ['Under 10 ft', '10 to 20 ft', 'Over 20 ft', 'Not sure'] },
+      ],
+    },
+  };
+
+  // ── Service details (state 1 of the lead modal) ─────────────────────────
+  // Keyed by the same slugs as SERVICE_FORMS. `about` is 2-3 short paragraphs
+  // drawn from the client's real service copy (tightened, no em dashes). `expect`
+  // is a process-descriptive "What to expect" list, kept non-promissory since we
+  // write on the client's behalf. `review: true` flags copy the client should
+  // still review before it is treated as final. Content edits here are code edits.
+  const SERVICE_DETAILS = {
+    pollinator_garden: {
+      headline: 'Pollinator Garden / Mini Meadow',
+      about: [
+        'Host a small space on your land, from 100 to 1,000 square feet, with native perennial wildflowers that bloom across three seasons and give four-season habitat for birds, butterflies, bees, and beneficial insects.',
+        'We grow all of our wildflower plugs from seed we collected the year before. With around 40 species to choose from, we group at least 12 that complement one another in habitat, growth habit, bloom time, and color.',
+        'Native plants host the butterflies, moths, and beneficial insects our ecosystem depends on. For nearly every ornamental nursery plant there is a native alternative that actually feeds local wildlife.',
+      ],
+      expect: [
+        'A free estimate at an in-person site visit',
+        'Measurements and your plant preferences gathered on site',
+        'A printed design for the site caretaker; designs range from 5 to 10 cents per square foot',
+        'Native plants supplied from our local nursery',
+        'Optional planting and first-year care by our team',
+      ],
+    },
+    food_forest: {
+      headline: 'Food Forest Design',
+      about: [
+        'Permaculture design studies the patterns in nature\'s blueprint and scales them down to match your planting site.',
+        'By arranging edible perennials through companion planting and multiple vertical layers, a food forest builds a self-nurturing ecosystem that produces more food per square foot.',
+      ],
+      expect: [
+        'A free estimate at an in-person site visit',
+        'Measurements and your preferences gathered on site',
+        'A printed design for the site caretaker; designs range from 5 to 10 cents per square foot',
+        'Native and edible perennials supplied from our local nursery',
+        'Optional planting and first-year care by our team',
+      ],
+    },
+    rain_garden: {
+      headline: 'Rain Garden',
+      about: [
+        'A rain garden is a planted depression that soaks up runoff from roofs, driveways, walkways, and compacted lawn, water that would otherwise carry pollutants straight to our streams.',
+        'Planted with native perennial wildflowers, shrubs, and small trees, a rain garden can soak up 30 percent or more water than an equivalent patch of lawn.',
+        'Have a flooded spot where water sits and the grass is hard to mow? A well-built rain garden takes up that standing water and redirects it away from your basement, and it doubles as a pollinator garden with three-season color and four-season habitat.',
+      ],
+      expect: [
+        'A free estimate at an in-person site visit',
+        'A look at where water collects and any downspouts involved',
+        'A printed design for the site caretaker; designs range from 5 to 10 cents per square foot',
+        'Native plants supplied from our local nursery',
+        'Optional planting and first-year care by our team',
+      ],
+    },
+    annual_food_garden: {
+      headline: 'Annual Food Garden',
+      about: [
+        'A productive vegetable garden planned around your space, your soil, and how you like to grow.',
+        'We help with layout, soil analysis and improvement, plant selection, and sustainable practices for a healthy harvest, whether you prefer raised beds or in-ground rows.',
+      ],
+      expect: [
+        'A free estimate at an in-person site visit',
+        'Measurements and your growing preferences gathered on site',
+        'A printed design for the site caretaker; designs range from 5 to 10 cents per square foot',
+        'Plants supplied from our local nursery',
+        'Optional planting and first-year care by our team',
+      ],
+    },
+    living_willow: {
+      headline: 'Living Willow Fence',
+      about: [
+        'The longevity and beauty of a living willow fence surpasses one made from dead material.',
+        'A willow cutting of almost any size will root when planted in or near soil. Once pruned, new growth returns tenfold and can grow 4 to 12 feet in a single year, a technique called coppicing. You can prune the top growth back each year, or harvest it in winter for basket weaving.',
+        'Willow fences sequester carbon, and willow roots filter heavy metals and other toxins from soil and water while stabilizing stream banks against erosion.',
+      ],
+      expect: [
+        'A free estimate at an in-person site visit',
+        'Your preferred structure gathered on site: fence, tunnel, dome, or archway',
+        'Living willow supplied and woven by our team',
+        'Planted and woven in late winter, the season for harvesting cuttings',
+        'Optional pruning and structural care in the years that follow',
+      ],
+    },
+    garden_maintenance: {
+      headline: 'Routine Garden Maintenance',
+      about: [
+        'Ongoing care from ecological landscapers who can tell an invasive weed from the native you planted.',
+        'We keep your beds, meadows, and plantings healthy through the season, at home, at your business, or in a community space.',
+      ],
+      expect: [
+        'A free estimate at an in-person site visit',
+        'A walk-through of your plantings and priorities on site',
+        'One-time cleanups, or recurring monthly and seasonal care',
+        'Native-plant knowledge so the plants you want stay and the invasives go',
+      ],
+    },
+    medicinal_herb: {
+      headline: 'Medicinal Herb Garden and Consulting',
+      about: [
+        'Our herbalist JennaRose helps you create a medicine garden suited to your needs and your land.',
+        'Choose annual medicinals like ashwagandha, tulsi, and calendula for an elegant, space-saving herb spiral, or native perennial medicine plants like echinacea, blue vervain, and wild rose planted into your site\'s own soil.',
+        'At harvest, JennaRose can also process and prepare the herb, root, or fruit into medicine through WildRose Herbal Apothecary.',
+      ],
+      expect: [
+        'A free estimate at an in-person site visit',
+        'Consulting only, or full design and install',
+        'A printed design for the site caretaker; designs range from 5 to 10 cents per square foot',
+        'Native and annual medicinal plants supplied from our nursery',
+        'Optional planting, first-year care, and harvest-time herbal processing',
+        'Please reach out before April 1st for the coming season',
+      ],
+    },
+    forest_restoration: {
+      headline: 'Forest Habitat Restoration',
+      about: [
+        'We restore wooded and streamside habitat by planting native vegetation and removing invasive plants that crowd out the natives wildlife depends on.',
+        'Riparian buffers, 15 to 35 foot corridors of native plants along creeks and rivers, filter pollutants, cool the water, prevent erosion, and rebuild habitat.',
+        'Invasive nursery plants escape into our woodlands and outcompete natives. Because most native butterflies, moths, and bees cannot use foreign plants, replacing invasives with natives feeds the whole food chain.',
+      ],
+      expect: [
+        'A free estimate at an in-person site visit',
+        'A walk of the site to assess invasives, erosion, and habitat',
+        'Native trees, shrubs, and plants supplied from our nursery',
+        'Optional planting and first-year care by our team',
+      ],
+    },
+    woodland_restoration: {
+      headline: 'Woodland Habitat Restoration',
+      about: [
+        'We open a crowded canopy to bring sunlight back to the forest floor, then rebuild the understory.',
+        'Thinning select canopy trees makes room to add understory trees, shrubs, vines, herbs, and woodland wildflowers for a layered, biodiverse habitat.',
+      ],
+      expect: [
+        'A free estimate at an in-person site visit',
+        'A walk of the site to assess canopy, understory, and habitat',
+        'Native trees, shrubs, and plants supplied from our nursery',
+        'Optional planting and first-year care by our team',
+      ],
+    },
+    lawn_to_meadow: {
+      headline: 'Lawn to Meadow Conversion',
+      about: [
+        'We transform high-maintenance grass lawns into low-maintenance native perennial meadows, potentially at no cost to you.',
+        'The Pennsylvania DCNR runs a program that can convert qualifying lawns of a half acre or more into native meadow or upland forest for free. Ecotopian EarthCare is an approved contractor with the state.',
+        'Meadows need no watering and are mowed just once a year. Their deep roots soak up water and prevent erosion, and they provide real habitat for bees, butterflies, and birds where a turf lawn cannot.',
+      ],
+      expect: [
+        'A free estimate at an in-person site visit',
+        'We check whether your land meets the DCNR half-acre minimum and program qualifications',
+        'If your land qualifies, the DCNR program can cover the conversion at no cost to you',
+        'Native meadow seed and plants suited to your site',
+        'Optional ongoing meadow care by our team',
+      ],
+    },
+    // NEW 2026 service. Copy is intentionally modest and honest; the client
+    // should review this wording before it is treated as final (review: true).
+    tree_nets: {
+      headline: 'Tree Nets',
+      review: true,
+      about: [
+        'Hand-woven tree nets, made to order by our team.',
+        'Woven structures in the same craft family as our living willow work, shaped to fit the trees you already have.',
+        'Not sure what a tree net could do for your space? Tell us what you have in mind and we will talk it through on a visit.',
+      ],
+      expect: [
+        'An in-person site visit and a free estimate',
+        'A custom shape and size woven to fit your trees',
+        'Natural materials',
+      ],
+    },
   };
 
   // Runtime state for the lead modal (browser only).
@@ -357,12 +537,68 @@
     );
   }
 
-  // Active service: the inquiry form.
+  // State 1: the details card. Answers common questions before any form, then a
+  // single primary CTA transitions the SAME modal into the inquiry flow (state 2).
+  // Always renderable from static SERVICE_DETAILS, so it shows even if the
+  // service_settings fetch failed (the CTA is what falls back to intake.html).
+  function renderDetails(slug, form) {
+    const body = document.getElementById('ecoLeadBody');
+    const d = SERVICE_DETAILS[slug];
+    const about = (d.about || []).map((p) => '<p class="eco-lead-about">' + esc(p) + '</p>').join('');
+    const bullets = (d.expect || []).map((b) => '<li>' + esc(b) + '</li>').join('');
+    const review = d.review
+      ? '<p class="eco-lead-reviewnote">This is a new offering and we are still shaping how we provide it. Reach out and we will talk through the details with you.</p>'
+      : '';
+    body.innerHTML =
+      '<p class="eco-lead-eyebrow">Our services</p>' +
+      '<h2 id="ecoLeadTitle">' + esc(d.headline || form.name) + '</h2>' +
+      about +
+      review +
+      '<p class="eco-lead-sub">What to expect</p>' +
+      '<ul class="eco-lead-expect">' + bullets + '</ul>' +
+      '<button type="button" class="eco-lead-primary" id="ecoLeadProceed">I\'m interested in ' + esc(d.headline || form.name) + '</button>' +
+      '<button type="button" class="eco-lead-quiet" id="ecoLeadDetailsClose">Close</button>';
+    document.getElementById('ecoLeadProceed').addEventListener('click', () => enterInquiryFlow(slug, form));
+    document.getElementById('ecoLeadDetailsClose').addEventListener('click', closeModal);
+  }
+
+  // Small "Back to details" affordance for state 2.
+  function backHtml() {
+    return '<button type="button" class="eco-lead-back" id="ecoLeadBack">← Back to details</button>';
+  }
+  function wireBack(slug, form) {
+    const b = document.getElementById('ecoLeadBack');
+    if (b) b.addEventListener('click', () => {
+      renderDetails(slug, form);
+      const p = document.getElementById('ecoLeadProceed');
+      if (p) p.focus();
+    });
+  }
+  // Move focus to the first form control when entering state 2.
+  function focusFirstField() {
+    const first = document.querySelector('#ecoLeadForm input, #ecoLeadForm select, #ecoLeadForm textarea');
+    if (first) first.focus();
+  }
+
+  // Transition from details (state 1) into the inquiry flow (state 2). Uses the
+  // same active/off decision the old flow used. Fail-soft: if settings never
+  // loaded, fall back to the plain intake form instead of guessing.
+  function enterInquiryFlow(slug, form) {
+    if (!SETTINGS_LOADED) { window.location.href = 'intake.html'; return; }
+    const setting = SERVICE_SETTINGS[slug];
+    const active = setting ? setting.active : true;
+    if (active) renderInquiry(slug, form);
+    else renderOff(slug, form, setting);
+    focusFirstField();
+  }
+
+  // Active service: the inquiry form (state 2).
   function renderInquiry(slug, form) {
     const body = document.getElementById('ecoLeadBody');
     const qs = (form.questions || []).map(fieldHtml).join('');
     const hint = form.hint ? '<p class="eco-lead-hint">' + esc(form.hint) + '</p>' : '';
     body.innerHTML =
+      backHtml() +
       '<p class="eco-lead-eyebrow">Start an inquiry</p>' +
       '<h2 id="ecoLeadTitle">' + esc(form.name) + '</h2>' +
       hint +
@@ -377,15 +613,17 @@
       e.preventDefault();
       submitInquiry(slug, form);
     });
+    wireBack(slug, form);
   }
 
-  // Inactive service: out-of-season message + waitlist mini form.
+  // Inactive service: out-of-season message + waitlist mini form (state 2).
   function renderOff(slug, form, setting) {
     const body = document.getElementById('ecoLeadBody');
     let msg = setting && setting.offMessage ? esc(setting.offMessage) : 'This service is out of season.';
     const reopen = setting && setting.reopenDate ? formatLongDate(setting.reopenDate) : '';
     if (reopen) msg += ' We will be starting these again around ' + esc(reopen) + '.';
     body.innerHTML =
+      backHtml() +
       '<p class="eco-lead-eyebrow">Out of season</p>' +
       '<h2 id="ecoLeadTitle">' + esc(form.name) + '</h2>' +
       '<p class="eco-lead-offmsg">' + msg + '</p>' +
@@ -409,6 +647,7 @@
       e.preventDefault();
       submitWaitlist(slug, form);
     });
+    wireBack(slug, form);
   }
 
   // Raw label: answer lines for DB storage. NOT esc'd: these are stored as plain
@@ -499,17 +738,15 @@
   }
 
   // Open the modal for a service. Slug is validated against the SERVICE_FORMS
-  // allowlist; anything else is ignored. If settings never loaded, fall back to
-  // the plain intake form instead of blocking.
+  // allowlist; anything else is ignored. Opens on the details card (state 1) when
+  // details exist; the "I'm interested" CTA there transitions to the inquiry flow.
+  // Services without details (defensive) go straight to the inquiry flow.
   function openService(slug) {
     const form = SERVICE_FORMS[slug];
     if (!form) return;
     ensureModal();
-    if (!SETTINGS_LOADED) { window.location.href = 'intake.html'; return; }
-    const setting = SERVICE_SETTINGS[slug];
-    const active = setting ? setting.active : true;
-    if (active) renderInquiry(slug, form);
-    else renderOff(slug, form, setting);
+    if (SERVICE_DETAILS[slug]) renderDetails(slug, form);
+    else enterInquiryFlow(slug, form);
     showModal();
   }
 
@@ -529,7 +766,7 @@
       const cue = document.createElement('span');
       cue.className = 'svc-cue';
       cue.setAttribute('aria-hidden', 'true');
-      cue.textContent = 'Start an inquiry →';
+      cue.textContent = 'See details →';
       (card.matches('.svc-row') ? (card.lastElementChild || card) : card).appendChild(cue);
       card.addEventListener('click', () => openService(slug));
       card.addEventListener('keydown', (e) => {

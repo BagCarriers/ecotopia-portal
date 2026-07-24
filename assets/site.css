@@ -514,6 +514,39 @@ details.past-events[open] > summary::before { transform: rotate(90deg); }
   transition: background 0.16s ease;
 }
 .eco-lead-primary:hover { background: var(--green-dark); }
+/* Details card (state 1) */
+.eco-lead-about {
+  font-family: var(--font-util); font-size: 1rem; line-height: 1.6;
+  color: var(--ink-soft); margin: 0 0 14px;
+}
+.eco-lead-about:last-of-type { margin-bottom: 4px; }
+.eco-lead-reviewnote {
+  font-family: var(--font-util); font-style: italic; font-size: 0.9rem;
+  line-height: 1.5; color: var(--ink-soft); background: var(--cream);
+  border-left: 3px solid var(--amber); padding: 10px 12px;
+  margin: 14px 0 4px; border-radius: 0 8px 8px 0;
+}
+.eco-lead-expect { list-style: none; margin: 0; padding: 0; }
+.eco-lead-expect li {
+  position: relative; font-family: var(--font-util); font-size: 0.98rem;
+  line-height: 1.5; color: var(--ink); padding: 6px 0 6px 26px;
+}
+.eco-lead-expect li::before {
+  content: '\276F'; position: absolute; left: 6px; top: 6px;
+  color: var(--green); font-size: 0.8rem;
+}
+.eco-lead-quiet {
+  display: block; width: 100%; margin: 10px 0 0; padding: 10px;
+  background: transparent; border: 0; color: var(--ink-soft);
+  font-family: var(--font-util); font-size: 0.95rem; cursor: pointer;
+}
+.eco-lead-quiet:hover { color: var(--ink); text-decoration: underline; }
+.eco-lead-back {
+  background: transparent; border: 0; padding: 4px 0; margin: 0 0 10px;
+  color: var(--green-dark); font-family: var(--font-util);
+  font-weight: 600; font-size: 0.9rem; cursor: pointer;
+}
+.eco-lead-back:hover { text-decoration: underline; }
 .eco-lead-success { text-align: center; padding: 14px 6px; }
 .eco-lead-check {
   width: 62px; height: 62px; margin: 0 auto 14px; border-radius: 50%;

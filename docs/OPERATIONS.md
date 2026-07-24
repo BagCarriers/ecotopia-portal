@@ -146,6 +146,14 @@ or delete an entry.
 Where leads land: both modal-submitted inquiries and waitlist conversions appear in
 `jobs.html` as `inquiry` jobs. Modal submissions also write an `intake_submissions` row.
 
+Service details (the details card shown before the inquiry form) live in the
+`SERVICE_DETAILS` const in `assets/site.js`, keyed by the same slugs. Editing that
+copy is a code edit (not a database change). Migration `0012_tree_nets.sql` added the
+`tree_nets` service (hand-woven tree nets, made to order), applied live via the
+Management API; register it with `supabase migration repair --status applied 0012`
+before any `supabase db push`. Its wording is flagged for client review
+(`review: true` in `SERVICE_DETAILS`).
+
 ## Deploy
 
 The site is a static bundle deployed to Netlify:
