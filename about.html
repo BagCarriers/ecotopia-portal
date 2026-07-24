@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>About - Ecotopian EarthCare</title>
+  <link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png">
+<meta name="description" content="What it means to be an Ecotopian, and the team of ecological landscapers, herbalists, and stewards behind Ecotopian EarthCare in Central Pennsylvania.">
+<meta property="og:site_name" content="Ecotopian EarthCare">
+<meta property="og:type" content="website">
+<meta property="og:title" content="About - Ecotopian EarthCare">
+<meta property="og:description" content="What it means to be an Ecotopian, and the team of ecological landscapers, herbalists, and stewards behind Ecotopian EarthCare, based in the Altoona area of Central Pennsylvania.">
+  <meta property="og:image" content="https://ecotopia.bagcarriers.dev/assets/img/og-pawpaw.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Flamenco:wght@300;400&family=Inter+Tight:wght@400;500;600;700&family=Megrim&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+<script src="assets/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/mapping.js"></script>
+<script src="assets/site.js"></script>
+<style>
+/* ── About page (marketing) ─────────────────────────────────────────────── */
+.ethos-copy { max-width: 70ch; }
+.ethos-copy p { font-size: 1.16rem; line-height: 1.72; color: var(--ink-soft); margin: 0 0 20px; }
+.ethos-copy p:last-child { margin-bottom: 0; }
+
+.team-grid {
+  display: grid; gap: 22px; margin-top: 44px;
+  grid-template-columns: repeat(auto-fill, minmax(238px, 1fr));
+}
+.team-card {
+  margin: 0; background: var(--white); border: 1px solid var(--line);
+  border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow);
+  display: flex; flex-direction: column;
+}
+.section.cream .team-card { background: #fff; }
+.team-card img {
+  width: 100%; aspect-ratio: 1 / 1; object-fit: cover; display: block;
+  background: var(--cream);
+}
+.team-card figcaption { padding: 18px 20px 22px; }
+.team-card h3 {
+  font-family: var(--font-util); font-weight: 700; font-size: 1.14rem;
+  color: var(--green-dark); letter-spacing: 0.005em; margin: 0 0 6px;
+}
+.team-card p { margin: 0; font-size: 0.97rem; line-height: 1.52; color: var(--ink-soft); }
+
+.land-ack p.affil {
+  margin-top: 20px; font-family: var(--font-util); font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.16em; font-size: 0.8rem;
+  color: var(--cream);
+}
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header" id="siteHeader"></header>
+
+<main id="main">
+  <!-- What it means to be an Ecotopian (client copy, verbatim; source dashes
+       replaced with commas/periods, no em dashes) -->
+  <section class="section cream" aria-labelledby="ethos-h">
+    <div class="wrap">
+      <p class="eyebrow">Our roots</p>
+      <h1 id="ethos-h">What does it mean to be an Ecotopian?</h1>
+      <div class="ethos-copy">
+        <p>Inspired by the novel Ecotopia, written in the 70s by Central Pennsylvania born author Ernest Callenbach. An Ecotopian (Ecological Utopian) is a member of a subcultural community in a borough or city that makes a great effort to take a holistic approach to all facets of day to day life. Like choosing to commute by bike rather than car, choosing to support local shops and farmers markets over chain stores, choosing more sustainable technologies, choosing to drink from spring water and protect waterways from pollution, choosing cooperation and sharing over competition and materialism.</p>
+        <p>These ideals and ethics are fostered by Ecotopians' reciprocal relationship with the land. Sowing the seeds of regenerative EarthCare stewardship reaps the rewards of celebrating the seasons in abundance: autumn PawPaw festivals, winter maple water harvests, the spring and summer return of thousands of hummingbirds and monarchs.</p>
+        <p>Being an Ecotopian assures us that we as humans have a role in the ecosystem after all. It feels good to belong.</p>
+      </div>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="intake.html">Contact us to get involved</a>
+        <a class="btn btn-ghost" href="volunteer-board.html">See the volunteer board</a>
+      </div>
+    </div>
+  </section>
+  <div class="willow on-cream" data-opacity="0.4"></div>
+
+  <!-- Meet the team -->
+  <section class="section" aria-labelledby="team-h">
+    <div class="wrap">
+      <p class="eyebrow">Who we are</p>
+      <h2 id="team-h">Meet the team</h2>
+      <p class="lead">The designers, herbalists, growers, and stewards who tend this work across the neighborhoods of the Altoona area.</p>
+      <div class="team-grid">
+        <figure class="team-card reveal">
+          <img src="assets/img/team/team-jordan.jpg" alt="Jordan Sesame Wild" loading="lazy" width="400" height="400">
+          <figcaption>
+            <h3>Jordan Sesame Wild</h3>
+            <p>Founder, Manager, Ecological Landscape Designer, Permaculturist, Project Scout, and President of WildOnes Nonprofit.</p>
+          </figcaption>
+        </figure>
+        <figure class="team-card reveal">
+          <img src="assets/img/team/team-jenna.jpg" alt="Jenna Rose Wild" loading="lazy" width="400" height="400">
+          <figcaption>
+            <h3>Jenna Rose Wild</h3>
+            <p>Cofounder, Herbalist, Medicine Woman and Guide, Nursery Caretaker, Ecological Landscape Designer, and a Holistic Birth and Postpartum Doula.</p>
+          </figcaption>
+        </figure>
+        <figure class="team-card reveal">
+          <img src="assets/img/team/team-kat.jpg" alt="Kat Weakland" loading="lazy" width="400" height="400">
+          <figcaption>
+            <h3>Kat Weakland</h3>
+            <p>Community Food Systems Consultant, Botanical Weaver, and down-to-earth Garden Mentor.</p>
+          </figcaption>
+        </figure>
+        <figure class="team-card reveal">
+          <img src="assets/img/team/team-samuel.jpg" alt="Samuel Mohnkern" loading="lazy" width="400" height="400">
+          <figcaption>
+            <h3>Samuel Mohnkern</h3>
+            <p>Landscape Designer, Ecosystem Steward, Arborist, and Invasive Plant Remover. Contracting through his neighboring business Restoration LandCare.</p>
+          </figcaption>
+        </figure>
+        <figure class="team-card reveal">
+          <img src="assets/img/team/team-joshua.jpg" alt="Joshua Ritchey" loading="lazy" width="400" height="400">
+          <figcaption>
+            <h3>Joshua Ritchey</h3>
+            <p>Lead Landscape and Garden Tender.</p>
+          </figcaption>
+        </figure>
+        <figure class="team-card reveal">
+          <img src="assets/img/team/team-jordansneed.jpg" alt="Jordan Sneed" loading="lazy" width="400" height="400">
+          <figcaption>
+            <h3>Jordan Sneed</h3>
+            <p>Pawpaw Seedling Grower and Ecological Landscaper for his nearby neighborhoods of Juniata, Juniata Gap, Wehnwood, and Fairview.</p>
+          </figcaption>
+        </figure>
+        <figure class="team-card reveal">
+          <img src="assets/img/team/team-tricia.jpg" alt="Tricia Lynn" loading="lazy" width="400" height="400">
+          <figcaption>
+            <h3>Tricia Lynn</h3>
+            <p>Ecological Landscaper for her neighborhoods of East End, Greenwood, Little Italy, Downtown, Centre City, Dutch Hill, 6th Ward, AASD School District, and Columbia Park.</p>
+          </figcaption>
+        </figure>
+        <figure class="team-card reveal">
+          <img src="assets/img/team/team-john.jpg" alt="John Peacefire" loading="lazy" width="400" height="400">
+          <figcaption>
+            <h3>John Peacefire</h3>
+            <p>Ecological Landscaper for his nearby neighborhoods of Lakemont, Frankstown, and Garden Heights.</p>
+          </figcaption>
+        </figure>
+        <figure class="team-card reveal">
+          <img src="assets/img/team/team-brendan.jpg" alt="Brendan" loading="lazy" width="400" height="400">
+          <figcaption>
+            <h3>Brendan</h3>
+            <p>Ecological Landscaper for his nearby neighborhoods of Llyswen, Mansion Park, Knickerbocker, and Highland Park.</p>
+          </figcaption>
+        </figure>
+        <figure class="team-card reveal">
+          <img src="assets/img/team/team-emily.jpg" alt="Emily Evey" loading="lazy" width="400" height="400">
+          <figcaption>
+            <h3>Emily Evey</h3>
+            <p>Program Coordinator.</p>
+          </figcaption>
+        </figure>
+        <figure class="team-card reveal">
+          <img src="assets/img/team/team-russ.jpg" alt="Russ Replogle" loading="lazy" width="400" height="400">
+          <figcaption>
+            <h3>Russ Replogle</h3>
+            <p>Tractor and Mower service for Lawn to Meadow and Food Forest Conversion.</p>
+          </figcaption>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- Land acknowledgment strip -->
+  <section class="band land-ack" aria-labelledby="land-h">
+    <div class="willow willow-inline top" data-white data-opacity="0.5" aria-hidden="true"></div>
+    <p class="eyebrow" style="color: var(--cream)">On this land</p>
+    <h2 id="land-h">Rooted in place</h2>
+    <p>Based in the Altoona area of Pennsylvania, living on Susquehannock and Iroquois tribal land. Serving native plant ecosystems at the southwestern headwaters of the Susquehanna Watershed, among the ridges and valleys of the southern Allegheny Mountains.</p>
+    <p class="affil">Affiliated with WildOnes</p>
+    <div class="willow willow-inline bot" data-white data-opacity="0.5" aria-hidden="true"></div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div>
+      <p class="fbrand">Ecotopian EarthCare</p>
+      <p>Ecological landscaping, community gardens, and native plants in Central Pennsylvania.</p>
+      <p>Serving the Altoona area &amp; Blair County. Find us at the Reciprocity Community Food Forest, 211 Browning Ave, Altoona, PA 16602.</p>
+      <p>Call or text <a href="tel:+18146315338">814-631-5338</a> · <a href="mailto:admin@ecotopianearthcare.com">admin@ecotopianearthcare.com</a></p>
+    </div>
+    <div>
+      <h4>Explore</h4>
+      <ul>
+        <li><a href="services.html">Services</a></li>
+        <li><a href="plants.html">Native Plants</a></li>
+        <li><a href="happenings.html">Events</a></li>
+        <li><a href="community-gardens.html">Community Gardens</a></li>
+        <li><a href="photos.html">Photos</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Get involved</h4>
+      <ul>
+        <li><a href="intake.html">Client Request Form</a></li>
+        <li><a href="volunteer-board.html">Volunteer board</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>© 2026 Ecotopian EarthCare</span>
+    <a class="staff" href="login.html">Staff sign in</a>
+  </div>
+</footer>
+
+<div class="credit-band">
+  <div class="credit-inner">
+    <span>© 2026 Ecotopian EarthCare. All rights reserved.</span>
+    <span>Website by <a href="https://bagcarriers.com">BagCarriers Systems</a></span>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  EcoSite.renderNav('about');
+});
+</script>
+</body>
+</html>

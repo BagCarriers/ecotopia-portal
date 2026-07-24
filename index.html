@@ -9,7 +9,7 @@
 <meta property="og:site_name" content="Ecotopian EarthCare">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Ecotopian EarthCare - Ecological landscaping in Central Pennsylvania">
-<meta property="og:description" content="Native-plant landscaping, community gardens, and living willow structures rooted in Central Pennsylvania.">
+<meta property="og:description" content="Eleven ecological landscaping services with native plants, from pollinator meadows, food forests, and rain gardens to living willow, hand-woven tree nets, and lawn-to-meadow conversions across Central Pennsylvania.">
   <meta property="og:image" content="https://ecotopia.bagcarriers.dev/assets/img/og-pawpaw.jpg">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
@@ -51,22 +51,100 @@
   </section>
   <div class="willow on-cream" data-opacity="0.4"></div>
 
-  <!-- Services preview (6 of 10) -->
+  <!-- Services showcase: all eleven, photo-backdrop cards. tree_nets +
+       lawn_to_meadow lead as featured priorities. Each card opens the same
+       details-first lead modal via EcoSite.initServiceLeads (data-service-slug).
+       Backdrops are decorative (empty alt); the heading + teaser carry meaning. -->
   <section class="section" aria-labelledby="svc-h">
     <div class="wrap">
       <p class="eyebrow">What we do</p>
       <h2 id="svc-h">Landscapes that give back</h2>
-      <p class="lead">Every design starts with the native plants and living systems that belong here, then layers in beauty, food, and habitat for the pollinators and people who share your land.</p>
-      <div class="card-grid">
-        <article class="svc-card reveal" data-service-slug="pollinator_garden"><div class="ico" aria-hidden="true">🦋</div><h3>Pollinator Garden &amp; Mini Meadow</h3><p>Native perennial wildflowers that bloom across three seasons and draw butterflies, hummingbirds, bees, and beneficial insects.</p></article>
-        <article class="svc-card reveal" data-service-slug="food_forest"><div class="ico" aria-hidden="true">🌳</div><h3>Food Forest Design</h3><p>Edible landscaping designed with permaculture techniques, planted in vertical layers for an abundance of perennial food.</p></article>
-        <article class="svc-card reveal" data-service-slug="living_willow"><div class="ico" aria-hidden="true">🧺</div><h3>Living Willow Fence</h3><p>Willow branches planted and woven in March into living fences, tunnels, domes, and archways.</p></article>
-        <article class="svc-card reveal" data-service-slug="rain_garden"><div class="ico" aria-hidden="true">💧</div><h3>Rain Garden</h3><p>A planted depression filled with well-drained soil and deep-rooted perennial flowers that soak up seasonal water.</p></article>
-        <article class="svc-card reveal" data-service-slug="medicinal_herb"><div class="ico" aria-hidden="true">🌿</div><h3>Medicinal Herb Garden</h3><p>Medicinal plants chosen for your land and health needs, with consulting and implementation.</p></article>
-        <article class="svc-card reveal" data-service-slug="lawn_to_meadow"><div class="ico" aria-hidden="true">🌾</div><h3>Lawn to Meadow Conversion</h3><p>You may qualify for a free conversion through the PA DCNR program we contract for (half acre minimum).</p></article>
+      <p class="lead">Every design starts with the native plants and living systems that belong here, then layers in beauty, food, and habitat for the pollinators and people who share your land. Explore all eleven ways we can help your ground come alive.</p>
+      <div class="svc-showcase">
+        <article class="svc-photo-card priority reveal" data-service-slug="tree_nets">
+          <!-- INTERIM photo: a woven living willow dome standing in for a tree net,
+               same craft family. TODO: Frank to supply a real tree net photo. -->
+          <img src="assets/img/services/tree-nets.jpg" alt="" loading="lazy">
+          <div class="svc-photo-body">
+            <p class="svc-photo-eyebrow">Featured</p>
+            <h3>Tree Nets</h3>
+            <p>Hand-woven tree nets, made to order in the same craft family as our living willow work.</p>
+          </div>
+        </article>
+        <article class="svc-photo-card priority reveal" data-service-slug="lawn_to_meadow">
+          <img src="assets/img/services/lawn-to-meadow.jpg" alt="" loading="lazy">
+          <div class="svc-photo-body">
+            <p class="svc-photo-eyebrow">Featured</p>
+            <h3>Lawn to Meadow Conversion</h3>
+            <p>Turn a high-maintenance lawn into native meadow, potentially at no cost through the PA DCNR program.</p>
+          </div>
+        </article>
+        <article class="svc-photo-card reveal" data-service-slug="pollinator_garden">
+          <img src="assets/img/services/pollinator-garden.jpg" alt="" loading="lazy">
+          <div class="svc-photo-body">
+            <h3>Pollinator Garden &amp; Mini Meadow</h3>
+            <p>Native perennial wildflowers that bloom across three seasons for butterflies, bees, and birds.</p>
+          </div>
+        </article>
+        <article class="svc-photo-card reveal" data-service-slug="food_forest">
+          <img src="assets/img/services/food-forest.jpg" alt="" loading="lazy">
+          <div class="svc-photo-body">
+            <h3>Food Forest Design</h3>
+            <p>Edible perennials in layered permaculture design for an abundance of low-work food.</p>
+          </div>
+        </article>
+        <article class="svc-photo-card reveal" data-service-slug="rain_garden">
+          <img src="assets/img/services/rain-garden.jpg" alt="" loading="lazy">
+          <div class="svc-photo-body">
+            <h3>Rain Garden</h3>
+            <p>A planted depression that soaks up runoff and blooms with three-season color.</p>
+          </div>
+        </article>
+        <article class="svc-photo-card reveal" data-service-slug="annual_food_garden">
+          <img src="assets/img/services/annual-food.jpg" alt="" loading="lazy">
+          <div class="svc-photo-body">
+            <h3>Annual Food Garden</h3>
+            <p>A productive vegetable garden planned around your space, your soil, and how you like to grow.</p>
+          </div>
+        </article>
+        <article class="svc-photo-card reveal" data-service-slug="living_willow">
+          <img src="assets/img/services/living-willow.jpg" alt="" loading="lazy">
+          <div class="svc-photo-body">
+            <h3>Living Willow Fence</h3>
+            <p>Willow branches planted and woven in March into living fences, tunnels, domes, and archways.</p>
+          </div>
+        </article>
+        <article class="svc-photo-card reveal" data-service-slug="garden_maintenance">
+          <img src="assets/img/services/maintenance-crew.jpg" alt="" loading="lazy">
+          <div class="svc-photo-body">
+            <h3>Routine Garden Maintenance</h3>
+            <p>Ongoing care from ecological landscapers who know a native from an invasive weed.</p>
+          </div>
+        </article>
+        <article class="svc-photo-card reveal" data-service-slug="medicinal_herb">
+          <img src="assets/img/services/medicinal-herb.jpg" alt="" loading="lazy">
+          <div class="svc-photo-body">
+            <h3>Medicinal Herb Garden</h3>
+            <p>A medicine garden of native and annual healing plants, with herbalist consulting.</p>
+          </div>
+        </article>
+        <article class="svc-photo-card reveal" data-service-slug="forest_restoration">
+          <img src="assets/img/services/forest-restoration.jpg" alt="" loading="lazy">
+          <div class="svc-photo-body">
+            <h3>Forest Habitat Restoration</h3>
+            <p>Riparian buffer planting and invasive removal that rebuilds streamside habitat.</p>
+          </div>
+        </article>
+        <article class="svc-photo-card reveal" data-service-slug="woodland_restoration">
+          <img src="assets/img/services/woodland-restoration.jpg" alt="" loading="lazy">
+          <div class="svc-photo-body">
+            <h3>Woodland Habitat Restoration</h3>
+            <p>Thinning the canopy and rebuilding the understory for layered, biodiverse woods.</p>
+          </div>
+        </article>
       </div>
       <div class="cta-row">
-        <a class="btn btn-ghost" href="services.html">See all ten services</a>
+        <a class="btn btn-ghost" href="services.html">See all eleven services</a>
       </div>
     </div>
   </section>
@@ -160,6 +238,13 @@
     <a class="staff" href="login.html">Staff sign in</a>
   </div>
 </footer>
+
+<div class="credit-band">
+  <div class="credit-inner">
+    <span>© 2026 Ecotopian EarthCare. All rights reserved.</span>
+    <span>Website by <a href="https://bagcarriers.com">BagCarriers Systems</a></span>
+  </div>
+</div>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {

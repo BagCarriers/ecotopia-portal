@@ -374,6 +374,7 @@
   // ── Nav / chrome rendering (browser only) ───────────────────────────────
   const NAV = [
     { href: 'index.html', label: 'Home', key: 'home' },
+    { href: 'about.html', label: 'About', key: 'about' },
     { href: 'services.html', label: 'Services', key: 'services' },
     { href: 'plants.html', label: 'Native Plants', key: 'plants' },
     { href: 'happenings.html', label: 'Events', key: 'events' },

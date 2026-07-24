@@ -31,6 +31,26 @@
 }
 .plants-crosslink a { font-weight: 600; }
 
+/* Card game feature */
+.game-feature { display: grid; grid-template-columns: 1fr 1fr; gap: 44px; align-items: center; }
+.game-visual img {
+  width: 100%; aspect-ratio: 4 / 5; object-fit: cover; display: block;
+  border-radius: var(--radius); box-shadow: var(--shadow); background: var(--cream);
+}
+.game-price { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 18px 0 0; }
+.game-amount { font-family: var(--font-util); font-weight: 700; font-size: 1.5rem; color: var(--green-dark); }
+.game-status {
+  font-family: var(--font-util); font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.12em; font-size: 0.72rem; color: var(--amber-dark);
+  background: hsl(38.6, 100%, 90%); padding: 5px 12px; border-radius: 999px;
+}
+.game-thumbs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 28px; }
+.game-thumbs img {
+  width: 100%; aspect-ratio: 3 / 4; object-fit: cover; display: block;
+  border-radius: 10px; box-shadow: var(--shadow); background: var(--cream);
+}
+@media (max-width: 800px) { .game-feature { grid-template-columns: 1fr; gap: 28px; } }
+
 /* Habitat kit cards */
 .kit-grid {
   display: grid; gap: 24px; margin-top: 40px;
@@ -255,6 +275,33 @@
       <div class="plant-grid" id="plantGrid"></div>
     </div>
   </section>
+  <div class="willow on-cream" data-opacity="0.4"></div>
+
+  <!-- Card game feature (pre-order). Modal reuses the page's eco-lead-* shell;
+       submits anon fire-and-forget to intake_submissions + jobs, like submitKit. -->
+  <section class="section" aria-labelledby="game-h">
+    <div class="wrap">
+      <div class="game-feature">
+        <div class="game-visual">
+          <img src="assets/img/game/game-playing.jpg" alt="People gathered around a table playing the Ecotopian EarthCare card game" loading="lazy" width="675" height="900">
+        </div>
+        <div class="game-copy">
+          <p class="eyebrow">Now in the works</p>
+          <h2 id="game-h">The Ecotopian EarthCare Card Game</h2>
+          <p class="lead">A tabletop card game of native plants, habitats, roles, and seasons. Two hundred game cards. Play as the Conservationist, the Herbalist, the Permaculturist, the Ecological Landscaper, or the Elder.</p>
+          <p class="game-price"><span class="game-amount">US $40</span> <span class="game-status">Pre-order</span></p>
+          <div class="cta-row">
+            <button type="button" class="btn btn-primary" id="gamePreorderBtn">Pre-order and join the waiting list</button>
+          </div>
+          <div class="game-thumbs">
+            <img src="assets/img/game/game-pawpaw.jpg" alt="Pawpaw card artwork from the Ecotopian EarthCare card game" loading="lazy" width="681" height="900">
+            <img src="assets/img/game/game-layout.jpg" alt="A spread of cards from the Ecotopian EarthCare card game" loading="lazy" width="681" height="900">
+            <img src="assets/img/game/game-roles.jpg" alt="The player role cards from the Ecotopian EarthCare card game" loading="lazy" width="681" height="900">
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
 </main>
 
 <button type="button" class="tray-fab" id="trayFab" aria-haspopup="dialog">
@@ -292,6 +339,13 @@
     <a class="staff" href="login.html">Staff sign in</a>
   </div>
 </footer>
+
+<div class="credit-band">
+  <div class="credit-inner">
+    <span>© 2026 Ecotopian EarthCare. All rights reserved.</span>
+    <span>Website by <a href="https://bagcarriers.com">BagCarriers Systems</a></span>
+  </div>
+</div>
 
 <script>
 /* ==========================================================================
@@ -817,6 +871,82 @@
     }
   }
 
+  // ── Card game pre-order modal ────────────────────────────────────────────
+  // Name required; email OR phone required; quantity 1-5. Anon fire-and-forget
+  // to intake_submissions (service_type card_game) + jobs (Card Game Pre-order).
+  function openGamePreorder() {
+    ensureModal();
+    var body = document.getElementById('plantModalBody');
+    var qtyOpts = [1, 2, 3, 4, 5].map(function (n) {
+      return '<option value="' + n + '">' + n + '</option>';
+    }).join('');
+    body.innerHTML =
+      '<p class="eco-lead-eyebrow">Pre-order</p>' +
+      '<h2 id="plantModalTitle">Ecotopian EarthCare Card Game</h2>' +
+      '<p class="eco-lead-tinynote">US $40 each. Pre-order to join the waiting list. Nothing is charged online; we will reach out when it is ready.</p>' +
+      '<form id="gameForm" novalidate>' +
+        '<div class="eco-lead-grid">' +
+          '<div class="eco-lead-field eco-lead-full"><label for="pl-g-name">Name <span class="req">*</span></label>' +
+            '<input type="text" id="pl-g-name" placeholder="Full name"></div>' +
+          '<div class="eco-lead-field"><label for="pl-g-email">Email</label>' +
+            '<input type="email" id="pl-g-email" placeholder="email@example.com"></div>' +
+          '<div class="eco-lead-field"><label for="pl-g-phone">Phone</label>' +
+            '<input type="tel" id="pl-g-phone" placeholder="(814) 555-0000"></div>' +
+          '<div class="eco-lead-field"><label for="pl-g-qty">Quantity</label>' +
+            '<select id="pl-g-qty">' + qtyOpts + '</select></div>' +
+        '</div>' +
+        '<p class="eco-lead-tinynote">Add an email or a phone number so we can reach you.</p>' +
+        '<p class="eco-lead-error" id="plantModalError"></p>' +
+        '<button type="submit" class="eco-lead-primary">Join the waiting list</button>' +
+      '</form>';
+    document.getElementById('gameForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      submitGamePreorder();
+    });
+    showModal();
+  }
+
+  async function submitGamePreorder() {
+    var errEl = document.getElementById('plantModalError');
+    errEl.textContent = '';
+    var name = (document.getElementById('pl-g-name').value || '').trim();
+    var email = (document.getElementById('pl-g-email').value || '').trim();
+    var phone = (document.getElementById('pl-g-phone').value || '').trim();
+    var qty = parseInt(document.getElementById('pl-g-qty').value, 10);
+    if (!(qty >= 1 && qty <= 5)) qty = 1;
+    if (!name) { errEl.textContent = 'Please add your name.'; return; }
+    if (!email && !phone) {
+      errEl.textContent = 'Please add an email or a phone number so we can reach you.';
+      return;
+    }
+    var pref = (email && !phone) ? 'email' : 'phone';
+    var descr = 'Card game pre-order\nQuantity: ' + qty + ' at US $40 each' +
+      '\nContact: ' + (phone || '(no phone)') + (email ? ' / ' + email : '') +
+      '\nPre-order only. Nothing charged online.';
+    var notes = 'Submitted via plants page card game pre-order.\n\n' + descr;
+    try {
+      var ins1 = await sb().from('intake_submissions').insert({
+        name: name, phone: phone, email: email, address: '',
+        service_type: 'card_game', size: qty + ' copies', description: descr,
+        contact_preference: pref, submitted_at: new Date().toISOString()
+      });
+      if (ins1.error) throw new Error(ins1.error.message);
+      var ins2 = await sb().from('jobs').insert({
+        status: 'inquiry',
+        title: 'Card Game Pre-order',
+        client_name: name,
+        address: '',
+        type: 'card_game',
+        notes: notes,
+        activity_log: [{ ts: new Date().toISOString(), note: 'Received via plants page card game pre-order.' }]
+      });
+      if (ins2.error) throw new Error(ins2.error.message);
+      showSuccess('You are on the waiting list.', 'Thanks for pre-ordering the card game. We will reach out when it is ready. Nothing is charged online.');
+    } catch (err) {
+      errEl.textContent = 'Something went wrong sending your pre-order. Please try again, or email us at admin@ecotopianearthcare.com or call 814-631-5338.';
+    }
+  }
+
   // ── Plant request tray modal ─────────────────────────────────────────────
   function openTray() {
     ensureModal();
@@ -971,6 +1101,7 @@
     renderPlants();
     updateTrayCount();
     document.getElementById('trayFab').addEventListener('click', openTray);
+    document.getElementById('gamePreorderBtn').addEventListener('click', openGamePreorder);
     EcoSite.decorate();
   });
 })();

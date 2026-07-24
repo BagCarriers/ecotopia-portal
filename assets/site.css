@@ -96,13 +96,13 @@ h1, h2, h3 { line-height: 1.15; margin: 0 0 0.5em; }
 .brand:focus-visible { outline-offset: 4px; }
 .brand .leaf { font-size: 1.15rem; }
 .nav-links {
-  display: flex; align-items: center; gap: 4px;
+  display: flex; align-items: center; gap: 2px;
   list-style: none; margin: 0; padding: 0;
 }
 .nav-links a {
   font-family: var(--font-util); font-weight: 500; font-size: 0.98rem;
   color: rgba(255,255,255,0.92); text-decoration: none;
-  padding: 8px 12px; border-radius: 8px; letter-spacing: 0.01em;
+  padding: 8px 10px; border-radius: 8px; letter-spacing: 0.01em;
   display: inline-block; transition: background 0.15s ease, color 0.15s ease;
 }
 .nav-links a:hover { background: rgba(255,255,255,0.14); color: #fff; }
@@ -125,7 +125,7 @@ h1, h2, h3 { line-height: 1.15; margin: 0 0 0.5em; }
 }
 .nav-toggle svg { width: 28px; height: 28px; display: block; }
 
-@media (max-width: 860px) {
+@media (max-width: 1140px) {
   .nav-toggle { display: inline-flex; }
   .nav-links {
     position: absolute; top: var(--header-h); left: 0; right: 0;
@@ -435,6 +435,77 @@ details.past-events[open] > summary::before { transform: rotate(90deg); }
 .svc-lead:focus .svc-cue,
 .svc-lead:focus-within .svc-cue { opacity: 1; transform: none; }
 .svc-lead:focus-visible { outline: 3px solid var(--amber); outline-offset: 3px; }
+
+/* ── Photo-backdrop service showcase (homepage) ────────────────────────── */
+.svc-showcase {
+  display: grid; gap: 18px; margin-top: 40px;
+  grid-template-columns: repeat(4, 1fr);
+}
+.svc-photo-card {
+  position: relative; overflow: hidden;
+  border-radius: var(--radius); box-shadow: var(--shadow);
+  min-height: 244px; background: var(--green-deep);
+  display: flex; align-items: flex-end;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.svc-photo-card > img {
+  position: absolute; inset: 0; z-index: 0;
+  width: 100%; height: 100%; object-fit: cover;
+  transition: transform 0.3s ease;
+}
+.svc-photo-card::after {
+  content: ''; position: absolute; inset: 0; z-index: 1;
+  background: linear-gradient(to top,
+    hsla(116, 30%, 9%, 0.94) 0%,
+    hsla(116, 30%, 11%, 0.6) 42%,
+    hsla(116, 30%, 14%, 0.06) 78%);
+}
+.svc-photo-body { position: relative; z-index: 2; padding: 20px 20px 18px; width: 100%; }
+.svc-photo-eyebrow {
+  font-family: var(--font-util); font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.16em; font-size: 0.66rem; color: var(--cream);
+  margin: 0 0 6px; text-shadow: 0 1px 6px rgba(0,0,0,0.6);
+}
+.svc-photo-card h3 {
+  font-family: var(--font-util); font-weight: 700; font-size: 1.16rem;
+  color: #fff; letter-spacing: 0.005em; margin: 0 0 6px;
+  text-shadow: 0 1px 8px rgba(0,0,0,0.55);
+}
+.svc-photo-card p {
+  margin: 0; font-size: 0.97rem; line-height: 1.45;
+  color: rgba(255,255,255,0.93); text-shadow: 0 1px 6px rgba(0,0,0,0.6);
+}
+.svc-photo-card.priority { min-height: 316px; outline: 2px solid var(--amber); outline-offset: -2px; }
+.svc-photo-card:hover, .svc-photo-card:focus-within {
+  transform: translateY(-3px); box-shadow: 0 16px 44px -18px rgba(20, 30, 20, 0.72);
+}
+.svc-photo-card:hover > img { transform: scale(1.045); }
+.svc-photo-card.svc-lead:focus-visible { outline: 3px solid var(--amber); outline-offset: 3px; }
+.svc-photo-card .svc-cue {
+  position: absolute; z-index: 2; top: 14px; right: 16px;
+  margin: 0; padding: 0; color: #fff; text-shadow: 0 1px 6px rgba(0,0,0,0.65);
+}
+@media (max-width: 900px) { .svc-showcase { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 540px) {
+  .svc-showcase { grid-template-columns: 1fr; }
+  .svc-photo-card, .svc-photo-card.priority { min-height: 220px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .svc-photo-card, .svc-photo-card > img { transition: none !important; }
+  .svc-photo-card:hover > img { transform: none; }
+}
+
+/* ── Credit band (BagCarriers) ─────────────────────────────────────────── */
+.credit-band { background: var(--green-deep); }
+.credit-inner {
+  max-width: var(--maxw); margin: 0 auto; padding: 14px 22px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  display: flex; flex-wrap: wrap; gap: 8px 18px; justify-content: space-between;
+  font-family: var(--font-util); font-size: 0.82rem;
+  color: rgba(255,255,255,0.6);
+}
+.credit-inner a { color: rgba(255,255,255,0.6); text-decoration: none; }
+.credit-inner a:hover { color: #fff; text-decoration: underline; }
 
 /* ── Service lead modal (marketing aesthetic) ──────────────────────────── */
 .eco-lead-overlay {
