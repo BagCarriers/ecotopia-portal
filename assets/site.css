@@ -225,6 +225,32 @@ main { display: block; }
   margin: 0 0 20px;
 }
 
+/* ── Hero with the pawpaw-hands artwork (client's own painting) ────────── */
+/* Background matches the painting's own olive green so it reads as one canvas. */
+.hero-art {
+  background:
+    radial-gradient(ellipse 90% 120% at 78% 40%, #4b5e31 0%, #46582e 45%, #3f4f28 100%);
+}
+.hero-art .hero-inner.hero-split {
+  max-width: 1120px;
+  display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.8fr);
+  gap: clamp(28px, 5vw, 64px); align-items: center;
+}
+.hero-art h1 { color: var(--cream); }
+.hero-art .subhead { color: rgba(250, 244, 222, 0.88); }
+.hero-art .place { color: hsl(38.6, 100%, 62%); }
+.hero-art-frame { display: flex; justify-content: center; }
+.hero-art-frame img {
+  width: 100%; max-width: 430px; height: auto;
+  -webkit-mask-image: radial-gradient(ellipse 74% 72% at 50% 48%, #000 52%, transparent 76%);
+  mask-image: radial-gradient(ellipse 74% 72% at 50% 48%, #000 52%, transparent 76%);
+}
+@media (max-width: 860px) {
+  .hero-art .hero-inner.hero-split { grid-template-columns: 1fr; }
+  .hero-art-frame { order: 2; margin-top: 8px; }
+  .hero-art-frame img { max-width: 330px; }
+}
+
 /* ── Willow weave divider (signature motif) ────────────────────────────── */
 .willow {
   display: block; width: 100%; height: 48px; line-height: 0;
