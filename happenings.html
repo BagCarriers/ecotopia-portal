@@ -112,12 +112,15 @@ async function loadEvents() {
       ? upcoming.map(e => renderEvent(e, false)).join('')
       : '';
     if (!upcoming.length) {
-      up.outerHTML = '<p class="empty-line">No upcoming events are scheduled right now. Check back soon, or browse past events below.</p>';
+      up.outerHTML = '<p class="empty-line">No upcoming events on the calendar just yet. Here is what we have been up to; new season dates land here first.</p>';
     }
 
     if (past.length) {
+      // When nothing is upcoming, show recent events expanded so the page
+      // never reads as empty; otherwise keep them tucked in the toggle.
+      const openAttr = upcoming.length ? '' : ' open';
       pastWrap.innerHTML =
-        '<details class="past-events"><summary>Past events (' + past.length + ')</summary>' +
+        '<details class="past-events"' + openAttr + '><summary>Past events (' + past.length + ')</summary>' +
         '<ul class="event-list">' + past.map(e => renderEvent(e, true)).join('') + '</ul></details>';
     }
     EcoSite.decorate();

@@ -270,11 +270,20 @@ async function loadHomeEvents() {
     const all = await EcoSite.getEvents();
     const today = EcoSite.todayISO();
     const upcoming = all.filter(e => e.date && e.date >= today).slice(0, 3);
-    if (!upcoming.length) {
+    // Fall back to the most recent past events so this section always shows
+    // real community activity between seasons.
+    const shown = upcoming.length
+      ? upcoming
+      : all.filter(e => e.date && e.date < today).reverse().slice(0, 3);
+    if (!shown.length) {
       el.outerHTML = '<p class="empty-line">New events are being planned. Check the <a href="happenings.html">events page</a> for our full calendar.</p>';
       return;
     }
-    el.innerHTML = upcoming.map(renderEvent).join('');
+    if (!upcoming.length) {
+      el.insertAdjacentHTML('beforebegin',
+        '<p class="empty-line">New season dates are being planned. Recently:</p>');
+    }
+    el.innerHTML = shown.map(renderEvent).join('');
     EcoSite.decorate();
   } catch (e) {
     el.outerHTML = '<p class="fallback-line">Events are updating. Check back soon.</p>';
