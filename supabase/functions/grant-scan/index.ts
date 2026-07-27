@@ -252,7 +252,7 @@ async function upsertOpps(
         summary: o.summary,
         keywords: o.keywords,
         last_seen: now,
-        // NOTE: status is intentionally NOT touched — staff triage survives rescans.
+        // NOTE: status is intentionally NOT touched - staff triage survives rescans.
       }).eq('id', existing.id);
       if (!error) upserted++;
     } else {
