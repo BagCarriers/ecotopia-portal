@@ -16,6 +16,7 @@ const Nav = (() => {
     { href: 'invoices.html',   label: 'Invoices',    icon: '💵' },
     { href: 'quotes.html',     label: 'Quotes',      icon: '📄' },
     { href: 'grants.html',     label: 'Grants',      icon: '🏛'  },
+    { href: 'grant-finder.html', label: 'Grant Finder', icon: '🔎' },
     { href: 'reports.html',    label: 'Reports',     icon: '📊' },
   ];
 

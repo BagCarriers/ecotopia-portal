@@ -173,6 +173,12 @@ const DataStore = (() => {
     addGrant: (r) => insert('grants', r),
     updateGrant: (id, ch) => update('grants', id, ch),
 
+    // Grant finder (auto-discovered opportunities; staff triage). Query stays
+    // simple; grant-finder.html orders client-side (new first, then close_date
+    // ascending nulls last).
+    getGrantOpportunities: () => list('grant_opportunities'),
+    updateGrantOpportunity: (id, ch) => update('grant_opportunities', id, ch),
+
     // Observations
     getObservations: () => list('observations'),
     getObservationsByGarden: async (gId) =>

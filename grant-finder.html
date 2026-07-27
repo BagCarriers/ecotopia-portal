@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grant Finder - Ecotopia</title>
+  <link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/mapping.js"></script>
+<script src="assets/auth.js"></script>
+<script>if (!AuthManager.hasCachedSession()) location.replace('login.html');</script>
+<script src="assets/data.js"></script>
+<script src="assets/nav.js"></script>
+<style>
+  :root {
+    --forest: #1B4332; --forest-mid: #2D6A4F; --forest-light: #52B788;
+    --sage: #D8F3DC; --sage-dim: #B7E4C7; --earth: #8B5E3C;
+    --earth-light: #C68642; --gold: #F4A261; --cream: #F9F6F0;
+    --cream-dim: #E8E0D5; --text: #1C1C1C; --text-dim: #5A5A5A;
+    --border: rgba(45,106,79,0.2);
+    --amber-bg: #fef3c7; --amber-fg: #92400e;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--text); }
+  .page { padding: 28px 32px; max-width: 900px; }
+  .page-header { display: flex; align-items: center; justify-content: space-between;
+    gap: 12px; margin-bottom: 8px; flex-wrap: wrap; }
+  h1 { font-family: 'Fraunces', serif; font-size: 1.9rem; color: var(--forest); }
+  .subtitle { color: var(--text-dim); font-size: 0.9rem; margin-bottom: 20px; }
+  .btn { padding: 10px 18px; border-radius: 8px; border: none; font-size: 0.875rem;
+    font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif;
+    text-decoration: none; display: inline-flex; gap: 6px; align-items: center;
+    transition: background 0.15s; }
+  .btn-primary { background: var(--forest); color: #fff; }
+  .btn-primary:hover { background: var(--forest-mid); }
+  .btn-primary:disabled { opacity: 0.6; cursor: default; }
+  .btn-sm { padding: 7px 14px; font-size: 0.8rem; }
+  .btn-outline { background: #fff; color: var(--forest); border: 1.5px solid var(--forest-light); }
+  .btn-outline:hover { background: var(--sage); }
+
+  .spinner { width: 15px; height: 15px; border: 2px solid rgba(255,255,255,0.4);
+    border-top-color: #fff; border-radius: 50%; display: inline-block;
+    animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Stat chips */
+  .chips { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+  .chip { background: #fff; border: 1px solid var(--border); border-radius: 12px;
+    padding: 12px 18px; min-width: 96px; }
+  .chip .num { font-family: 'Fraunces', serif; font-size: 1.6rem; color: var(--forest); font-weight: 700; }
+  .chip .lbl { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--text-dim); font-weight: 700; }
+
+  .scan-result { font-size: 0.85rem; color: var(--forest-mid); margin-bottom: 16px;
+    min-height: 1.1em; }
+
+  /* Groups */
+  .group { margin-bottom: 28px; }
+  .group-title { font-family: 'Fraunces', serif; font-size: 1.15rem; color: var(--forest);
+    margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+  .group-count { font-family: 'DM Sans', sans-serif; font-size: 0.8rem; color: var(--text-dim);
+    background: var(--cream-dim); border-radius: 20px; padding: 2px 10px; font-weight: 600; }
+
+  .opp-list { display: flex; flex-direction: column; gap: 14px; }
+  .opp-card { background: #fff; border-radius: 14px; border: 1px solid var(--border); padding: 20px; }
+  .opp-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .opp-title { font-family: 'Fraunces', serif; font-size: 1.12rem; color: var(--forest);
+    line-height: 1.3; text-decoration: none; }
+  .opp-title:hover { text-decoration: underline; }
+  .opp-agency { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--text-dim); font-weight: 700; margin-bottom: 4px; }
+  .source-badge { padding: 4px 10px; border-radius: 20px; font-size: 0.72rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.04em; white-space: nowrap; }
+  .badge-grants { background: #dbeafe; color: #1e40af; }
+  .badge-dcnr { background: var(--sage); color: var(--forest); border: 1px solid var(--forest-light); }
+  .badge-dep { background: #ede9fe; color: #5b21b6; }
+  .opp-meta { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 12px; font-size: 0.83rem; }
+  .opp-meta .m-lbl { color: var(--text-dim); font-weight: 600; }
+  .close-soon { color: var(--amber-fg); background: var(--amber-bg); border-radius: 6px;
+    padding: 1px 7px; font-weight: 700; }
+  .close-past { color: var(--text-dim); font-style: italic; }
+  .opp-keywords { font-size: 0.78rem; color: var(--text-dim); margin-top: 10px; }
+  .opp-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px;
+    padding-top: 14px; border-top: 1px solid var(--border); }
+
+  details.dismissed-wrap { margin-top: 10px; }
+  details.dismissed-wrap summary { cursor: pointer; color: var(--text-dim);
+    font-size: 0.9rem; font-weight: 600; padding: 8px 0; }
+  details.dismissed-wrap .opp-card { opacity: 0.7; }
+
+  .empty { color: var(--text-dim); background: #fff; border: 1px dashed var(--border);
+    border-radius: 14px; padding: 32px; text-align: center; }
+  .modal-error { color: #b3261e; font-size: 0.85rem; margin-bottom: 12px; min-height: 1em; }
+
+  @media (max-width: 600px) {
+    .page { padding: 20px 16px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="page-header">
+    <h1>Grant Finder</h1>
+    <button class="btn btn-primary" id="scanBtn" onclick="runScan()">🔎 Scan now</button>
+  </div>
+  <p class="subtitle">Auto-discovered grants for ecological landscaping, native plants,
+    riparian buffers, pollinator habitat, community gardens, urban forestry, and watershed
+    restoration. Scanned nightly from Grants.gov and PA DCNR.</p>
+
+  <div class="scan-result" id="scanResult"></div>
+
+  <div class="chips" id="chips"></div>
+
+  <div class="modal-error" id="pageError"></div>
+
+  <div id="content"></div>
+</div>
+
+<script>
+const esc = DataStore.esc;
+let opps = [];
+
+const STATUS_ORDER = { new: 0, reviewing: 1, applying: 2, dismissed: 3 };
+const SOURCE_BADGE = { 'grants.gov': 'badge-grants', dcnr: 'badge-dcnr', dep: 'badge-dep' };
+const SOURCE_LABEL = { 'grants.gov': 'Grants.gov', dcnr: 'DCNR', dep: 'DEP' };
+const SCAN_URL = 'https://wibnryfinfwbwwgsyojr.supabase.co/functions/v1/grant-scan';
+
+// New first, then close_date ascending with nulls last (client-side ordering).
+function sortActive(list) {
+  return list.slice().sort((a, b) => {
+    const so = (STATUS_ORDER[a.status] ?? 9) - (STATUS_ORDER[b.status] ?? 9);
+    if (so !== 0) return so;
+    if (!a.closeDate && !b.closeDate) return 0;
+    if (!a.closeDate) return 1;
+    if (!b.closeDate) return -1;
+    return a.closeDate < b.closeDate ? -1 : a.closeDate > b.closeDate ? 1 : 0;
+  });
+}
+
+function closeDateHtml(closeDate) {
+  if (!closeDate) return '';
+  const days = DataStore.daysUntil(closeDate + 'T00:00:00');
+  const nice = DataStore.formatDate(closeDate + 'T00:00:00');
+  if (days == null) return '';
+  if (days < 0) return `<span class="close-past">Closed? (${esc(nice)})</span>`;
+  if (days <= 30) return `<span class="close-soon">Closes ${esc(nice)} (${days}d)</span>`;
+  return esc(nice);
+}
+
+function cardHtml(o) {
+  const badge = SOURCE_BADGE[o.source] || 'badge-grants';
+  const srcLabel = SOURCE_LABEL[o.source] || esc(o.source);
+  const titleHtml = o.url
+    ? `<a class="opp-title" href="${esc(o.url)}" target="_blank" rel="noopener">${esc(o.title)}</a>`
+    : `<span class="opp-title">${esc(o.title)}</span>`;
+  const closeHtml = closeDateHtml(o.closeDate);
+  const actions = [];
+  if (o.status !== 'reviewing')
+    actions.push(`<button class="btn btn-outline btn-sm" onclick="setStatus('${o.id}','reviewing')">Reviewing</button>`);
+  if (o.status !== 'applying')
+    actions.push(`<button class="btn btn-outline btn-sm" onclick="setStatus('${o.id}','applying')">Applying</button>`);
+  actions.push(`<button class="btn btn-primary btn-sm" onclick="trackInGrants('${o.id}')">Track in Grants</button>`);
+  if (o.status !== 'dismissed')
+    actions.push(`<button class="btn btn-outline btn-sm" onclick="setStatus('${o.id}','dismissed')">Dismiss</button>`);
+  else
+    actions.push(`<button class="btn btn-outline btn-sm" onclick="setStatus('${o.id}','new')">Restore</button>`);
+
+  return `
+    <div class="opp-card">
+      <div class="opp-top">
+        <div>
+          <div class="opp-agency">${esc(o.agency || srcLabel)}</div>
+          ${titleHtml}
+        </div>
+        <span class="source-badge ${badge}">${srcLabel}</span>
+      </div>
+      <div class="opp-meta">
+        ${closeHtml ? `<div><span class="m-lbl">Deadline:</span> ${closeHtml}</div>` : ''}
+        ${o.firstSeen ? `<div><span class="m-lbl">Found:</span> ${esc(DataStore.formatDate(o.firstSeen))}</div>` : ''}
+      </div>
+      ${o.keywords ? `<div class="opp-keywords">Matched: ${esc(o.keywords)}</div>` : ''}
+      <div class="opp-actions">${actions.join('')}</div>
+    </div>`;
+}
+
+function render() {
+  const chips = document.getElementById('chips');
+  const counts = { new: 0, reviewing: 0, applying: 0 };
+  opps.forEach(o => { if (counts[o.status] != null) counts[o.status]++; });
+  chips.innerHTML = [
+    ['New', counts.new], ['Reviewing', counts.reviewing], ['Applying', counts.applying],
+  ].map(([lbl, n]) => `<div class="chip"><div class="num">${n}</div><div class="lbl">${lbl}</div></div>`).join('');
+
+  const content = document.getElementById('content');
+  if (opps.length === 0) {
+    content.innerHTML = '<div class="empty">No opportunities yet. Run the first scan.</div>';
+    return;
+  }
+
+  const groups = [
+    ['new', 'New'], ['reviewing', 'Reviewing'], ['applying', 'Applying'],
+  ];
+  let html = '';
+  for (const [status, label] of groups) {
+    const list = sortActive(opps.filter(o => o.status === status));
+    if (list.length === 0) continue;
+    html += `
+      <div class="group">
+        <div class="group-title">${label} <span class="group-count">${list.length}</span></div>
+        <div class="opp-list">${list.map(cardHtml).join('')}</div>
+      </div>`;
+  }
+  if (html === '') {
+    html = '<div class="empty">Nothing active. Check dismissed below or run a scan.</div>';
+  }
+
+  const dismissed = sortActive(opps.filter(o => o.status === 'dismissed'));
+  if (dismissed.length > 0) {
+    html += `
+      <details class="dismissed-wrap">
+        <summary>Dismissed (${dismissed.length})</summary>
+        <div class="opp-list" style="margin-top:12px">${dismissed.map(cardHtml).join('')}</div>
+      </details>`;
+  }
+  content.innerHTML = html;
+}
+
+async function setStatus(id, status) {
+  const errEl = document.getElementById('pageError');
+  errEl.textContent = '';
+  try {
+    await DataStore.updateGrantOpportunity(id, { status });
+    opps = await DataStore.getGrantOpportunities();
+    render();
+  } catch (err) {
+    errEl.textContent = 'Could not update status. ' + err.message;
+  }
+}
+
+async function trackInGrants(id) {
+  const o = opps.find(x => x.id === id);
+  if (!o) return;
+  const errEl = document.getElementById('pageError');
+  errEl.textContent = '';
+  try {
+    await DataStore.addGrant({
+      funder: o.agency || SOURCE_LABEL[o.source] || o.source,
+      program: o.title,
+      status: 'prospect',
+      notes: (o.url ? o.url + ' ' : '') + '(found by grant finder)',
+      deadline: o.closeDate || null,
+    });
+    await DataStore.updateGrantOpportunity(id, { status: 'applying' });
+    opps = await DataStore.getGrantOpportunities();
+    render();
+    document.getElementById('scanResult').textContent =
+      'Added to Grants tracker as a prospect.';
+  } catch (err) {
+    errEl.textContent = 'Could not track in Grants. ' + err.message;
+  }
+}
+
+async function runScan() {
+  const btn = document.getElementById('scanBtn');
+  const resEl = document.getElementById('scanResult');
+  const errEl = document.getElementById('pageError');
+  errEl.textContent = '';
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Scanning…';
+  resEl.textContent = 'Scanning Grants.gov and PA DCNR…';
+  try {
+    const { data } = await window.ecoSupabase.auth.getSession();
+    const token = data && data.session ? data.session.access_token : null;
+    if (!token) throw new Error('Not signed in.');
+    const res = await fetch(SCAN_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token,
+        'apikey': window.ECO_CONFIG.SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({ action: 'scan' }),
+    });
+    const payload = await res.json();
+    if (!res.ok) throw new Error(payload.error || 'Scan failed.');
+    const c = payload.counts || {};
+    const bs = c.bySource || {};
+    const parts = Object.keys(bs).map(k => `${SOURCE_LABEL[k] || k}: ${bs[k]}`);
+    let msg = `Scanned. ${c.upserted || 0} opportunities refreshed`;
+    if (parts.length) msg += ' (' + parts.join(', ') + ')';
+    msg += '.';
+    if (payload.errors) {
+      msg += ' Some sources had issues: ' +
+        Object.keys(payload.errors).map(k => `${SOURCE_LABEL[k] || k}`).join(', ') + '.';
+    }
+    resEl.textContent = msg;
+    opps = await DataStore.getGrantOpportunities();
+    render();
+  } catch (err) {
+    resEl.textContent = '';
+    errEl.textContent = 'Scan failed. ' + err.message;
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '🔎 Scan now';
+  }
+}
+
+(async function init() {
+  try {
+    await AuthManager.requireAuth();
+    Nav.render();
+    opps = await DataStore.getGrantOpportunities();
+    render();
+  } catch (err) {
+    document.getElementById('content').innerHTML =
+      '<div class="empty">Could not load opportunities (' + esc(err.message) +
+      '). <a href="javascript:location.reload()">Retry</a></div>';
+  }
+})();
+</script>
+</body>
+</html>

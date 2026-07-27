@@ -198,6 +198,72 @@ Monthly, BagCarriers invoices the client (Open Sesame Designs LLC / Ecotopian
 EarthCare) for the accumulated fees; the YTD figure on `quotes.html` is the running
 tally. The legal entity printed on quotes is Open Sesame Designs LLC.
 
+## Grant finder
+
+Migration `0014_grant_finder.sql` adds `public.grant_opportunities` (applied live via
+the Management API, so register it with `supabase migration repair --status applied 0014`
+before any `supabase db push`). RLS is staff-only: a single `go_staff_all` policy for
+authenticated portal users; there is no anon policy, so the public site cannot read
+discovered opportunities. Staff triage them on `grant-finder.html` (the "Grant Finder"
+nav link, right after Grants).
+
+The `grant-scan` edge function auto-discovers grants relevant to Ecotopia's work
+(ecological landscaping, native plants, riparian buffers, pollinator habitat, community
+gardens, urban forestry, watershed restoration in Central PA):
+
+- POST `{"action":"scan"}`. Auth is EITHER a valid staff JWT (`Authorization: Bearer`,
+  validated the same way as `calendar-feed` - `auth.getUser` + an active `portal_users`
+  row) OR the shared secret header `X-Scan-Token` matching the `GRANT_SCAN_TOKEN`
+  function secret (used by the nightly cron). Otherwise 401.
+- Sources (per-source isolated: one failing never kills the others; per-source errors
+  come back in the response `errors` map):
+  - **Grants.gov** (`https://api.grants.gov/v1/api/search2`, no API key): runs seven
+    keyword queries (the `GRANTS_GOV_QUERIES` const in the function), collects unique
+    opportunities by number, and applies a lightweight relevance heuristic (the
+    `ALLOW_WORDS` / `BLOCK_WORDS` consts) to drop obviously-irrelevant hits (tribal-only,
+    overseas/embassy, NASA/space, defense). `source = 'grants.gov'`,
+    `source_ref = <opp number>`, `url = https://www.grants.gov/search-results-detail/<id>`,
+    `close_date` parsed from MM/DD/YYYY (null-safe), `keywords` = the matching queries.
+  - **DCNR** (`https://www.pa.gov/agencies/dcnr/programs-and-services/grants.html`,
+    server-rendered): a lightweight change-surface, not a parser. Surfaces up to 10
+    distinct program links whose href is under `/dcnr/` and mentions "grant" (e.g. the
+    Community Conservation Partnerships Program / C2P2), one row each, `close_date` null,
+    with a "Check the page for current round dates" summary.
+  - **DEP** (`.../dep/.../grants-loans-and-rebates.html`): attempted the same way, but as
+    of 2026-07 that URL 301-redirects to a 404, so the source is skipped cleanly and the
+    skip reason is reported in `errors.dep`. Revisit if DEP restores a server-rendered
+    grants page.
+- Upsert semantics: on conflict `(source, source_ref)` it refreshes
+  `title`/`url`/`close_date`/`summary` and bumps `last_seen`, but **never overwrites
+  `status`** - staff triage (`new` -> `reviewing` -> `applying`, or `dismissed`) survives
+  every rescan. "Track in Grants" on the finder page creates a `grants` row
+  (`status = 'prospect'`, notes carry the source URL) and flips the opportunity to
+  `applying`.
+
+Deploy (JWT verification is done manually in the function so the cron token path works;
+the platform check stays off, pinned in `supabase/config.toml`):
+
+```
+supabase functions deploy grant-scan --no-verify-jwt --project-ref wibnryfinfwbwwgsyojr
+```
+
+`GRANT_SCAN_TOKEN` (function secret) - the shared cron token. Set it with:
+
+```
+supabase secrets set --project-ref wibnryfinfwbwwgsyojr GRANT_SCAN_TOKEN=<random hex>
+```
+
+The nightly cron embeds this same value. To rotate: generate a new hex, `secrets set` it,
+and reschedule the cron job (below) with the new value - the two must stay in sync.
+
+Nightly schedule (`pg_cron` + `pg_net`, inside the Ecotopia Supabase project, applied via
+the Management API - `create extension if not exists pg_cron; create extension if not
+exists pg_net;` then `cron.schedule(...)`): job name `grant-scan-nightly`, `0 9 * * *`
+(09:00 UTC, overnight ET), which `net.http_post`s to the function with the `X-Scan-Token`
+header. The token lives in the cron job's SQL (stored in the same DB the service role
+protects; acceptable). Inspect/verify with `select * from cron.job where jobname =
+'grant-scan-nightly';`.
+
 ## Deploy
 
 The site is a static bundle deployed to Netlify:

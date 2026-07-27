@@ -418,3 +418,6 @@ verify_jwt = false
 
 [functions.calendar-feed]
 verify_jwt = false
+
+[functions.grant-scan]
+verify_jwt = false
