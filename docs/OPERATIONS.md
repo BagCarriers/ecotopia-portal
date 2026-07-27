@@ -109,6 +109,13 @@ a missing object is ignored so the row is still removed. `DataStore.resizeImage`
 downscales images client-side (canvas, long edge <= 1600px, JPEG q0.85) before
 upload; GIFs and already-small images pass through untouched.
 
+Event photos (migration `0015_event_photos.sql`) live in this same `gallery`
+bucket under the `events/<uuid>.jpg` prefix, referenced by column
+`public.events.photo_path`; the existing `gallery_staff_all` policy (no path
+restriction) covers staff writes and public bucket read serves the marketing pages.
+Replacing or removing an event photo deletes the old storage object best-effort
+(errors ignored), the same pattern as gallery deletes.
+
 ## Service lead-gen (per-service toggles + waitlist)
 
 Migration `0011_service_leads.sql` adds two tables (applied live via the Management

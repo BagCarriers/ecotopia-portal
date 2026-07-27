@@ -294,8 +294,11 @@ function renderEvent(e) {
   const esc = EcoSite.esc;
   const where = e.location || e.gardenName || '';
   const type = e.type ? '<span class="chip">' + esc(String(e.type).replace(/_/g, ' ')) + '</span>' : '';
+  const photo = e.photoPath
+    ? '<img class="event-photo sm" src="' + esc(EcoSite.eventPhotoUrl(e.photoPath)) + '" loading="lazy" alt="">'
+    : '';
   return '<li class="event-item reveal">' + EcoSite.eventBadge(e.date, false) +
-    '<div class="event-body"><h3>' + esc(e.title) + '</h3>' +
+    '<div class="event-body">' + photo + '<h3>' + esc(e.title) + '</h3>' +
     (where ? '<p class="where">' + esc(where) + '</p>' : '') +
     (e.description ? '<p>' + esc(e.description) + '</p>' : '') +
     type + '</div></li>';

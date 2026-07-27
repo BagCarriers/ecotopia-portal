@@ -47,6 +47,15 @@
   .event-month { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.8; }
   .event-day { font-family: 'Fraunces', serif; font-size: 1.8rem; font-weight: 700; line-height: 1; }
   .event-info { flex: 1; }
+  .event-photo { width: 88px; height: 88px; flex-shrink: 0; border-radius: 10px;
+    object-fit: cover; background: var(--cream-dim); border: 1px solid var(--border); }
+
+  /* Photo picker (new + edit forms) */
+  .photo-preview { margin-top: 8px; display: flex; align-items: center; gap: 12px; }
+  .photo-preview img { width: 72px; height: 72px; object-fit: cover; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--cream-dim); }
+  .photo-preview a { font-size: 0.8rem; color: #b3261e; cursor: pointer; text-decoration: none; }
+  .photo-preview a:hover { text-decoration: underline; }
   .event-title { font-family: 'Fraunces', serif; font-size: 1.1rem; color: var(--forest);
     margin-bottom: 4px; }
   .event-type-pill { padding: 2px 8px; border-radius: 20px; font-size: 0.72rem; font-weight: 600;
@@ -148,6 +157,13 @@
       </div>
       <div class="form-group"><label>Description</label>
         <textarea id="ev_desc" rows="2" placeholder="Event details…"></textarea></div>
+      <div class="form-group"><label>Photo (optional)</label>
+        <input type="file" id="ev_photo" accept="image/*" onchange="onNewPhotoChosen(this)">
+        <div class="photo-preview" id="ev_photo_preview" style="display:none">
+          <img id="ev_photo_thumb" alt="">
+          <a onclick="clearNewPhoto()">Remove</a>
+        </div>
+      </div>
       <div class="modal-error" id="eventFormError"></div>
       <div class="form-actions">
         <button type="button" class="btn-cancel" onclick="toggleForm()">Cancel</button>
@@ -186,6 +202,13 @@
       <div class="form-group"><label>Volunteer Count Target</label>
         <input type="number" id="ee_vol_count" min="0" placeholder="e.g. 10"
           style="width:100%;padding:9px 11px;border-radius:7px;border:1.5px solid var(--border);font-size:0.875rem;font-family:'DM Sans',sans-serif;"></div>
+      <div class="form-group"><label>Photo</label>
+        <input type="file" id="ee_photo" accept="image/*" onchange="onEditPhotoChosen(this)">
+        <div class="photo-preview" id="ee_photo_preview" style="display:none">
+          <img id="ee_photo_thumb" alt="">
+          <a onclick="removeEditPhoto()">Remove photo</a>
+        </div>
+      </div>
       <input type="hidden" id="ee_id">
       <div class="modal-error" id="editEventError"></div>
       <div class="modal-actions">
@@ -199,6 +222,49 @@
 <script>
 const esc = DataStore.esc;
 let events = [], gardens = [];
+
+// Photo picker state.
+let newPhotoFile = null;                 // New Event form: chosen file (or null)
+let editPhotoFile = null;                // Edit modal: replacement file (or null)
+let editPhotoRemove = false;             // Edit modal: user tapped "Remove photo"
+let editPhotoCurrentPath = null;         // Edit modal: existing photo_path (or null)
+
+// Resize + upload a picked image to events/<uuid>.jpg in the gallery bucket.
+// Returns the storage path on success; throws on failure (caller shows inline error).
+async function uploadEventPhoto(file) {
+  const blob = await DataStore.resizeImage(file, 1600);
+  const path = `events/${crypto.randomUUID()}.jpg`;
+  const up = await window.ecoSupabase.storage.from('gallery')
+    .upload(path, blob, { contentType: blob.type || 'image/jpeg', upsert: false });
+  if (up.error) throw new Error(up.error.message);
+  return path;
+}
+
+// Best-effort delete of an old event photo object; ignore any error.
+async function removeEventPhotoObject(path) {
+  if (!path) return;
+  try { await window.ecoSupabase.storage.from('gallery').remove([path]); } catch (e) { /* ignore */ }
+}
+
+// ── New Event photo picker ──────────────────────────────────────────────────
+function onNewPhotoChosen(input) {
+  const file = (input.files || [])[0] || null;
+  newPhotoFile = file;
+  const wrap = document.getElementById('ev_photo_preview');
+  const thumb = document.getElementById('ev_photo_thumb');
+  if (file) {
+    thumb.src = URL.createObjectURL(file);
+    wrap.style.display = 'flex';
+  } else {
+    wrap.style.display = 'none';
+  }
+}
+function clearNewPhoto() {
+  newPhotoFile = null;
+  document.getElementById('ev_photo').value = '';
+  document.getElementById('ev_photo_preview').style.display = 'none';
+  document.getElementById('ev_photo_thumb').src = '';
+}
 
 function populateGardenDropdown() {
   const gardenSel = document.getElementById('ev_garden');
@@ -231,6 +297,7 @@ function renderEvents() {
           <div class="event-month">${month}</div>
           <div class="event-day">${day}</div>
         </div>
+        ${ev.photoPath ? `<img class="event-photo" src="${esc(DataStore.eventPhotoUrl(ev.photoPath))}" loading="lazy" alt="">` : ''}
         <div class="event-info">
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
             <div class="event-title">${esc(ev.title)}</div>
@@ -264,6 +331,7 @@ function renderEvents() {
 function toggleForm() {
   document.getElementById('newEventForm').classList.toggle('open');
   document.getElementById('ev_date').value = new Date().toISOString().slice(0, 10);
+  clearNewPhoto();
 }
 
 document.getElementById('eventFormEl').addEventListener('submit', async function(e) {
@@ -275,12 +343,24 @@ document.getElementById('eventFormEl').addEventListener('submit', async function
   const garden = gardenId ? gardens.find(g => g.id === gardenId) : null;
   const errEl = document.getElementById('eventFormError');
   errEl.textContent = '';
+  // Upload the photo first (if any). On failure, abort the submit and keep the
+  // form open so the user can retry; the event is not created without its photo.
+  let photoPath = null;
+  if (newPhotoFile) {
+    try {
+      photoPath = await uploadEventPhoto(newPhotoFile);
+    } catch (err) {
+      errEl.textContent = 'Could not upload photo. ' + err.message + ' Please try again.';
+      return;
+    }
+  }
   try {
     await DataStore.addEvent({
       title, date, gardenId: gardenId || null,
       gardenName: garden ? garden.name : '',
       type: document.getElementById('ev_type').value,
       description: document.getElementById('ev_desc').value.trim(),
+      photoPath,
       openSignup: true, signups: []
     });
     events = await DataStore.getEvents();
@@ -289,12 +369,41 @@ document.getElementById('eventFormEl').addEventListener('submit', async function
     setTimeout(() => {
       document.getElementById('newEventForm').classList.remove('open');
       document.getElementById('eventFormEl').reset();
+      clearNewPhoto();
       document.getElementById('eventSuccess').classList.remove('visible');
     }, 1200);
   } catch (err) {
+    // The event row failed after the photo uploaded; clean up the orphan object.
+    if (photoPath) removeEventPhotoObject(photoPath);
     errEl.textContent = 'Could not create event. ' + err.message;
   }
 });
+
+// ── Edit modal photo picker ─────────────────────────────────────────────────
+// Show the current or newly-chosen photo thumb (or hide if there is none).
+function renderEditPhoto(url) {
+  const wrap = document.getElementById('ee_photo_preview');
+  const thumb = document.getElementById('ee_photo_thumb');
+  if (url) {
+    thumb.src = url;
+    wrap.style.display = 'flex';
+  } else {
+    wrap.style.display = 'none';
+    thumb.src = '';
+  }
+}
+function onEditPhotoChosen(input) {
+  const file = (input.files || [])[0] || null;
+  editPhotoFile = file;
+  editPhotoRemove = false; // choosing a file overrides a prior "remove"
+  renderEditPhoto(file ? URL.createObjectURL(file) : (editPhotoCurrentPath ? DataStore.eventPhotoUrl(editPhotoCurrentPath) : ''));
+}
+function removeEditPhoto() {
+  editPhotoFile = null;
+  editPhotoRemove = true;
+  document.getElementById('ee_photo').value = '';
+  renderEditPhoto('');
+}
 
 function openEditEvent(id) {
   const ev = events.find(x => x.id === id);
@@ -307,6 +416,11 @@ function openEditEvent(id) {
   document.getElementById('ee_location').value = ev.location || ev.gardenName || '';
   document.getElementById('ee_desc').value = ev.description || '';
   document.getElementById('ee_vol_count').value = ev.volunteerCount || '';
+  editPhotoFile = null;
+  editPhotoRemove = false;
+  editPhotoCurrentPath = ev.photoPath || null;
+  document.getElementById('ee_photo').value = '';
+  renderEditPhoto(editPhotoCurrentPath ? DataStore.eventPhotoUrl(editPhotoCurrentPath) : '');
   document.getElementById('editEventModal').classList.add('open');
 }
 function closeEditEvent() {
@@ -323,20 +437,41 @@ document.getElementById('editEventForm').addEventListener('submit', async functi
   if (!title || !date) return;
   const errEl = document.getElementById('editEventError');
   errEl.textContent = '';
+  // Resolve the photo change first. A new upload replaces the old; "Remove photo"
+  // clears it; otherwise the existing photo is untouched. Upload failure aborts.
+  const changes = {
+    title,
+    type: document.getElementById('ee_type').value,
+    date,
+    location: document.getElementById('ee_location').value.trim(),
+    gardenName: document.getElementById('ee_location').value.trim(),
+    description: document.getElementById('ee_desc').value.trim(),
+    volunteerCount: parseInt(document.getElementById('ee_vol_count').value) || null
+  };
+  let newPath = null; // uploaded this save (for cleanup / old-object removal)
+  if (editPhotoFile) {
+    try {
+      newPath = await uploadEventPhoto(editPhotoFile);
+    } catch (err) {
+      errEl.textContent = 'Could not upload photo. ' + err.message + ' Please try again.';
+      return;
+    }
+    changes.photoPath = newPath;
+  } else if (editPhotoRemove) {
+    changes.photoPath = null;
+  }
   try {
-    await DataStore.updateEvent(id, {
-      title,
-      type: document.getElementById('ee_type').value,
-      date,
-      location: document.getElementById('ee_location').value.trim(),
-      gardenName: document.getElementById('ee_location').value.trim(),
-      description: document.getElementById('ee_desc').value.trim(),
-      volunteerCount: parseInt(document.getElementById('ee_vol_count').value) || null
-    });
+    await DataStore.updateEvent(id, changes);
+    // Swap/remove succeeded: delete the old object best-effort (ignore its error).
+    if ((newPath || editPhotoRemove) && editPhotoCurrentPath && editPhotoCurrentPath !== newPath) {
+      removeEventPhotoObject(editPhotoCurrentPath);
+    }
     events = await DataStore.getEvents();
     closeEditEvent();
     renderEvents();
   } catch (err) {
+    // The row update failed after a new upload; clean up the orphan object.
+    if (newPath) removeEventPhotoObject(newPath);
     errEl.textContent = 'Could not save changes. ' + err.message;
   }
 });

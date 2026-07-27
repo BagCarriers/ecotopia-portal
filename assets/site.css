@@ -339,6 +339,9 @@ main { display: block; }
 .date-badge .day { display: block; font-size: 1.7rem; font-weight: 700; line-height: 1.1; }
 .date-badge .yr { display: block; font-size: 0.72rem; opacity: 0.8; }
 .date-badge.past { background: var(--ink-soft); }
+.event-photo { display: block; width: 100%; max-height: 220px; object-fit: cover;
+  border-radius: 12px; margin: 0 0 12px; background: var(--line); }
+.event-photo.sm { max-height: 150px; }
 .event-body h3 { font-family: var(--font-util); font-weight: 700; font-size: 1.22rem; color: var(--green-dark); margin: 0 0 6px; }
 .event-body .where { font-family: var(--font-util); font-size: 0.98rem; color: var(--ink-soft); margin: 0 0 8px; }
 .event-body p { margin: 6px 0 0; font-size: 1.03rem; color: var(--ink-soft); }

@@ -316,6 +316,11 @@
     return map().fromDbAll(data);
   }
 
+  // Public URL for an event photo (same public gallery bucket, events/ prefix).
+  function eventPhotoUrl(photoPath) {
+    return sb().storage.from('gallery').getPublicUrl(photoPath).data.publicUrl;
+  }
+
   async function getGardens() {
     const { data, error } = await sb().from('gardens').select('*')
       .order('name', { ascending: true });
@@ -794,6 +799,7 @@
     renderNav: renderNav,
     decorate: decorate,
     getEvents: getEvents,
+    eventPhotoUrl: eventPhotoUrl,
     getGardens: getGardens,
     getStaffPhotos: getStaffPhotos,
     getServiceSettings: getServiceSettings,

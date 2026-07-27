@@ -203,6 +203,9 @@ const DataStore = (() => {
     },
     galleryPublicUrl: (storagePath) =>
       sb.storage.from('gallery').getPublicUrl(storagePath).data.publicUrl, // sync
+    // Event photos live in the same public gallery bucket under events/.
+    eventPhotoUrl: (photoPath) =>
+      sb.storage.from('gallery').getPublicUrl(photoPath).data.publicUrl, // sync
 
     // Service lead-gen settings + waitlist (staff)
     getServiceSettings: () => list('service_settings', 'name'),
