@@ -20,6 +20,13 @@
   const sb = () => root.ecoSupabase;
   const map = () => root.EcoMapping;
 
+  // Google My Maps id guard. map_mid is staff-entered but renders into an iframe
+  // src on the public site; only a bare id (letters, numbers, hyphen, underscore)
+  // is ever embedded. Anything else returns false and the caller renders no map.
+  function validMapMid(mid) {
+    return typeof mid === 'string' && /^[A-Za-z0-9_-]+$/.test(mid);
+  }
+
   // ── Service lead-gen forms ──────────────────────────────────────────────
   // One entry per marketing service, keyed by the same slug as
   // public.service_settings. `questions` are the service-specific inputs; a
@@ -796,6 +803,7 @@
 
   root.EcoSite = {
     esc: esc,
+    validMapMid: validMapMid,
     renderNav: renderNav,
     decorate: decorate,
     getEvents: getEvents,

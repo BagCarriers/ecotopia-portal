@@ -378,6 +378,11 @@ details.past-events[open] > summary::before { transform: rotate(90deg); }
 .garden-card h3 { font-family: var(--font-util); font-weight: 700; font-size: 1.25rem; color: var(--green-dark); margin: 0 0 8px; }
 .garden-card .addr { font-family: var(--font-util); color: var(--ink-soft); font-size: 1rem; margin: 0 0 6px; }
 .garden-card .sqft { font-family: var(--font-util); font-size: 0.9rem; color: var(--amber-dark); font-weight: 600; }
+.garden-card .garden-desc { font-family: var(--font-body); color: var(--ink); font-size: 1.05rem; line-height: 1.55; margin: 12px 0 0; }
+.garden-map { position: relative; width: 100%; aspect-ratio: 16 / 10; margin-top: 16px; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); background: var(--cream-soft); }
+.garden-map iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.garden-map-link { display: inline-block; margin-top: 10px; font-family: var(--font-util); font-weight: 600; font-size: 0.92rem; color: var(--green-dark); }
+.garden-map-link:hover { text-decoration: underline; }
 
 /* ── Volunteer band ────────────────────────────────────────────────────── */
 .band {

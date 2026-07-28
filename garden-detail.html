@@ -45,6 +45,11 @@
     font-family: 'DM Sans', sans-serif; transition: background 0.15s;
   }
   .btn-qr:hover { background: rgba(255,255,255,0.25); }
+  .garden-header-actions { display: flex; flex-direction: column; gap: 8px; }
+
+  .garden-desc-detail { font-size: 0.95rem; line-height: 1.55; color: var(--text);
+    background: #fff; border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px 18px; margin-bottom: 24px; }
 
   .section { margin-bottom: 28px; }
   .section-header { display: flex; align-items: center; justify-content: space-between;
@@ -212,6 +217,34 @@
   </div>
 </div>
 
+<!-- Edit Garden Details Modal -->
+<div class="modal-overlay" id="editGardenModal">
+  <div class="modal edit-modal">
+    <h2>Edit Garden Details</h2>
+    <form id="editGardenForm" class="modal-form" novalidate>
+      <div class="form-group"><label>Name *</label>
+        <input type="text" id="eg_name" placeholder="Garden name" required></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div class="form-group"><label>Address</label>
+          <input type="text" id="eg_address" placeholder="123 Main St"></div>
+        <div class="form-group"><label>Size (sqft)</label>
+          <input type="number" id="eg_sqft" min="0" placeholder="2500"></div>
+      </div>
+      <div class="form-group"><label>Description (shown on the public site)</label>
+        <textarea id="eg_desc" rows="4" placeholder="A short description for the community gardens page."></textarea></div>
+      <div class="form-group"><label>Google My Maps link or ID</label>
+        <input type="text" id="eg_map" placeholder="https://www.google.com/maps/d/viewer?mid=... or the mid value">
+        <div style="font-size:0.72rem;color:var(--text-dim);margin-top:4px;">Paste the full share link, or just the map ID. Shows an embedded map on the public page.</div></div>
+      <input type="hidden" id="eg_id">
+      <div class="modal-error" id="editGardenError"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel btn" onclick="closeEditGarden()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <!-- Edit Task Modal -->
 <div class="modal-overlay" id="editTaskModal">
   <div class="modal edit-modal">
@@ -330,8 +363,12 @@ function renderPage() {
         <h1>${esc(garden.name)}</h1>
         <div class="garden-meta">📍 ${esc(garden.address)}${garden.sqft != null ? ' · ' + garden.sqft.toLocaleString() + ' sqft' : ''}</div>
       </div>
-      <button class="btn-qr" onclick="openQR()">📱 QR Check-in</button>
+      <div class="garden-header-actions">
+        <button class="btn-qr" onclick="openQR()">📱 QR Check-in</button>
+        <button class="btn-qr" onclick="openEditGarden()">✎ Edit details</button>
+      </div>
     </div>
+    ${garden.description ? `<p class="garden-desc-detail">${esc(garden.description)}</p>` : ''}
 
     <!-- Tasks -->
     <div class="section">
@@ -490,6 +527,50 @@ function renderPage() {
     </div>
   `;
 }
+
+// ── Edit Garden Details ───────────────────────────────────────────────────────
+function openEditGarden() {
+  if (!garden) return;
+  document.getElementById('editGardenError').textContent = '';
+  document.getElementById('eg_id').value = garden.id;
+  document.getElementById('eg_name').value = garden.name || '';
+  document.getElementById('eg_address').value = garden.address || '';
+  document.getElementById('eg_sqft').value = garden.sqft != null ? garden.sqft : '';
+  document.getElementById('eg_desc').value = garden.description || '';
+  document.getElementById('eg_map').value = garden.mapMid || '';
+  document.getElementById('editGardenModal').classList.add('open');
+}
+function closeEditGarden() {
+  document.getElementById('editGardenModal').classList.remove('open');
+}
+document.getElementById('editGardenModal').addEventListener('click', function(e) {
+  if (e.target === this) closeEditGarden();
+});
+document.getElementById('editGardenForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const errEl = document.getElementById('editGardenError');
+  errEl.textContent = '';
+  const name = document.getElementById('eg_name').value.trim();
+  if (!name) { errEl.textContent = 'Name is required.'; return; }
+  const sqftVal = document.getElementById('eg_sqft').value;
+  const description = document.getElementById('eg_desc').value.trim();
+  const parsed = DataStore.parseMapMid(document.getElementById('eg_map').value);
+  if (parsed.error) { errEl.textContent = parsed.error; return; }
+  try {
+    await DataStore.updateGarden(garden.id, {
+      name,
+      address: document.getElementById('eg_address').value.trim(),
+      sqft: Number(sqftVal) || null,
+      description: description || null,
+      mapMid: parsed.mid,
+    });
+    garden = await DataStore.getGarden(garden.id);
+    closeEditGarden();
+    renderPage();
+  } catch (err) {
+    errEl.textContent = 'Could not save changes. ' + err.message;
+  }
+});
 
 // ── Edit Task ────────────────────────────────────────────────────────────────
 function openEditTask(id) {

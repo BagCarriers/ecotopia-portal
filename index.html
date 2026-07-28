@@ -304,6 +304,14 @@ function renderEvent(e) {
     type + '</div></li>';
 }
 
+// First sentence of a description, for the light homepage strip (raw text; the
+// caller esc's it). Falls back to the whole string when there is no sentence end.
+function firstSentence(text) {
+  const s = String(text || '').trim();
+  const m = s.match(/^.*?[.!?](\s|$)/);
+  return (m ? m[0] : s).trim();
+}
+
 async function loadHomeGardens() {
   const el = document.getElementById('homeGardens');
   const esc = EcoSite.esc;
@@ -317,6 +325,8 @@ async function loadHomeGardens() {
       '<div class="garden-card reveal"><h3>' + esc(g.name) + '</h3>' +
       (g.address ? '<p class="addr">📍 ' + esc(g.address) + '</p>' : '') +
       (g.sqft ? '<p class="sqft">' + esc(g.sqft) + ' sq ft</p>' : '') +
+      // Homepage strip stays light: first sentence of the description only, no maps.
+      (g.description ? '<p class="garden-desc">' + esc(firstSentence(g.description)) + '</p>' : '') +
       '</div>').join('');
     EcoSite.decorate();
   } catch (e) {

@@ -235,6 +235,26 @@ const DataStore = (() => {
         .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
     },
     uid: () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+    // Parse a staff-entered Google My Maps value into a bare mid. Accepts either
+    // a bare mid or any URL/string containing mid=<value> (extracted by regex).
+    // Returns { mid } (null for empty input) or { error } with a message when the
+    // input looks like a link but has no mid, or the mid fails the charset guard.
+    // Charset MUST match the public renderer's guard (/^[A-Za-z0-9_-]+$/): map_mid
+    // is rendered into an iframe src, so a value that would break out is refused.
+    parseMapMid(raw) {
+      const s = (raw == null ? '' : String(raw)).trim();
+      if (!s) return { mid: null };
+      const m = s.match(/[?&]mid=([^&#\s]+)/);
+      let mid = m ? decodeURIComponent(m[1]).trim() : s;
+      const looksLikeLink = /^https?:\/\//i.test(s) || s.indexOf('/') !== -1;
+      if (!m && looksLikeLink) {
+        return { error: 'That looks like a link but has no mid= value. Paste the full Google My Maps share link, or just the map ID.' };
+      }
+      if (!/^[A-Za-z0-9_-]+$/.test(mid)) {
+        return { error: 'The map ID should contain only letters, numbers, hyphens, and underscores.' };
+      }
+      return { mid };
+    },
     // Client-side downscale, shared by gallery.html + qr-checkin.html. Browser
     // only: needs createImageBitmap + canvas (NOT available in Node). Returns a
     // JPEG Blob (q0.85) no larger than maxDim on its long edge. GIFs (may be

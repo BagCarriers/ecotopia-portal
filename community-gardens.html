@@ -105,11 +105,21 @@ async function loadGardens() {
       el.outerHTML = '<p class="empty-line">Community garden listings are coming soon. In the meantime, join us at an <a href="happenings.html">upcoming event</a>.</p>';
       return;
     }
-    el.innerHTML = gardens.map(g =>
-      '<div class="garden-card reveal"><h3>' + esc(g.name) + '</h3>' +
-      (g.address ? '<p class="addr">📍 ' + esc(g.address) + '</p>' : '') +
-      (g.sqft ? '<p class="sqft">' + esc(g.sqft) + ' sq ft</p>' : '') +
-      '</div>').join('');
+    el.innerHTML = gardens.map(g => {
+      // Only embed a map when map_mid passes the id guard (iframe src safety).
+      const mid = EcoSite.validMapMid(g.mapMid) ? encodeURIComponent(g.mapMid) : null;
+      return '<div class="garden-card reveal"><h3>' + esc(g.name) + '</h3>' +
+        (g.address ? '<p class="addr">📍 ' + esc(g.address) + '</p>' : '') +
+        (g.sqft ? '<p class="sqft">' + esc(g.sqft) + ' sq ft</p>' : '') +
+        (g.description ? '<p class="garden-desc">' + esc(g.description) + '</p>' : '') +
+        (mid
+          ? '<div class="garden-map"><iframe src="https://www.google.com/maps/d/embed?mid=' + mid +
+              '" title="Map of ' + esc(g.name) + '" loading="lazy" allowfullscreen></iframe></div>' +
+            '<a class="garden-map-link" href="https://www.google.com/maps/d/viewer?mid=' + mid +
+              '" target="_blank" rel="noopener">View full map &rarr;</a>'
+          : '') +
+        '</div>';
+    }).join('');
     EcoSite.decorate();
   } catch (e) {
     el.outerHTML = '<p class="fallback-line">Gardens are updating. Check back soon.</p>';

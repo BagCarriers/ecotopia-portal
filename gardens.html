@@ -94,9 +94,9 @@
   .form-group { margin-bottom: 12px; }
   .form-group label { display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-dim);
     margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.04em; }
-  .form-group input { width: 100%; padding: 8px 10px; border-radius: 6px;
+  .form-group input, .form-group textarea { width: 100%; padding: 8px 10px; border-radius: 6px;
     border: 1.5px solid var(--border); font-size: 0.875rem; font-family: 'DM Sans', sans-serif; }
-  .form-group input:focus { outline: none; border-color: var(--forest-light); }
+  .form-group input:focus, .form-group textarea:focus { outline: none; border-color: var(--forest-light); }
   .form-hint { font-size: 0.72rem; color: var(--text-dim); margin-top: 4px; }
   .form-actions { display: flex; gap: 10px; }
   .modal-error { color: #b3261e; font-size: 0.85rem; margin-top: 8px; }
@@ -131,6 +131,15 @@
         <input type="text" id="ag_qr" placeholder="auto-generated">
         <div class="form-hint">Used in the check-in kiosk link. Leave blank to auto-generate.</div>
       </div>
+    </div>
+    <div class="form-group">
+      <label>Description (shown on the public site)</label>
+      <textarea id="ag_desc" rows="3" placeholder="A short description for the community gardens page."></textarea>
+    </div>
+    <div class="form-group">
+      <label>Google My Maps link or ID (optional)</label>
+      <input type="text" id="ag_map" placeholder="https://www.google.com/maps/d/viewer?mid=... or the mid value">
+      <div class="form-hint">Paste the full Google My Maps share link, or just the map ID. Shows an embedded map on the public page.</div>
     </div>
     <div class="modal-error" id="addGardenError"></div>
     <div class="form-actions">
@@ -218,14 +227,22 @@ async function addGarden() {
   const sqftVal = document.getElementById('ag_sqft').value;
   let qrToken = document.getElementById('ag_qr').value.trim();
   if (!qrToken) qrToken = slugToken(name);
+  const description = document.getElementById('ag_desc').value.trim();
+  const parsed = DataStore.parseMapMid(document.getElementById('ag_map').value);
+  if (parsed.error) { errEl.textContent = parsed.error; return; }
   try {
-    await DataStore.addGarden({ name, address, sqft: Number(sqftVal) || null, qrToken });
+    await DataStore.addGarden({
+      name, address, sqft: Number(sqftVal) || null, qrToken,
+      description: description || null, mapMid: parsed.mid,
+    });
     const [gardens, tasks] = await Promise.all([DataStore.getGardens(), DataStore.getTasks()]);
     renderGardens(gardens, tasks);
     document.getElementById('ag_name').value = '';
     document.getElementById('ag_address').value = '';
     document.getElementById('ag_sqft').value = '';
     document.getElementById('ag_qr').value = '';
+    document.getElementById('ag_desc').value = '';
+    document.getElementById('ag_map').value = '';
     document.getElementById('addGardenForm').classList.remove('open');
   } catch (err) {
     errEl.textContent = 'Could not add garden. ' + err.message;

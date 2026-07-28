@@ -271,6 +271,22 @@ header. The token lives in the cron job's SQL (stored in the same DB the service
 protects; acceptable). Inspect/verify with `select * from cron.job where jobname =
 'grant-scan-nightly';`.
 
+## Garden profiles
+
+Migration `0016_garden_profiles.sql` adds `public.gardens.description` (public text,
+shown esc'd on `community-gardens.html` full cards and as the first sentence on the
+homepage strip) and `public.gardens.map_mid` (a Google My Maps id only). Applied live
+via the Management API, so register it with `supabase migration repair --status applied
+0016` before any `supabase db push`.
+
+`map_mid` renders into an iframe `src` (`https://www.google.com/maps/d/embed?mid=<mid>`)
+on `community-gardens.html`, so the public renderer refuses any value failing
+`/^[A-Za-z0-9_-]+$/` (`EcoSite.validMapMid`); the portal parses staff input (bare mid or
+any URL with `mid=`) and enforces the same charset via `DataStore.parseMapMid`. Staff set
+both fields on the `gardens.html` Add Garden form and the `garden-detail.html` Edit details
+modal. Seeded gardens: Pawpaw Pathways and Zebra Swallowtail Trails (has a map) and
+Reciprocity Community Food Forest.
+
 ## Deploy
 
 The site is a static bundle deployed to Netlify:
