@@ -153,7 +153,12 @@ function gardenCardInner(g) {
           '" target="_blank" rel="noopener">Suggest a planting site</a></p>'
       : '') +
     '<div class="garden-volunteer">' +
-      '<p>Want to help this garden grow? Workdays are open to everyone, no experience needed.</p>' +
+      '<p>Want to help this garden grow? Workdays are open to everyone, no experience needed.' +
+      (g.qrToken && /^[A-Za-z0-9_-]+$/.test(g.qrToken)
+        ? ' Not ready for a recurring task? Scan the QR code on the garden sign, or peek at the <a href="qr-checkin.html?garden=' +
+          encodeURIComponent(g.qrToken) + '">walk-in tasks</a> you can help with any time.'
+        : '') +
+      '</p>' +
       '<a class="btn btn-ghost" href="volunteer-board.html">Volunteer here</a>' +
     '</div>';
   // The sign is a designed poster: contain, never crop (see .garden-photo CSS).

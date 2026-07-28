@@ -43,6 +43,21 @@
   .garden-addr { font-size: 0.85rem; color: var(--text-dim); margin-bottom: 16px; }
 
   .task-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+
+  /* Walk-in explainer */
+  .walkin-info {
+    margin-top: 48px; padding: 26px 24px;
+    background: var(--sage); border-radius: 16px; border: 1px solid var(--border);
+  }
+  .walkin-info h2 { font-family: 'Fraunces', serif; font-size: 1.35rem; color: var(--forest); margin-bottom: 10px; }
+  .walkin-info p { font-size: 0.95rem; color: var(--text); line-height: 1.6; max-width: 640px; }
+  .walkin-steps { margin: 14px 0 18px 20px; font-size: 0.92rem; line-height: 1.7; color: var(--text); }
+  .walkin-gardens { display: flex; flex-wrap: wrap; gap: 10px; }
+  .walkin-garden-link {
+    display: inline-block; background: var(--forest); color: #fff; text-decoration: none;
+    padding: 9px 16px; border-radius: 999px; font-size: 0.85rem; font-weight: 600;
+  }
+  .walkin-garden-link:hover { background: var(--forest-mid); }
   .task-card {
     background: #fff; border-radius: 14px; border: 1px solid var(--border); padding: 18px;
     display: flex; flex-direction: column; gap: 10px;
@@ -105,6 +120,20 @@
     If something feels right for your schedule, tap "I'll take this" to sign up.</p>
 
   <div id="boardContent"></div>
+
+  <!-- Walk-in tasks: the no-commitment path via each garden's QR kiosk -->
+  <div class="walkin-info" id="walkinInfo" hidden>
+    <h2>Not ready to commit to a recurring task?</h2>
+    <p>No problem. Every community garden keeps a list of walk-in tasks: simple,
+      do-it-when-you-can jobs like pulling weeds, picking up trash, or watering if
+      it is dry. Help with one whenever you happen to be there.</p>
+    <ol class="walkin-steps">
+      <li>Stop by any of our community gardens whenever suits you.</li>
+      <li>Scan the QR code on the garden sign, or open the garden's task list below.</li>
+      <li>Pick a walk-in task, do it, and check in so we know the garden got some love.</li>
+    </ol>
+    <div class="walkin-gardens" id="walkinGardens"></div>
+  </div>
 </div>
 
 <script>
@@ -218,10 +247,21 @@ async function submitClaim(taskId) {
   }, 100);
 }
 
+function renderWalkinInfo() {
+  // Only gardens with a kiosk token can take walk-in check-ins.
+  const withKiosk = gardens.filter(g => g.qrToken && /^[A-Za-z0-9_-]+$/.test(g.qrToken));
+  if (!withKiosk.length) return;
+  document.getElementById('walkinGardens').innerHTML = withKiosk.map(g =>
+    `<a class="walkin-garden-link" href="qr-checkin.html?garden=${encodeURIComponent(g.qrToken)}">${esc(g.name)}</a>`
+  ).join('');
+  document.getElementById('walkinInfo').hidden = false;
+}
+
 (async function init() {
   try {
     [gardens, allTasks] = await Promise.all([DataStore.getGardens(), DataStore.getTasks()]);
     renderBoard();
+    renderWalkinInfo();
   } catch (err) {
     document.getElementById('boardContent').innerHTML =
       '<p class="empty-tasks">Could not load open tasks right now. Please refresh the page.</p>';
