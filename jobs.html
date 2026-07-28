@@ -53,7 +53,13 @@
     background: #fff; border: 1px solid var(--border); border-radius: 20px;
     padding: 1px 7px; font-size: 0.75rem; font-weight: 600; color: var(--text-dim);
   }
-  .col-cards { padding: 10px; display: flex; flex-direction: column; gap: 10px; }
+  .col-cards { padding: 10px; display: flex; flex-direction: column; gap: 10px; min-height: 70px; }
+
+  /* Drag and drop */
+  .job-card[draggable="true"] { cursor: grab; }
+  .job-card.dragging { opacity: 0.45; cursor: grabbing; }
+  .kanban-col.drag-over { outline: 2px dashed var(--forest-light); outline-offset: -4px; background: var(--sage); }
+  .kanban-col.drag-over .col-cards { background: transparent; }
 
   /* Job card */
   .job-card {
@@ -133,6 +139,7 @@
     <h1>Job Pipeline</h1>
     <button class="btn btn-primary" onclick="openModal()">+ New Job</button>
   </div>
+  <div class="modal-error" id="movePageError" style="margin-bottom:10px"></div>
   <div class="kanban" id="kanban"></div>
 </div>
 
@@ -226,7 +233,7 @@ function renderKanban() {
   board.innerHTML = STATUSES.map(st => {
     const colJobs = jobs.filter(j => j.status === st.key);
     return `
-      <div class="kanban-col">
+      <div class="kanban-col" data-status="${st.key}">
         <div class="col-header">
           <h3>${st.label}</h3>
           <span class="col-count">${colJobs.length}</span>
@@ -237,7 +244,7 @@ function renderKanban() {
             : colJobs.map(j => {
               const typeInfo = TYPE_MAP[j.type] || { label: j.type, cls: 'pill-other' };
               return `
-                <a href="job-detail.html?id=${j.id}" class="job-card">
+                <a href="job-detail.html?id=${j.id}" class="job-card" draggable="true" data-job-id="${j.id}">
                   <div class="job-card-top">
                     <div class="job-client">${esc(j.clientName)}</div>
                     <span class="job-type-pill ${typeInfo.cls}">${esc(typeInfo.label)}</span>
@@ -254,6 +261,64 @@ function renderKanban() {
         </div>
       </div>`;
   }).join('');
+  wireDragAndDrop();
+}
+
+// ── Drag and drop between status columns ─────────────────────────────────
+// HTML5 DnD (mouse/trackpad). On touch devices Jordan still moves jobs from
+// the job detail page, so this is an enhancement, not the only path.
+let draggedJobId = null;
+
+function wireDragAndDrop() {
+  document.querySelectorAll('.job-card[draggable="true"]').forEach(card => {
+    card.addEventListener('dragstart', (e) => {
+      draggedJobId = card.getAttribute('data-job-id');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', draggedJobId);
+      card.classList.add('dragging');
+    });
+    card.addEventListener('dragend', () => {
+      card.classList.remove('dragging');
+      draggedJobId = null;
+      document.querySelectorAll('.kanban-col.drag-over').forEach(c => c.classList.remove('drag-over'));
+    });
+  });
+  document.querySelectorAll('.kanban-col').forEach(col => {
+    col.addEventListener('dragover', (e) => {
+      if (!draggedJobId) return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      col.classList.add('drag-over');
+    });
+    col.addEventListener('dragleave', (e) => {
+      if (!col.contains(e.relatedTarget)) col.classList.remove('drag-over');
+    });
+    col.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      col.classList.remove('drag-over');
+      const id = draggedJobId || e.dataTransfer.getData('text/plain');
+      const newStatus = col.getAttribute('data-status');
+      const job = jobs.find(j => j.id === id);
+      if (!job || !newStatus || job.status === newStatus) return;
+      const oldStatus = job.status;
+      const label = (STATUSES.find(s => s.key === newStatus) || {}).label || newStatus;
+      // Optimistic move; revert on failure.
+      job.status = newStatus;
+      const moveErr = document.getElementById('movePageError');
+      if (moveErr) moveErr.textContent = '';
+      renderKanban();
+      try {
+        const log = job.activityLog || [];
+        log.push({ ts: new Date().toISOString(), note: 'Status changed to ' + label + '.' });
+        await DataStore.updateJob(id, { status: newStatus, activityLog: log });
+      } catch (err) {
+        job.status = oldStatus;
+        renderKanban();
+        const errEl = document.getElementById('movePageError');
+        if (errEl) errEl.textContent = 'Could not move the job. ' + err.message;
+      }
+    });
+  });
 }
 
 function openModal() { document.getElementById('newJobModal').classList.add('open'); }
