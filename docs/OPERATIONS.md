@@ -371,6 +371,61 @@ Retired predecessor: the Pawpaw "Suggest a planting site" Google Form
 is no longer linked anywhere and can be closed in Google Forms. Its responses (if any) were
 not migrated.
 
+## Plant catalog (native plants shop)
+
+Migration `0019_plant_catalog.sql` moves the native-plant shop from hardcoded
+`PLANTS` / `KITS` consts in `plants.html` into two editable tables (applied live via
+the Management API, so register it with `supabase migration repair --status applied
+0019` before any `supabase db push`):
+
+- `public.plant_species` - one row per wildflower species. Columns: `common` (required),
+  `botanical`, `bloom`, `height`, `attracts`, `fact`, `tags` (jsonb array), `photo_path`,
+  `sort` (integer, ascending), `active` (boolean). RLS: `sp_anon_read` lets anon SELECT
+  only `active` rows; `sp_staff_all` gives authenticated portal users full CRUD (and their
+  reads return inactive rows too).
+- `public.plant_kits` - one row per habitat kit. Columns: `slug` (unique; the old const
+  id, e.g. `hummingbird`), `name` (required), `blurb`, `plants` (jsonb array of
+  `{name, note?}`), `photo_path`, `sort`, `active`. Same two-policy RLS
+  (`pk_anon_read` active-only for anon, `pk_staff_all` for staff).
+
+Both tables carry the shared `set_updated_at` trigger.
+
+Seed provenance: the 50 species and 11 kits were migrated verbatim from the `plants.html`
+consts on 2026-07-28 (species `sort = index * 10` in the old array order; kits kept their
+const id as `slug` and their `plants` jsonb verbatim). The one-off seed script was run out
+of the scratchpad and is not committed.
+
+Photo convention (identical to garden photos, but rooted at `assets/img/plants/`):
+
+- `static:<file>` -> a repo static asset served from `assets/img/plants/<file>`. The
+  filename is charset-guarded (`/^[A-Za-z0-9._-]+$/`) so it cannot escape the folder. All
+  seeded photos use this form (e.g. `static:wild-columbine.jpg`).
+- any other value -> a gallery-bucket object served via its public URL. Staff photo
+  uploads on `manage-plants.html` go through `DataStore.resizeImage` (long edge <= 1600px,
+  JPEG q0.85) and land in the `gallery` bucket under `plants/<uuid>.jpg` (the existing
+  `gallery_staff_all` object policy covers these writes; public bucket read serves them).
+
+Public page (`plants.html`): reads active rows over anon (ordered `sort` then name),
+rendering the same filter chips, `$5` request tray, and 4-tier kit modals as before. The
+kit pricing table (`KIT_TIERS`) and `PLANT_PRICE` stay hardcoded (universal), and the card
+game section is unchanged. The request tray now references species by row id (not array
+index) so a reorder in the portal cannot corrupt a pending request. Each section fails
+soft independently: a failed species fetch shows "The plant list is updating. Check back
+soon." while the kit section (and its request modals) keep working, and vice versa.
+
+Staff page (`manage-plants.html`, the "Plants" nav link after Services): two tabs
+(Species / Kits). Each is a compact list (photo thumb, name, botanical/blurb, Live/Hidden
+pill) with up/down arrows that swap the two rows' `sort` values, an Edit modal (all fields;
+tags entered comma-separated and validated against the allowlist
+`spring/summer/fall/shade/medicinal/edible/bird`, unknown tags rejected inline; the kit
+editor edits its plant list as dynamic name+note rows), Deactivate/Reactivate (soft hide
+from the shop, `active` flag), and Delete. Delete is a hard delete; if the row's photo is a
+gallery-bucket object (not a `static:` asset) the storage object is removed best-effort
+first, then the row. New rows get `sort = max(existing) + 10`. Data helpers live in
+`assets/data.js`: `getPlantSpecies` / `getPlantKits` (staff reads, inactive included),
+`addPlantSpecies` / `updatePlantSpecies` / `deletePlantSpecies` (and the kit equivalents),
+plus `plantPhotoUrl` for gallery-bucket paths.
+
 ## Deploy
 
 The site is a static bundle deployed to Netlify:

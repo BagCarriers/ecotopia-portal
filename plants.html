@@ -371,226 +371,39 @@
 
   var PLANT_PRICE = 5; // dollars, per plant, at the spring sale
 
-  // ── The 11 habitat kits (page-specific data, kept out of site.js) ─────────
-  // Each plant: { name, note } where note is a soil / optional qualifier.
-  var KITS = [
-    {
-      id: 'hummingbird',
-      img: 'kit-hummingbird.jpg',
-      name: 'Hummingbird Kit',
-      blurb: 'Did you know 80% of a hummingbird’s diet is insects? Too much sugar water can be unhealthy for hummingbirds. Let’s provide them with their favorite native flowers that bloom April through September while they are here.',
-      plants: [
-        { name: 'Wild Red Columbine' },
-        { name: 'Bradbury’s Monarda' },
-        { name: 'Foxglove Beardtongue' },
-        { name: 'Scarlet Beebalm' },
-        { name: 'Cardinal Flower' },
-        { name: 'Cup Plant' },
-        { name: 'Trumpet Vine or Tulip Poplar', note: 'optional vine or tree' }
-      ]
-    },
-    {
-      id: 'monarch',
-      img: 'kit-monarch.jpg',
-      name: 'Monarch Butterfly Habitat Kit',
-      blurb: 'Provides monarch butterflies with different species of their essential host plant, milkweed, while also providing their favorite native plants to obtain nectar from that aids their great migration to and from Mexico every year.',
-      plants: [
-        { name: 'Common Milkweed' },
-        { name: 'Butterfly Milkweed', note: 'dry to medium soil only' },
-        { name: 'Swamp Rose Milkweed', note: 'wet to medium soil only' },
-        { name: 'Meadow Blazing Star' },
-        { name: 'Blue Mist Flower', note: 'wet to medium soil only' },
-        { name: 'Aromatic Aster', note: 'dry to medium soil only' },
-        { name: 'Summersweet', note: 'optional shrub' }
-      ]
-    },
-    {
-      id: 'bee_pollen',
-      img: 'kit-bee-pollen.jpg',
-      name: 'Bee Pollen Kit',
-      blurb: 'A variety of wildflowers that produce a copious amount of pollen specifically to attract a wide variety of bees. Numbers of North American bumblebees have fallen nearly 50 percent since 1974, and 80% of our food requires pollinators.',
-      plants: [
-        { name: 'Wild Indigo' },
-        { name: 'Anise Hyssop' },
-        { name: 'Mountain Mint' },
-        { name: 'Wild Bergamot' },
-        { name: 'Great Blue Lobelia' },
-        { name: 'Turtlehead (wet soil) or Aromatic Aster (dry soil)', note: 'soil dependent' },
-        { name: 'American Plum', note: 'optional small tree' }
-      ]
-    },
-    {
-      id: 'shade_soft_landing',
-      name: 'Shade Garden Soft Landing Kit',
-      blurb: 'We can enhance declining woodland plant diversity and provide soft landing habitat under trees for insects like lightning bugs, beetles, and caterpillars.',
-      plants: [
-        { name: 'Wild Columbine' },
-        { name: 'Golden Ragwort or Green & Gold' },
-        { name: 'Jacob’s Ladder' },
-        { name: 'Maidenhair Fern or Pennsylvania Sedge' },
-        { name: 'Wild Geranium' },
-        { name: 'Foam Flower' },
-        { name: 'Native Azalea', note: 'optional shrub' }
-      ]
-    },
-    {
-      id: 'rain_garden',
-      img: 'kit-rain-garden.jpg',
-      name: 'Rain Garden Kit',
-      blurb: 'Deep-rooted wetland native plants excel at reducing water runoff and filtering out pollutants.',
-      plants: [
-        { name: 'Blue Flag Iris' },
-        { name: 'Swamp Rose Milkweed' },
-        { name: 'Great Blue Lobelia and/or Cardinal Flower' },
-        { name: 'Joe Pye Weed' },
-        { name: 'Swamp Rose Hibiscus' },
-        { name: 'New England Aster' },
-        { name: 'Buttonbush', note: 'optional shrub' }
-      ]
-    },
-    {
-      id: 'medicine_garden',
-      name: 'Medicine Garden Kit',
-      blurb: 'Perennial native plant herbs that double as a benefit to the ecosystem while offering medicinal roots, flowers, or leaves that can be made into teas, tinctures, salves, and more.',
-      plants: [
-        { name: 'Scarlet Beebalm' },
-        { name: 'New Jersey Tea', note: 'dry to medium soil only' },
-        { name: 'Echinacea' },
-        { name: 'Blue Vervain', note: 'wet to medium soil only' },
-        { name: 'Sweet Grass', note: 'wet to medium soil only' },
-        { name: 'Blue Sage', note: 'dry to medium soil only' },
-        { name: 'Skullcap' },
-        { name: 'Passion Flower Vine, Elderberry, or Wild Rose', note: 'optional' }
-      ]
-    },
-    {
-      id: 'bird_feeder',
-      img: 'kit-bird-feeder.jpg',
-      name: 'Bird Feeder Kit',
-      blurb: 'Provides seeds straight from the wildflowers themselves to feed the birds from summer through winter.',
-      plants: [
-        { name: 'Purple Giant Hyssop' },
-        { name: 'Early Sunflower' },
-        { name: 'Echinacea' },
-        { name: 'Meadow Blazing Star' },
-        { name: 'Cup Plant or Sawtooth Sunflower' },
-        { name: 'Aster', note: 'species dependent on soil type' },
-        { name: 'Native Dogwood species', note: 'optional shrub' }
-      ]
-    },
-    {
-      id: 'roadside',
-      name: 'Roadside Flower Kit',
-      blurb: 'A variety of wildflowers chosen for their ability to survive and thrive near roadside salt, pollution, and dry rocky soil. This kit’s flowers are short to fit in with city ordinances and are perfect for boulevard strips.',
-      plants: [
-        { name: 'Bradbury’s Monarda' },
-        { name: 'Coreopsis' },
-        { name: 'Butterfly Milkweed or Sundial Lupine' },
-        { name: 'Pink Muhly Grass or Yarrow' },
-        { name: 'Spotted Beebalm' },
-        { name: 'Aromatic Aster' }
-      ]
-    },
-    {
-      id: 'moon_garden',
-      name: 'Moon Garden Kit',
-      blurb: 'A variety of flowers that bloom white or a pastel color that glows in the moonlight to attract lunar moths and other night pollinators.',
-      plants: [
-        { name: 'Foam Flower' },
-        { name: 'Woodland Phlox' },
-        { name: 'Culver’s Root' },
-        { name: 'Black Cohosh' },
-        { name: 'Obedient Plant' },
-        { name: 'Turtlehead', note: 'wet soil only' },
-        { name: 'Magnolia or Persimmon', note: 'optional tree' }
-      ]
-    },
-    {
-      id: 'essentials',
-      name: 'Essentials Kit',
-      blurb: 'Keeping it simple, this kit offers a balanced, diverse, colorful team of seven important species, with each species featuring at least once in all of the other kits. Blended together to fit any garden scenario with average soil and sun exposure.',
-      plants: [
-        { name: 'Bradbury’s Monarda' },
-        { name: 'Milkweed species', note: 'variety depending on soil type' },
-        { name: 'Early Sunflower' },
-        { name: 'Scarlet Beebalm' },
-        { name: 'Echinacea' },
-        { name: 'Blazing Star' },
-        { name: 'Aromatic Aster' }
-      ]
-    },
-    {
-      id: 'insectopia',
-      name: 'Insectopia Kit',
-      blurb: 'A variety of native wildflowers chosen specifically to attract beneficial insects like beetles, dragonflies, and predatory bees that help protect gardens from invasive bugs and help pollinate garden plants.',
-      plants: [
-        { name: 'Yarrow' },
-        { name: 'Milkweed species', note: 'variety depending on soil type' },
-        { name: 'Mountain Mint' },
-        { name: 'Wild Bergamot' },
-        { name: 'Rattlesnake Master' },
-        { name: 'Showy Goldenrod' },
-        { name: 'Wild Rose', note: 'optional shrub' }
-      ]
-    }
-  ];
-  var KIT_BY_ID = {};
-  KITS.forEach(function (k) { KIT_BY_ID[k.id] = k; });
+  // ── Live catalog state (loaded from the DB over anon) ────────────
+  // KITS + species come from public.plant_kits / public.plant_species, which
+  // staff edit via manage-plants.html. Anon RLS returns only active rows.
+  // Photo paths: 'static:<file>' -> assets/img/plants/<file> (charset-guarded);
+  // any other value is a gallery-bucket object served via its public URL.
+  // Everything is esc()'d at render (rows are staff-entered, untrusted).
+  var KITS = [];
+  var PLANTS = [];        // wildflower species (name kept as PLANTS for the renderers)
+  var KIT_BY_ID = {};     // kit id (uuid) -> kit row
+  var PLANT_BY_ID = {};   // species id (uuid) -> species row
 
-  // ── The 50 wildflower species (canonical index order 1-50) ───────────────
-  // tags allowlist: spring, summer, fall, shade, medicinal, edible, bird.
-  var PLANTS = [
-    { img: 'wild-columbine.jpg', common: 'Wild Columbine', botanical: 'Aquilegia canadensis', bloom: 'April to July', height: '1 to 3 ft', attracts: 'Hummingbirds and native bees, deer resistant. Host plant for the Columbine Duskywing butterfly and the Pink-Tinted Beauty moth.', fact: 'An important flower for the hummingbirds when they arrive in spring. Keep this nectar source available and they may build a nest nearby. Instead of hummingbird feeders, plant their favorite flowers in abundance!', tags: ['spring', 'summer', 'bird'] },
-    { img: 'woodland-phlox.jpg', common: 'Woodland Phlox', botanical: 'Phlox divaricata', bloom: 'May', height: '1 ft', attracts: 'The Hummingbird Sphinx moth. Shade tolerant.', fact: '', tags: ['spring', 'shade'] },
-    { common: 'Foam Flower', botanical: 'Tiarella cordifolia', bloom: 'May to June', height: '6 to 12 in', attracts: 'Butterflies, bees, and hummingbirds. A shade lover and a beautiful ground cover.', fact: '', tags: ['spring', 'summer', 'shade', 'bird'] },
-    { img: 'green-gold.jpg', common: 'Green & Gold', botanical: 'Chrysogonum virginianum', bloom: 'April to October', height: '6 to 12 in', attracts: 'Butterflies and bees. Thrives in part shade and makes a pretty ground cover.', fact: '', tags: ['spring', 'summer', 'fall', 'shade'] },
-    { img: 'wild-strawberry.jpg', common: 'Wild Strawberry', botanical: 'Fragaria virginiana', bloom: 'April to June', height: '4 in', attracts: 'Pollinators, and you: a sweet little snack.', fact: 'A sweet lil snack.', tags: ['spring', 'summer', 'edible'] },
-    { common: 'Yarrow', botanical: 'Achillea millefolium', bloom: 'April to September', height: 'about 3 ft', attracts: 'A pollinator haven.', fact: 'A highly cherished medicinal plant. Yarrow is a wonderful wound healer, a go-to first aid herb, with many more health benefits.', tags: ['spring', 'summer', 'fall', 'medicinal'] },
-    { common: 'Ohio Spiderwort', botanical: 'Tradescantia ohiensis', bloom: 'May to July', height: '1.5 to 2.5 ft', attracts: 'Butterflies and native bee species. A great border plant.', fact: 'Spiderwort’s leaves are edible and taste like kale!', tags: ['spring', 'summer', 'edible'] },
-    { img: 'bradburys-monarda.jpg', common: 'Bradbury’s Monarda', botanical: 'Monarda bradburiana', bloom: 'May to June', height: '1 to 2 ft', attracts: 'Bumblebees, butterflies, and hummingbird moths. Deer resistant, a great border plant.', fact: 'Has a wonderful minty, oregano aroma. After it flowers it still looks beautiful through the rest of summer into fall.', tags: ['spring', 'summer'] },
-    { img: 'sundial-lupine.jpg', common: 'Sundial Lupine', botanical: 'Lupinus perennis', bloom: 'May to June', height: '12 to 24 in', attracts: 'Butterflies, native bees, hummingbirds, and beneficial insects.', fact: 'The host plant for the endangered Karner Blue butterfly, the only plant in the entire world that this butterfly needs to survive and thrive. Can also be used as a natural dye!', tags: ['spring', 'summer', 'bird'] },
-    { img: 'wild-blue-indigo.jpg', common: 'Wild Blue Indigo', botanical: 'Baptisia australis', bloom: 'May to July', height: '2 to 3 ft', attracts: 'Butterflies and queen bees.', fact: 'Fixes nitrogen into the soil.', tags: ['spring', 'summer'] },
-    { img: 'foxglove-beardtongue.jpg', common: 'Foxglove Beardtongue', botanical: 'Penstemon digitalis', bloom: 'May to July', height: '3 ft', attracts: 'Hummingbirds, butterflies, and native bee species. White-pink flowers.', fact: '', tags: ['spring', 'summer', 'bird'] },
-    { img: 'sand-coreopsis.jpg', common: 'Sand Coreopsis', botanical: 'Coreopsis lanceolata', bloom: 'May to August', height: '2 ft', attracts: 'Native bees and butterflies, plus goldfinches and other seed-eating bird species.', fact: '', tags: ['spring', 'summer', 'bird'] },
-    { common: 'Blue Flag Iris', botanical: 'Iris versicolor', bloom: 'May to July', height: '3 ft', attracts: 'Butterflies, bees, hummingbirds, and beneficial insects. Its seeds feed the birds.', fact: 'The yellow marking on the flower acts as a landing strip to help guide the native bees into the flower.', tags: ['spring', 'summer', 'bird'] },
-    { common: 'Nodding Onion', botanical: 'Allium cernuum', bloom: 'June to August', height: '18 in', attracts: 'Pollinators. Deer resistant and a good border plant.', fact: 'Edible, and can be used like chives.', tags: ['summer', 'edible'] },
-    { common: 'Scarlet Beebalm', botanical: 'Monarda didyma', bloom: 'June to July', height: '3 to 4 ft', attracts: 'A hummingbird favorite that attracts all the pollinators, and an important nutrient source for monarch butterflies.', fact: 'The petals and leaves are medicinal and can be made into a tea!', tags: ['summer', 'medicinal', 'bird'] },
-    { common: 'Passion Flower', botanical: 'Passiflora incarnata', bloom: 'June to August', height: 'vining', attracts: 'Pollinators. The most exotic flower on the east coast, with deliciously sweet and sour fruit.', fact: 'Tropical fruit of the East! The flower is medicinal, used as a highly effective relaxant that is helpful for a restful night’s sleep.', tags: ['summer', 'medicinal', 'edible'] },
-    { common: 'Common Milkweed', botanical: 'Asclepias syriaca', bloom: 'June to August', height: '1 to 4 ft', attracts: 'Many pollinators, and highly beneficial for the monarch butterfly as its host plant.', fact: '', tags: ['summer'] },
-    { common: 'Woodland Sunflower', botanical: 'Heliopsis helianthoides', bloom: 'June to September', height: '2 to 4 ft', attracts: 'Butterflies and bees, deer resistant. A nutrient-dense food source for the birds.', fact: 'Native sunflowers host the most types of caterpillars of all wildflower species!', tags: ['summer', 'fall', 'bird'] },
-    { common: 'Wild Bergamot', botanical: 'Monarda fistulosa', bloom: 'July to August', height: '3.5 ft', attracts: 'The Hummingbird Sphinx moth, hummingbirds, and butterflies. Attracts more bees than any other flower.', fact: 'A mint-family flower with medicinal and culinary uses.', tags: ['summer', 'medicinal', 'edible', 'bird'] },
-    { common: 'Purple Poppy Mallow', botanical: 'Callirhoe involucrata', bloom: 'May to September', height: '8 to 12 in', attracts: 'Butterflies and other beneficial insects.', fact: '', tags: ['spring', 'summer', 'fall'] },
-    { common: 'Culver’s Root', botanical: 'Veronicastrum virginicum', bloom: 'July to September', height: '2.5 to 4 ft', attracts: 'Many native species of bees, butterflies, and moths, bringing in a wide variety of pollinators.', fact: 'Brings in pollinators you have probably never seen before!', tags: ['summer', 'fall'] },
-    { common: 'Spotted Beebalm', botanical: 'Monarda punctata', bloom: 'June to September', height: '6 in to 3 ft', attracts: 'Butterflies. A mint-family flower also known as Horsemint.', fact: 'A medicinal flower well known for carvacrol and thymol, two powerful antiviral, antimicrobial, antifungal, anti-inflammatory, antioxidant-rich compounds (also found in oregano oil). Traditionally, fresh leaves were crushed and steeped in cold water to ease back pain, fever, inflammation, and chills.', tags: ['summer', 'fall', 'medicinal'] },
-    { common: 'New Jersey Tea', botanical: 'Ceanothus americanus', bloom: 'June to July', height: '3 to 4 ft', attracts: 'Hummingbirds. A low, dense, mounding flowering shrub whose little white flowers draw tiny insects that nourish hummingbirds, along with sweet nectar.', fact: 'Traditionally the roots were made into a tea, aka redroot tea, to help with upper respiratory issues like sore throats, coughs, asthma, and bronchitis.', tags: ['summer', 'medicinal', 'bird'] },
-    { common: 'Butterfly Milkweed', botanical: 'Asclepias tuberosa', bloom: 'June to July', height: '1 to 2 ft', attracts: 'Monarchs, swallowtails, grey hairstreaks, and queen butterflies, plus long-tongued bees and hummingbirds!', fact: '', tags: ['summer', 'bird'] },
-    { common: 'Anise Hyssop', botanical: 'Agastache foeniculum', bloom: 'July to August', height: '2 to 4 ft', attracts: 'Bees, butterflies, and hummingbirds. A mint-family flower.', fact: 'Smells amazing!', tags: ['summer', 'bird'] },
-    { common: 'Mountain Mint', botanical: 'Pycnanthemum virginicum & muticum', bloom: 'June to September', height: '2 to 4 ft', attracts: 'Butterflies and bees, deer resistant. A nutrient-dense food source for the birds.', fact: '', tags: ['summer', 'fall', 'bird'] },
-    { common: 'Echinacea', botanical: 'Echinacea purpurea', bloom: 'July to September', height: '3 to 4 ft', attracts: 'A hummingbird magnet that attracts many butterflies and pollinators.', fact: 'The roots are medicinal. Benefits include immune boosting, cold and flu remedy, anti-viral, anti-bacterial, and upper respiratory support.', tags: ['summer', 'fall', 'medicinal', 'bird'] },
-    { common: 'Swamp Rose Milkweed', botanical: 'Asclepias incarnata', bloom: 'June to October', height: '3 to 4 ft', attracts: 'Pollinators. A host plant for the monarch.', fact: '', tags: ['summer', 'fall'] },
-    { common: 'Meadow Blazing Star', botanical: 'Liatris ligulistylis', bloom: 'July to September', height: '3 to 5 ft', attracts: 'A monarch magnet, it is the monarch’s favorite flower for nectar, and also draws other butterflies, bees, hummingbirds, and caterpillars.', fact: 'The monarch’s favorite flower for nectar!', tags: ['summer', 'fall', 'bird'] },
-    { common: 'Dense Blazing Star', botanical: 'Liatris spicata', bloom: 'July to September', height: '3 to 6 ft', attracts: 'Butterflies and hummingbirds. Keeps away unwanted pests and attracts beneficial insects.', fact: 'The roots are edible and medicinal. Where Meadow Blazing Star is the monarch’s favorite, this one is the one with edible and medicinal roots.', tags: ['summer', 'fall', 'edible', 'medicinal', 'bird'] },
-    { common: 'Rattlesnake Master', botanical: 'Eryngium yuccifolium', bloom: 'June to August', height: '2 to 3.5 ft', attracts: 'A large variety of pollinators, from butterflies and moths to bees and hummingbirds. Will attract pollinators you have never seen before!', fact: 'Traditionally the roots were made into an antidote for rattlesnake venom, the leaves were used as weaving material, and the flower stalks were dried and made into a ceremonial rattle.', tags: ['summer', 'medicinal', 'bird'] },
-    { common: 'Cup Plant', botanical: 'Silphium perfoliatum', bloom: 'July to September', height: '4.5 to 8.5 ft', attracts: 'A wide variety of pollinators.', fact: 'The leaves come together to form a cup that retains water after it rains or from heavy morning dew.', tags: ['summer', 'fall'] },
-    { common: 'Cardinal Flower', botanical: 'Lobelia cardinalis', bloom: 'late July to frost', height: '4 to 5 ft', attracts: 'A hummingbird favorite that attracts many species of butterflies.', fact: 'A water-loving plant that loves to be near a stream or pond.', tags: ['summer', 'fall', 'bird'] },
-    { common: 'Blue Vervain', botanical: 'Verbena hastata', bloom: 'July to September', height: '2 to 6 ft', attracts: 'Many pollinators. A wetlands lover.', fact: 'Our favorite medicinal flower. Blue Vervain relaxes and nourishes the nervous system, calming and uplifting. In ancient times the plant was thought to be a cure-all, and the genus name is Latin for sacred plant.', tags: ['summer', 'fall', 'medicinal'] },
-    { common: 'Skullcap', botanical: 'Scutellaria lateriflora', bloom: 'June to September', height: '1 to 3 ft', attracts: 'Pollinators. A mint-family flower.', fact: 'Medicinal. Skullcap deeply relaxes the nervous system, calms muscle spasms, relaxes the mind, strengthens the immune system, detoxifies the body, is an effective treatment for epilepsy, promotes restful sleep, and is anti-inflammatory.', tags: ['summer', 'fall', 'medicinal'] },
-    { common: 'Orange Coneflower', botanical: 'Rudbeckia fulgida', bloom: 'July to September', height: '2 to 4 ft', attracts: 'Butterflies, hummingbirds, bees, and birds. Host plant for the Silvery Checkerspot and the Wavy-Lined Emerald butterflies.', fact: '', tags: ['summer', 'fall', 'bird'] },
-    { common: 'Great Blue Lobelia', botanical: 'Lobelia siphilitica', bloom: 'late July to September', height: '1 to 4 ft', attracts: 'Butterflies, bees, and hummingbirds, and provides nutrient-dense seeds for the birds.', fact: 'A medicinally rich flower that supports the respiratory system, relaxes muscles (anti-spasmodic), expels mucus and phlegm as an expectorant, and has been used to help with tobacco addiction.', tags: ['summer', 'fall', 'medicinal', 'bird'] },
-    { common: 'Swamp Rose Mallow', botanical: 'Hibiscus moscheutos', bloom: 'June to September', height: '3 to 4 ft', attracts: 'Many pollinators, butterflies, hummingbirds, and bees.', fact: 'Shrub-like and absolutely beautiful.', tags: ['summer', 'fall', 'bird'] },
-    { common: 'Cutleaf Coneflower', botanical: 'Rudbeckia laciniata', bloom: 'July to September', height: '4 to 8 ft', attracts: 'Pollinators. Shade tolerant.', fact: 'Also known as Sochan, with edible leaves for salad greens.', tags: ['summer', 'fall', 'shade', 'edible'] },
-    { common: 'Joe Pye Weed', botanical: 'Eutrochium fistulosum', bloom: 'July to August', height: '5 to 9 ft', attracts: 'Many pollinators. A host plant for over 35 species of moths and butterflies.', fact: 'Pennsylvania’s tallest wildflower! Also known as Gravel Root, medicinally used for urinary issues.', tags: ['summer', 'medicinal'] },
-    { common: 'White Turtlehead', botanical: 'Chelone glabra', bloom: 'July to November', height: '3 to 4 ft', attracts: 'The bumblebee’s favorite flower, plus bees, butterflies, and hummingbirds. A host plant for the Baltimore Checkerspot butterfly.', fact: 'Cleans parasites off bees.', tags: ['summer', 'fall', 'bird'] },
-    { common: 'Sunchoke', botanical: 'Helianthus tuberosus', bloom: 'August to October', height: 'up to 10 ft', attracts: 'Pollinators.', fact: 'Edible roots, harvestable December to January.', tags: ['summer', 'fall', 'edible'] },
-    { common: 'Obedient Plant', botanical: 'Physostegia virginiana', bloom: 'August to November', height: '2 to 3 ft', attracts: 'Butterflies, bees, and hummingbirds. A mint-family flower.', fact: 'If you move the flower, it will stay in place, which is where the name came from ;)', tags: ['summer', 'fall', 'bird'] },
-    { common: 'Blue Mist Flower', botanical: 'Conoclinium coelestinum', bloom: 'July to November', height: '3 ft', attracts: 'Bees and butterflies.', fact: 'Medicinal. Traditionally the flowers were made into a tea to strengthen the immune system.', tags: ['summer', 'fall', 'medicinal'] },
-    { common: 'Iron Weed', botanical: 'Vernonia noveboracensis', bloom: 'July to October', height: '4 to 5 ft', attracts: 'Butterflies, hummingbirds, and bees.', fact: 'The roots are medicinal and were traditionally used to prevent and stop postpartum hemorrhages.', tags: ['summer', 'fall', 'medicinal', 'bird'] },
-    { common: 'Sneezeweed', botanical: 'Helenium autumnale', bloom: 'August to October', height: '4 ft', attracts: 'Pollinators. A host plant for the Dainty Sulphur butterfly.', fact: '', tags: ['summer', 'fall'] },
-    { common: 'Blue Sage', botanical: 'Salvia azurea', bloom: 'August to frost', height: '3 to 5 ft', attracts: 'Butterflies, bees, moths, hummingbirds, and more! Salt tolerant.', fact: '', tags: ['summer', 'fall', 'bird'] },
-    { common: 'Sawtooth Sunflower', botanical: 'Helianthus grosseserratus', bloom: 'August to November', height: '3 to 12 ft', attracts: 'Bees and butterflies. The foliage is fed on by caterpillars.', fact: 'May only reach 5 ft in dense plantings.', tags: ['summer', 'fall'] },
-    { common: 'Aromatic Aster', botanical: 'Symphyotrichum oblongifolium', bloom: 'September to November', height: '1 to 2 ft', attracts: 'Late-season pollinators. A daisy-family flower.', fact: 'A late bloomer.', tags: ['fall'] },
-    { common: 'New England Aster', botanical: 'Symphyotrichum novae-angliae', bloom: 'September to November', height: '3 to 4 ft', attracts: 'Butterflies, moths, bees, and hummingbirds. Host plant for the Pearl Crescent and Checkerspot butterflies and the Canadian Conia moth.', fact: 'A late bloomer that is highly beneficial for migrating monarchs, and one of the largest-flowered aster species.', tags: ['fall', 'bird'] }
-  ];
+  function plantPhotoSrc(photoPath) {
+    if (!photoPath) return null;
+    if (String(photoPath).slice(0, 7) === 'static:') {
+      var file = String(photoPath).slice(7);
+      return /^[A-Za-z0-9._-]+$/.test(file) ? 'assets/img/plants/' + file : null;
+    }
+    return sb().storage.from('gallery').getPublicUrl(photoPath).data.publicUrl;
+  }
+
+  async function loadKits() {
+    var res = await sb().from('plant_kits').select('*')
+      .order('sort', { ascending: true }).order('name', { ascending: true });
+    if (res.error) throw new Error(res.error.message);
+    return window.EcoMapping.fromDbAll(res.data);
+  }
+  async function loadSpecies() {
+    var res = await sb().from('plant_species').select('*')
+      .order('sort', { ascending: true }).order('common', { ascending: true });
+    if (res.error) throw new Error(res.error.message);
+    return window.EcoMapping.fromDbAll(res.data);
+  }
+
 
   // Filter chips: label + tag key. 'all' shows everything.
   var FILTERS = [
@@ -607,7 +420,7 @@
   FILTERS.forEach(function (f) { FILTER_KEYS[f.key] = true; });
 
   // ── Runtime state (in-page only, no persistence) ─────────────────────────
-  var tray = {};        // idx -> qty
+  var tray = {};        // species id (uuid) -> qty
   var activeFilter = 'all';
 
   // ── Render: habitat kits ─────────────────────────────────────────────────
@@ -622,13 +435,14 @@
   function renderKits() {
     var grid = document.getElementById('kitGrid');
     grid.innerHTML = KITS.map(function (k) {
-      var plants = k.plants.map(function (p) {
+      var plants = (k.plants || []).map(function (p) {
         var cls = p.note && /optional/i.test(p.note) ? ' class="kit-optional"' : '';
         var note = p.note ? ' <span class="soil">(' + esc(p.note) + ')</span>' : '';
         return '<li' + cls + '>' + esc(p.name) + note + '</li>';
       }).join('');
+      var src = plantPhotoSrc(k.photoPath);
       return '<article class="kit-card reveal">' +
-        (k.img ? '<img class="kit-photo" src="assets/img/plants/' + esc(k.img) + '" alt="' + esc(k.name) + '" loading="lazy" width="640" height="480">' : '') +
+        (src ? '<img class="kit-photo" src="' + esc(src) + '" alt="' + esc(k.name) + '" loading="lazy" width="640" height="480">' : '') +
         '<h3>' + esc(k.name) + '</h3>' +
         '<p class="kit-blurb">' + esc(k.blurb) + '</p>' +
         '<p class="kit-plants-h">Plants in each kit</p>' +
@@ -668,9 +482,10 @@
 
   function renderPlants() {
     var grid = document.getElementById('plantGrid');
-    grid.innerHTML = PLANTS.map(function (p, i) {
-      return '<article class="plant-card" data-idx="' + i + '">' +
-        (p.img ? '<img class="plant-photo" src="assets/img/plants/' + esc(p.img) + '" alt="' + esc(p.common) + '" loading="lazy" width="640" height="480">' : '') +
+    grid.innerHTML = PLANTS.map(function (p) {
+      var src = plantPhotoSrc(p.photoPath);
+      return '<article class="plant-card" data-id="' + esc(p.id) + '">' +
+        (src ? '<img class="plant-photo" src="' + esc(src) + '" alt="' + esc(p.common) + '" loading="lazy" width="640" height="480">' : '') +
         '<h3>' + esc(p.common) + '</h3>' +
         '<p class="botanical"><em>' + esc(p.botanical) + '</em></p>' +
         '<div class="plant-meta">' +
@@ -680,11 +495,11 @@
         '<p class="plant-attracts">' + esc(p.attracts) + '</p>' +
         (p.fact ? '<p class="plant-fact">' + esc(p.fact) + '</p>' : '') +
         '<p class="plant-price">$' + esc(String(PLANT_PRICE)) + ' each</p>' +
-        '<button type="button" class="plant-add" data-idx="' + i + '">+ Add to request</button>' +
+        '<button type="button" class="plant-add" data-id="' + esc(p.id) + '">+ Add to request</button>' +
         '</article>';
     }).join('');
     grid.querySelectorAll('.plant-add').forEach(function (btn) {
-      btn.addEventListener('click', function () { togglePlant(Number(btn.getAttribute('data-idx')), btn); });
+      btn.addEventListener('click', function () { togglePlant(btn.getAttribute('data-id'), btn); });
     });
     applyFilter();
   }
@@ -693,9 +508,8 @@
     var grid = document.getElementById('plantGrid');
     var shown = 0;
     grid.querySelectorAll('.plant-card').forEach(function (card) {
-      var i = Number(card.getAttribute('data-idx'));
-      var p = PLANTS[i];
-      var match = activeFilter === 'all' || (p && p.tags.indexOf(activeFilter) !== -1);
+      var p = PLANT_BY_ID[card.getAttribute('data-id')];
+      var match = activeFilter === 'all' || (p && (p.tags || []).indexOf(activeFilter) !== -1);
       card.classList.toggle('hidden', !match);
       if (match) shown++;
     });
@@ -706,10 +520,10 @@
   }
 
   // ── Tray state ───────────────────────────────────────────────────────────
-  function togglePlant(idx, btn) {
-    if (!(idx >= 0 && idx < PLANTS.length)) return; // allowlist by range
-    if (tray[idx]) { delete tray[idx]; btn.classList.remove('added'); btn.textContent = '+ Add to request'; }
-    else { tray[idx] = 1; btn.classList.add('added'); btn.textContent = '✓ Added'; }
+  function togglePlant(id, btn) {
+    if (!PLANT_BY_ID[id]) return; // allowlist: only known species ids
+    if (tray[id]) { delete tray[id]; btn.classList.remove('added'); btn.textContent = '+ Add to request'; }
+    else { tray[id] = 1; btn.classList.add('added'); btn.textContent = '✓ Added'; }
     updateTrayCount();
   }
 
@@ -724,8 +538,8 @@
     document.getElementById('trayCount').textContent = String(trayCount());
   }
 
-  function setPlantButton(idx, added) {
-    var btn = document.querySelector('.plant-add[data-idx="' + idx + '"]');
+  function setPlantButton(id, added) {
+    var btn = document.querySelector('.plant-add[data-id="' + id + '"]');
     if (!btn) return;
     if (added) { btn.classList.add('added'); btn.textContent = '✓ Added'; }
     else { btn.classList.remove('added'); btn.textContent = '+ Add to request'; }
@@ -954,11 +768,17 @@
     showModal();
   }
 
+  // Tray species ids, filtered to known species, sorted by their catalog sort.
+  function trayIds() {
+    return Object.keys(tray)
+      .filter(function (id) { return PLANT_BY_ID[id]; })
+      .sort(function (a, b) { return (PLANT_BY_ID[a].sort || 0) - (PLANT_BY_ID[b].sort || 0); });
+  }
+
   function renderTrayModal() {
     var body = document.getElementById('plantModalBody');
-    var idxs = Object.keys(tray).map(Number).filter(function (i) { return i >= 0 && i < PLANTS.length; });
-    idxs.sort(function (a, b) { return a - b; });
-    if (!idxs.length) {
+    var ids = trayIds();
+    if (!ids.length) {
       body.innerHTML =
         '<p class="eco-lead-eyebrow">Your plant request</p>' +
         '<h2 id="plantModalTitle">Plant request</h2>' +
@@ -967,17 +787,17 @@
       document.getElementById('plantModalDone').addEventListener('click', closeModal);
       return;
     }
-    var items = idxs.map(function (i) {
-      var p = PLANTS[i];
-      var qty = tray[i];
-      return '<li class="tray-item" data-idx="' + i + '">' +
+    var items = ids.map(function (id) {
+      var p = PLANT_BY_ID[id];
+      var qty = tray[id];
+      return '<li class="tray-item" data-id="' + esc(id) + '">' +
         '<div class="ti-name"><b>' + esc(p.common) + '</b><span><em>' + esc(p.botanical) + '</em> · $' + esc(String(PLANT_PRICE)) + ' each</span></div>' +
         '<div class="tray-step">' +
-          '<button type="button" class="ti-dec" data-idx="' + i + '" aria-label="Decrease quantity">−</button>' +
+          '<button type="button" class="ti-dec" data-id="' + esc(id) + '" aria-label="Decrease quantity">−</button>' +
           '<span class="ti-qty">' + esc(String(qty)) + '</span>' +
-          '<button type="button" class="ti-inc" data-idx="' + i + '" aria-label="Increase quantity">+</button>' +
+          '<button type="button" class="ti-inc" data-id="' + esc(id) + '" aria-label="Increase quantity">+</button>' +
         '</div>' +
-        '<button type="button" class="ti-remove" data-idx="' + i + '" aria-label="Remove ' + esc(p.common) + '">&times;</button>' +
+        '<button type="button" class="ti-remove" data-id="' + esc(id) + '" aria-label="Remove ' + esc(p.common) + '">&times;</button>' +
         '</li>';
     }).join('');
     var total = trayCount() * PLANT_PRICE;
@@ -996,15 +816,15 @@
         '<p class="eco-lead-error" id="plantModalError"></p>' +
         '<button type="submit" class="eco-lead-primary" id="traySubmit">Send plant request</button>' +
       '</form>';
-    // Steppers + remove (event-delegated, validated by range).
+    // Steppers + remove (event-delegated, validated against known species ids).
     body.querySelectorAll('.ti-inc').forEach(function (b) {
-      b.addEventListener('click', function () { stepQty(Number(b.getAttribute('data-idx')), 1); });
+      b.addEventListener('click', function () { stepQty(b.getAttribute('data-id'), 1); });
     });
     body.querySelectorAll('.ti-dec').forEach(function (b) {
-      b.addEventListener('click', function () { stepQty(Number(b.getAttribute('data-idx')), -1); });
+      b.addEventListener('click', function () { stepQty(b.getAttribute('data-id'), -1); });
     });
     body.querySelectorAll('.ti-remove').forEach(function (b) {
-      b.addEventListener('click', function () { removeItem(Number(b.getAttribute('data-idx'))); });
+      b.addEventListener('click', function () { removeItem(b.getAttribute('data-id')); });
     });
     document.getElementById('trayForm').addEventListener('submit', function (e) {
       e.preventDefault();
@@ -1012,19 +832,19 @@
     });
   }
 
-  function stepQty(idx, delta) {
-    if (!(idx >= 0 && idx < PLANTS.length) || !tray[idx]) return;
-    var q = tray[idx] + delta;
+  function stepQty(id, delta) {
+    if (!PLANT_BY_ID[id] || !tray[id]) return;
+    var q = tray[id] + delta;
     if (q < 1) q = 1;
     if (q > 20) q = 20;
-    tray[idx] = q;
+    tray[id] = q;
     updateTrayCount();
     renderTrayModal();
   }
-  function removeItem(idx) {
-    if (!tray[idx]) return;
-    delete tray[idx];
-    setPlantButton(idx, false);
+  function removeItem(id) {
+    if (!tray[id]) return;
+    delete tray[id];
+    setPlantButton(id, false);
     updateTrayCount();
     renderTrayModal();
   }
@@ -1032,18 +852,17 @@
   async function submitTray() {
     var errEl = document.getElementById('plantModalError');
     errEl.textContent = '';
-    var idxs = Object.keys(tray).map(Number).filter(function (i) { return i >= 0 && i < PLANTS.length; });
-    if (!idxs.length) { errEl.textContent = 'Add at least one plant to your request.'; return; }
+    var ids = trayIds();
+    if (!ids.length) { errEl.textContent = 'Add at least one plant to your request.'; return; }
     var c = readContact();
     var msg = (document.getElementById('pl-c-msg').value || '').trim();
     if (!c.name || !c.phone) {
       errEl.textContent = 'Please add your name and a phone number so we can reach you.';
       return;
     }
-    idxs.sort(function (a, b) { return a - b; });
-    var lines = idxs.map(function (i) {
-      var p = PLANTS[i];
-      var qty = tray[i];
+    var lines = ids.map(function (id) {
+      var p = PLANT_BY_ID[id];
+      var qty = tray[id];
       return p.common + ' x ' + qty + ' ($' + (qty * PLANT_PRICE) + ')';
     });
     var total = trayCount() * PLANT_PRICE;
@@ -1070,7 +889,7 @@
       });
       if (ins2.error) throw new Error(ins2.error.message);
       // Clear the tray on success.
-      idxs.forEach(function (i) { setPlantButton(i, false); });
+      ids.forEach(function (id) { setPlantButton(id, false); });
       tray = {};
       updateTrayCount();
       showSuccess('Thanks, we got your plant request.', 'We will confirm availability and arrange pickup. Nothing is charged online.');
@@ -1093,15 +912,43 @@
     done.focus();
   }
 
+  // ── Live catalog loaders (fail-soft, independent per section) ─────────────
+  // A failed species fetch leaves the kit section (and its request modals)
+  // working, and vice versa: each renders its own quiet fallback line.
+  async function loadAndRenderKits() {
+    try {
+      KITS = await loadKits();
+      KIT_BY_ID = {};
+      KITS.forEach(function (k) { KIT_BY_ID[k.id] = k; });
+      renderKits();
+      EcoSite.decorate(); // reveal the freshly-added .kit-card.reveal elements
+    } catch (e) {
+      document.getElementById('kitGrid').innerHTML =
+        '<p class="tray-empty">The habitat kit list is updating. Check back soon.</p>';
+    }
+  }
+  async function loadAndRenderSpecies() {
+    try {
+      PLANTS = await loadSpecies();
+      PLANT_BY_ID = {};
+      PLANTS.forEach(function (p) { PLANT_BY_ID[p.id] = p; });
+      renderPlants();
+    } catch (e) {
+      document.getElementById('plantGrid').innerHTML =
+        '<p class="tray-empty">The plant list is updating. Check back soon.</p>';
+      document.getElementById('filterCount').textContent = '';
+    }
+  }
+
   // ── Init ─────────────────────────────────────────────────────────────────
   document.addEventListener('DOMContentLoaded', function () {
     EcoSite.renderNav('plants');
-    renderKits();
     renderFilters();
-    renderPlants();
     updateTrayCount();
     document.getElementById('trayFab').addEventListener('click', openTray);
     document.getElementById('gamePreorderBtn').addEventListener('click', openGamePreorder);
+    loadAndRenderKits();
+    loadAndRenderSpecies();
     EcoSite.decorate();
   });
 })();

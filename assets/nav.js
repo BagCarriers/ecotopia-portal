@@ -12,6 +12,7 @@ const Nav = (() => {
     { href: 'events.html',     label: 'Events',      icon: '📅' },
     { href: 'gallery.html',    label: 'Gallery',     icon: '📷' },
     { href: 'manage-services.html', label: 'Services', icon: '🛠' },
+    { href: 'manage-plants.html', label: 'Plants', icon: '🌼' },
     { href: 'calendar.html',   label: 'Calendar',    icon: '🗓'  },
     { href: 'invoices.html',   label: 'Invoices',    icon: '💵' },
     { href: 'quotes.html',     label: 'Quotes',      icon: '📄' },

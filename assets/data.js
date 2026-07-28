@@ -242,6 +242,39 @@ const DataStore = (() => {
       unwrap(await sb.from('planting_suggestions').delete().eq('id', id));
     },
 
+    // Plant catalog (staff-editable species + habitat kits). The public
+    // plants.html reads active rows directly over anon (RLS scopes it); these
+    // staff methods use the authenticated policy, which returns inactive rows
+    // too, so the portal can manage hidden entries. Photo uploads land in the
+    // gallery bucket under plants/<uuid>.jpg; 'static:<file>' photo_paths are
+    // repo assets (assets/img/plants/) and are never touched in storage.
+    getPlantSpecies: async () =>
+      fromDbAll(unwrap(await sb.from('plant_species').select('*')
+        .order('sort', { ascending: true }).order('common', { ascending: true }))),
+    addPlantSpecies: (r) => insert('plant_species', r),
+    updatePlantSpecies: (id, ch) => update('plant_species', id, ch),
+    deletePlantSpecies: async (id, photoPath) => {
+      if (photoPath && String(photoPath).slice(0, 7) !== 'static:') {
+        try { await sb.storage.from('gallery').remove([photoPath]); } catch (e) { /* ignore */ }
+      }
+      unwrap(await sb.from('plant_species').delete().eq('id', id));
+    },
+    getPlantKits: async () =>
+      fromDbAll(unwrap(await sb.from('plant_kits').select('*')
+        .order('sort', { ascending: true }).order('name', { ascending: true }))),
+    addPlantKit: (r) => insert('plant_kits', r),
+    updatePlantKit: (id, ch) => update('plant_kits', id, ch),
+    deletePlantKit: async (id, photoPath) => {
+      if (photoPath && String(photoPath).slice(0, 7) !== 'static:') {
+        try { await sb.storage.from('gallery').remove([photoPath]); } catch (e) { /* ignore */ }
+      }
+      unwrap(await sb.from('plant_kits').delete().eq('id', id));
+    },
+    // Public URL for a gallery-bucket plant photo (NOT the 'static:' repo-asset
+    // form, which resolves to a local path without touching storage).
+    plantPhotoUrl: (photoPath) =>
+      sb.storage.from('gallery').getPublicUrl(photoPath).data.publicUrl, // sync
+
     // Sync utilities (unchanged from the demo version)
     esc(v) {
       if (v == null) return '';

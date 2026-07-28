@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plants - Ecotopia</title>
+  <link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/mapping.js"></script>
+<script src="assets/auth.js"></script>
+<script>if (!AuthManager.hasCachedSession()) location.replace('login.html');</script>
+<script src="assets/data.js"></script>
+<script src="assets/nav.js"></script>
+<style>
+  :root {
+    --forest: #1B4332; --forest-mid: #2D6A4F; --forest-light: #52B788;
+    --sage: #D8F3DC; --sage-dim: #B7E4C7; --earth: #8B5E3C;
+    --earth-light: #C68642; --gold: #F4A261; --cream: #F9F6F0;
+    --cream-dim: #E8E0D5; --text: #1C1C1C; --text-dim: #5A5A5A;
+    --border: rgba(45,106,79,0.2); --amber: #B8730A; --amber-bg: #FDF0DA;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--text); }
+  .page { padding: 28px 32px; max-width: 1000px; }
+  .page-header { display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; margin-bottom: 8px; }
+  h1 { font-family: 'Fraunces', serif; font-size: 1.9rem; color: var(--forest); }
+  .page-intro { font-size: 0.9rem; color: var(--text-dim); margin-bottom: 20px;
+    max-width: 680px; line-height: 1.6; }
+
+  .btn { padding: 10px 18px; border-radius: 8px; border: none; font-size: 0.875rem;
+    font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif;
+    text-decoration: none; display: inline-flex; gap: 6px; align-items: center;
+    transition: background 0.15s; }
+  .btn-primary { background: var(--forest); color: #fff; }
+  .btn-primary:hover { background: var(--forest-mid); }
+  .btn-cancel { background: var(--cream-dim); color: var(--text); padding: 10px 18px;
+    border-radius: 8px; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+  .btn-sm { font-size: 0.78rem; padding: 5px 10px; background: transparent;
+    border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
+    color: var(--text-dim); font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+  .btn-sm:hover { color: var(--forest); border-color: var(--forest-light); background: var(--sage); }
+  .btn-sm:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-sm.btn-danger { color: #b3261e; }
+  .btn-sm.btn-danger:hover { color: #fff; background: #b3261e; border-color: #b3261e; }
+
+  /* Tabs */
+  .tabs { display: flex; gap: 8px; margin-bottom: 18px; }
+  .tab { padding: 8px 18px; border-radius: 20px; border: 1.5px solid var(--border);
+    background: #fff; color: var(--text-dim); font-size: 0.85rem; font-weight: 600;
+    cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+  .tab:hover { border-color: var(--forest-light); }
+  .tab.active { background: var(--forest); color: #fff; border-color: var(--forest); }
+
+  .toolbar { display: flex; justify-content: flex-end; margin-bottom: 14px; }
+
+  /* List rows */
+  .list { display: flex; flex-direction: column; gap: 10px; }
+  .row { background: #fff; border: 1px solid var(--border); border-radius: 12px;
+    padding: 12px 14px; display: flex; align-items: center; gap: 14px; }
+  .row.inactive { opacity: 0.62; }
+  .row-thumb { width: 52px; height: 52px; flex-shrink: 0; border-radius: 8px;
+    object-fit: cover; background: var(--cream-dim); border: 1px solid var(--border); }
+  .row-thumb.placeholder { display: flex; align-items: center; justify-content: center;
+    font-size: 1.3rem; color: var(--forest-light); }
+  .row-main { flex: 1; min-width: 0; }
+  .row-title { font-weight: 600; color: var(--forest); font-size: 0.98rem; }
+  .row-sub { font-size: 0.82rem; color: var(--text-dim); font-style: italic;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row-sub2 { font-size: 0.78rem; color: var(--text-dim); margin-top: 2px; }
+  .status-pill { display: inline-block; padding: 2px 10px; border-radius: 20px;
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+  .status-on { background: var(--sage); color: var(--forest); }
+  .status-off { background: var(--amber-bg); color: var(--amber); }
+  .row-sort { display: flex; flex-direction: column; gap: 2px; }
+  .row-sort button { width: 26px; height: 22px; line-height: 1; }
+  .row-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+
+  .empty { padding: 30px 16px; color: var(--text-dim); font-size: 0.9rem; text-align: center; }
+  .modal-error { color: #b3261e; font-size: 0.85rem; margin-top: 8px; }
+  #pageError { margin-bottom: 14px; }
+  #pageError:empty { display: none; }
+
+  /* Photo picker */
+  .photo-preview { margin-top: 8px; display: flex; align-items: center; gap: 12px; }
+  .photo-preview img { width: 72px; height: 72px; object-fit: cover; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--cream-dim); }
+  .photo-preview a { font-size: 0.8rem; color: #b3261e; cursor: pointer; text-decoration: none; }
+  .photo-preview a:hover { text-decoration: underline; }
+
+  /* Modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+    z-index: 500; align-items: center; justify-content: center; padding: 20px; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: #fff; border-radius: 16px; padding: 28px; width: 100%;
+    max-width: 520px; max-height: 90vh; overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.25); }
+  .modal h2 { font-family: 'Fraunces', serif; color: var(--forest); margin-bottom: 18px; }
+  .form-group { margin-bottom: 14px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .form-group label { display: block; font-size: 0.78rem; font-weight: 600;
+    color: var(--text-dim); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .form-group input, .form-group textarea, .form-group select {
+    width: 100%; padding: 9px 11px; border-radius: 7px; border: 1.5px solid var(--border);
+    font-size: 0.875rem; font-family: 'DM Sans', sans-serif; color: var(--text); background: #fff; }
+  .form-group textarea { min-height: 70px; resize: vertical; }
+  .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+    outline: none; border-color: var(--forest-light); }
+  .field-note { font-size: 0.76rem; color: var(--text-dim); margin-top: 4px; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 6px; }
+
+  /* Kit plant rows */
+  .kit-plant-rows { display: flex; flex-direction: column; gap: 8px; }
+  .kit-plant-row { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: center; }
+  .kit-plant-row input { width: 100%; padding: 8px 10px; border-radius: 7px;
+    border: 1.5px solid var(--border); font-size: 0.85rem; font-family: 'DM Sans', sans-serif; }
+  .kit-plant-row .kp-remove { background: transparent; border: 0; cursor: pointer;
+    color: var(--text-dim); font-size: 1.2rem; line-height: 1; padding: 4px 8px; border-radius: 6px; }
+  .kit-plant-row .kp-remove:hover { color: #b3261e; background: var(--cream); }
+  .kit-add-plant { margin-top: 8px; }
+
+  @media (max-width: 700px) {
+    .page { padding: 20px 16px; }
+    .row { flex-wrap: wrap; }
+    .form-row { grid-template-columns: 1fr; }
+    .kit-plant-row { grid-template-columns: 1fr auto; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="page-header">
+    <h1>Plants</h1>
+  </div>
+  <p class="page-intro">Edit the native plant shop shown on the public
+    <a href="plants.html" target="_blank" rel="noopener">Native Plants</a> page: wildflower
+    species and habitat kits. Deactivate to hide an entry from the shop without deleting it.
+    Photo uploads are stored in the gallery bucket. Nothing here is charged online.</p>
+
+  <div class="tabs">
+    <button class="tab active" id="tabSpecies" onclick="switchTab('species')">Species</button>
+    <button class="tab" id="tabKits" onclick="switchTab('kits')">Kits</button>
+  </div>
+
+  <div class="modal-error" id="pageError"></div>
+
+  <!-- Species tab -->
+  <div id="speciesPane">
+    <div class="toolbar">
+      <button class="btn btn-primary" onclick="openSpeciesModal(null)">+ Add species</button>
+    </div>
+    <div class="list" id="speciesList"><div class="empty">Loading…</div></div>
+  </div>
+
+  <!-- Kits tab -->
+  <div id="kitsPane" style="display:none">
+    <div class="toolbar">
+      <button class="btn btn-primary" onclick="openKitModal(null)">+ Add kit</button>
+    </div>
+    <div class="list" id="kitsList"><div class="empty">Loading…</div></div>
+  </div>
+</div>
+
+<!-- Species modal -->
+<div class="modal-overlay" id="speciesModal">
+  <div class="modal">
+    <h2 id="speciesModalTitle">Add species</h2>
+    <form id="speciesForm" novalidate>
+      <div class="form-row">
+        <div class="form-group"><label>Common name *</label>
+          <input type="text" id="sp_common" placeholder="Wild Columbine"></div>
+        <div class="form-group"><label>Botanical name</label>
+          <input type="text" id="sp_botanical" placeholder="Aquilegia canadensis"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Bloom</label>
+          <input type="text" id="sp_bloom" placeholder="April to July"></div>
+        <div class="form-group"><label>Height</label>
+          <input type="text" id="sp_height" placeholder="1 to 3 ft"></div>
+      </div>
+      <div class="form-group"><label>Attracts</label>
+        <textarea id="sp_attracts" placeholder="Hummingbirds and native bees…"></textarea></div>
+      <div class="form-group"><label>Fact (optional)</label>
+        <textarea id="sp_fact" placeholder="An important flower for the hummingbirds…"></textarea></div>
+      <div class="form-group"><label>Tags</label>
+        <input type="text" id="sp_tags" placeholder="spring, summer, bird">
+        <div class="field-note">Comma-separated. Allowed: spring, summer, fall, shade, medicinal, edible, bird.</div>
+      </div>
+      <div class="form-group"><label>Photo</label>
+        <input type="file" id="sp_photo" accept="image/*" onchange="onSpeciesPhotoChosen(this)">
+        <div class="photo-preview" id="sp_photo_preview" style="display:none">
+          <img id="sp_photo_thumb" alt="">
+          <a onclick="removeSpeciesPhoto()">Remove photo</a>
+        </div>
+      </div>
+      <div class="modal-error" id="speciesError"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" onclick="closeSpeciesModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="speciesSaveBtn">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Kit modal -->
+<div class="modal-overlay" id="kitModal">
+  <div class="modal">
+    <h2 id="kitModalTitle">Add kit</h2>
+    <form id="kitForm" novalidate>
+      <div class="form-group"><label>Kit name *</label>
+        <input type="text" id="kt_name" placeholder="Hummingbird Kit"></div>
+      <div class="form-group"><label>Blurb</label>
+        <textarea id="kt_blurb" placeholder="Provide hummingbirds with their favorite native flowers…"></textarea></div>
+      <div class="form-group"><label>Plants in this kit</label>
+        <div class="kit-plant-rows" id="kt_plant_rows"></div>
+        <button type="button" class="btn-sm kit-add-plant" onclick="addKitPlantRow()">+ Add plant</button>
+        <div class="field-note">Name is required per row; the note is an optional soil or "optional shrub/tree/vine" qualifier.</div>
+      </div>
+      <div class="form-group"><label>Photo</label>
+        <input type="file" id="kt_photo" accept="image/*" onchange="onKitPhotoChosen(this)">
+        <div class="photo-preview" id="kt_photo_preview" style="display:none">
+          <img id="kt_photo_thumb" alt="">
+          <a onclick="removeKitPhoto()">Remove photo</a>
+        </div>
+      </div>
+      <div class="modal-error" id="kitError"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" onclick="closeKitModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="kitSaveBtn">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+const esc = DataStore.esc;
+const TAG_ALLOW = ['spring', 'summer', 'fall', 'shade', 'medicinal', 'edible', 'bird'];
+
+let species = [];
+let kits = [];
+let currentTab = 'species';
+
+// Photo picker state (shared modal for add + edit; null id = add).
+let spEditId = null, spPhotoFile = null, spPhotoRemove = false, spPhotoCurrentPath = null;
+let ktEditId = null, ktPhotoFile = null, ktPhotoRemove = false, ktPhotoCurrentPath = null;
+
+// ── Photo helpers ────────────────────────────────────────────────────────────
+// Resolve a stored photo_path to a renderable src, or null. 'static:<file>' is a
+// repo asset under assets/img/plants/ (charset-guarded so it cannot escape the
+// folder); any other value is a gallery-bucket object served via its public URL.
+function catalogPhotoSrc(photoPath) {
+  if (!photoPath) return null;
+  if (String(photoPath).slice(0, 7) === 'static:') {
+    const file = String(photoPath).slice(7);
+    return /^[A-Za-z0-9._-]+$/.test(file) ? 'assets/img/plants/' + file : null;
+  }
+  return DataStore.plantPhotoUrl(photoPath);
+}
+async function uploadPlantPhoto(file) {
+  const blob = await DataStore.resizeImage(file, 1600);
+  const path = `plants/${crypto.randomUUID()}.jpg`;
+  const up = await window.ecoSupabase.storage.from('gallery')
+    .upload(path, blob, { contentType: blob.type || 'image/jpeg', upsert: false });
+  if (up.error) throw new Error(up.error.message);
+  return path;
+}
+// Best-effort delete of a gallery-bucket object; static: assets are never removed.
+async function removePlantPhotoObject(path) {
+  if (!path || String(path).slice(0, 7) === 'static:') return;
+  try { await window.ecoSupabase.storage.from('gallery').remove([path]); } catch (e) { /* ignore */ }
+}
+
+function parseTags(raw) {
+  const parts = String(raw || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+  const uniq = [];
+  parts.forEach(t => { if (uniq.indexOf(t) === -1) uniq.push(t); });
+  const bad = uniq.filter(t => TAG_ALLOW.indexOf(t) === -1);
+  return { tags: uniq, bad };
+}
+
+// ── Tabs ─────────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  currentTab = tab;
+  document.getElementById('tabSpecies').classList.toggle('active', tab === 'species');
+  document.getElementById('tabKits').classList.toggle('active', tab === 'kits');
+  document.getElementById('speciesPane').style.display = tab === 'species' ? '' : 'none';
+  document.getElementById('kitsPane').style.display = tab === 'kits' ? '' : 'none';
+}
+
+// ── Species list ─────────────────────────────────────────────────────────────
+function renderSpecies() {
+  const el = document.getElementById('speciesList');
+  if (!species.length) { el.innerHTML = '<div class="empty">No species yet. Add the first one.</div>'; return; }
+  el.innerHTML = species.map((p, i) => {
+    const src = catalogPhotoSrc(p.photoPath);
+    const thumb = src
+      ? `<img class="row-thumb" src="${esc(src)}" alt="" loading="lazy">`
+      : `<div class="row-thumb placeholder">🌼</div>`;
+    const pill = p.active
+      ? '<span class="status-pill status-on">Live</span>'
+      : '<span class="status-pill status-off">Hidden</span>';
+    return `
+      <div class="row ${p.active ? '' : 'inactive'}">
+        <div class="row-sort">
+          <button class="btn-sm" onclick="moveSpecies('${esc(p.id)}',-1)" ${i === 0 ? 'disabled' : ''} aria-label="Move up">▲</button>
+          <button class="btn-sm" onclick="moveSpecies('${esc(p.id)}',1)" ${i === species.length - 1 ? 'disabled' : ''} aria-label="Move down">▼</button>
+        </div>
+        ${thumb}
+        <div class="row-main">
+          <div class="row-title">${esc(p.common)} ${pill}</div>
+          <div class="row-sub"><em>${esc(p.botanical || '—')}</em></div>
+          <div class="row-sub2">${esc(p.bloom || '')}</div>
+        </div>
+        <div class="row-actions">
+          <button class="btn-sm" onclick="openSpeciesModal('${esc(p.id)}')">Edit</button>
+          <button class="btn-sm" onclick="toggleSpeciesActive('${esc(p.id)}')">${p.active ? 'Deactivate' : 'Reactivate'}</button>
+          <button class="btn-sm btn-danger" onclick="deleteSpecies('${esc(p.id)}')">Delete</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function speciesById(id) { return species.find(p => p.id === id); }
+
+async function moveSpecies(id, dir) {
+  const i = species.findIndex(p => p.id === id);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= species.length) return;
+  const a = species[i], b = species[j];
+  const errEl = document.getElementById('pageError');
+  errEl.textContent = '';
+  try {
+    // Swap the two sort values so the pair trades places in the ordering.
+    await Promise.all([
+      DataStore.updatePlantSpecies(a.id, { sort: b.sort }),
+      DataStore.updatePlantSpecies(b.id, { sort: a.sort }),
+    ]);
+    await loadSpecies();
+  } catch (err) {
+    errEl.textContent = 'Could not reorder. ' + err.message;
+  }
+}
+
+async function toggleSpeciesActive(id) {
+  const p = speciesById(id);
+  if (!p) return;
+  const errEl = document.getElementById('pageError');
+  errEl.textContent = '';
+  try {
+    await DataStore.updatePlantSpecies(id, { active: !p.active });
+    await loadSpecies();
+  } catch (err) {
+    errEl.textContent = 'Could not update. ' + err.message;
+  }
+}
+
+async function deleteSpecies(id) {
+  const p = speciesById(id);
+  if (!p) return;
+  if (!confirm(`Delete "${p.common}"? This permanently removes it from the shop.`)) return;
+  const errEl = document.getElementById('pageError');
+  errEl.textContent = '';
+  try {
+    await DataStore.deletePlantSpecies(id, p.photoPath);
+    await loadSpecies();
+  } catch (err) {
+    errEl.textContent = 'Could not delete. ' + err.message;
+  }
+}
+
+// ── Species modal ────────────────────────────────────────────────────────────
+function renderSpeciesPhoto(url) {
+  const wrap = document.getElementById('sp_photo_preview');
+  const thumb = document.getElementById('sp_photo_thumb');
+  if (url) { thumb.src = url; wrap.style.display = 'flex'; }
+  else { wrap.style.display = 'none'; thumb.src = ''; }
+}
+function onSpeciesPhotoChosen(input) {
+  const file = (input.files || [])[0] || null;
+  spPhotoFile = file;
+  spPhotoRemove = false;
+  renderSpeciesPhoto(file ? URL.createObjectURL(file)
+    : (spPhotoCurrentPath ? catalogPhotoSrc(spPhotoCurrentPath) : ''));
+}
+function removeSpeciesPhoto() {
+  spPhotoFile = null;
+  spPhotoRemove = true;
+  document.getElementById('sp_photo').value = '';
+  renderSpeciesPhoto('');
+}
+
+function openSpeciesModal(id) {
+  spEditId = id || null;
+  spPhotoFile = null;
+  spPhotoRemove = false;
+  const p = id ? speciesById(id) : null;
+  spPhotoCurrentPath = p ? (p.photoPath || null) : null;
+  document.getElementById('speciesModalTitle').textContent = p ? 'Edit species' : 'Add species';
+  document.getElementById('speciesError').textContent = '';
+  document.getElementById('sp_common').value = p ? (p.common || '') : '';
+  document.getElementById('sp_botanical').value = p ? (p.botanical || '') : '';
+  document.getElementById('sp_bloom').value = p ? (p.bloom || '') : '';
+  document.getElementById('sp_height').value = p ? (p.height || '') : '';
+  document.getElementById('sp_attracts').value = p ? (p.attracts || '') : '';
+  document.getElementById('sp_fact').value = p ? (p.fact || '') : '';
+  document.getElementById('sp_tags').value = p && p.tags ? p.tags.join(', ') : '';
+  document.getElementById('sp_photo').value = '';
+  renderSpeciesPhoto(spPhotoCurrentPath ? catalogPhotoSrc(spPhotoCurrentPath) : '');
+  document.getElementById('speciesModal').classList.add('open');
+  document.getElementById('sp_common').focus();
+}
+function closeSpeciesModal() { document.getElementById('speciesModal').classList.remove('open'); }
+document.getElementById('speciesModal').addEventListener('click', function (e) {
+  if (e.target === this) closeSpeciesModal();
+});
+
+document.getElementById('speciesForm').addEventListener('submit', async function (e) {
+  e.preventDefault();
+  const errEl = document.getElementById('speciesError');
+  errEl.textContent = '';
+  const common = document.getElementById('sp_common').value.trim();
+  if (!common) { errEl.textContent = 'A common name is required.'; return; }
+  const { tags, bad } = parseTags(document.getElementById('sp_tags').value);
+  if (bad.length) {
+    errEl.textContent = 'Unknown tag(s): ' + bad.join(', ') + '. Allowed: ' + TAG_ALLOW.join(', ') + '.';
+    return;
+  }
+  const changes = {
+    common,
+    botanical: document.getElementById('sp_botanical').value.trim() || null,
+    bloom: document.getElementById('sp_bloom').value.trim() || null,
+    height: document.getElementById('sp_height').value.trim() || null,
+    attracts: document.getElementById('sp_attracts').value.trim() || null,
+    fact: document.getElementById('sp_fact').value.trim() || null,
+    tags,
+  };
+  // Resolve photo change: new upload replaces; "remove" clears; else keep.
+  let newPath = null;
+  if (spPhotoFile) {
+    try { newPath = await uploadPlantPhoto(spPhotoFile); }
+    catch (err) { errEl.textContent = 'Could not upload photo. ' + err.message; return; }
+    changes.photoPath = newPath;
+  } else if (spPhotoRemove) {
+    changes.photoPath = null;
+  }
+  const btn = document.getElementById('speciesSaveBtn');
+  btn.disabled = true;
+  try {
+    if (spEditId) {
+      await DataStore.updatePlantSpecies(spEditId, changes);
+    } else {
+      changes.active = true;
+      changes.sort = species.length ? Math.max.apply(null, species.map(s => s.sort || 0)) + 10 : 0;
+      await DataStore.addPlantSpecies(changes);
+    }
+    // Photo swapped/removed: delete the old gallery object best-effort.
+    if ((newPath || spPhotoRemove) && spPhotoCurrentPath && spPhotoCurrentPath !== newPath) {
+      removePlantPhotoObject(spPhotoCurrentPath);
+    }
+    closeSpeciesModal();
+    await loadSpecies();
+  } catch (err) {
+    if (newPath) removePlantPhotoObject(newPath); // row write failed; clean orphan
+    errEl.textContent = 'Could not save. ' + err.message;
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// ── Kits list ────────────────────────────────────────────────────────────────
+function renderKits() {
+  const el = document.getElementById('kitsList');
+  if (!kits.length) { el.innerHTML = '<div class="empty">No kits yet. Add the first one.</div>'; return; }
+  el.innerHTML = kits.map((k, i) => {
+    const src = catalogPhotoSrc(k.photoPath);
+    const thumb = src
+      ? `<img class="row-thumb" src="${esc(src)}" alt="" loading="lazy">`
+      : `<div class="row-thumb placeholder">🌿</div>`;
+    const pill = k.active
+      ? '<span class="status-pill status-on">Live</span>'
+      : '<span class="status-pill status-off">Hidden</span>';
+    const n = (k.plants || []).length;
+    return `
+      <div class="row ${k.active ? '' : 'inactive'}">
+        <div class="row-sort">
+          <button class="btn-sm" onclick="moveKit('${esc(k.id)}',-1)" ${i === 0 ? 'disabled' : ''} aria-label="Move up">▲</button>
+          <button class="btn-sm" onclick="moveKit('${esc(k.id)}',1)" ${i === kits.length - 1 ? 'disabled' : ''} aria-label="Move down">▼</button>
+        </div>
+        ${thumb}
+        <div class="row-main">
+          <div class="row-title">${esc(k.name)} ${pill}</div>
+          <div class="row-sub">${esc(k.blurb || '')}</div>
+          <div class="row-sub2">${n} plant${n !== 1 ? 's' : ''}</div>
+        </div>
+        <div class="row-actions">
+          <button class="btn-sm" onclick="openKitModal('${esc(k.id)}')">Edit</button>
+          <button class="btn-sm" onclick="toggleKitActive('${esc(k.id)}')">${k.active ? 'Deactivate' : 'Reactivate'}</button>
+          <button class="btn-sm btn-danger" onclick="deleteKit('${esc(k.id)}')">Delete</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function kitById(id) { return kits.find(k => k.id === id); }
+
+async function moveKit(id, dir) {
+  const i = kits.findIndex(k => k.id === id);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= kits.length) return;
+  const a = kits[i], b = kits[j];
+  const errEl = document.getElementById('pageError');
+  errEl.textContent = '';
+  try {
+    await Promise.all([
+      DataStore.updatePlantKit(a.id, { sort: b.sort }),
+      DataStore.updatePlantKit(b.id, { sort: a.sort }),
+    ]);
+    await loadKits();
+  } catch (err) {
+    errEl.textContent = 'Could not reorder. ' + err.message;
+  }
+}
+
+async function toggleKitActive(id) {
+  const k = kitById(id);
+  if (!k) return;
+  const errEl = document.getElementById('pageError');
+  errEl.textContent = '';
+  try {
+    await DataStore.updatePlantKit(id, { active: !k.active });
+    await loadKits();
+  } catch (err) {
+    errEl.textContent = 'Could not update. ' + err.message;
+  }
+}
+
+async function deleteKit(id) {
+  const k = kitById(id);
+  if (!k) return;
+  if (!confirm(`Delete "${k.name}"? This permanently removes it from the shop.`)) return;
+  const errEl = document.getElementById('pageError');
+  errEl.textContent = '';
+  try {
+    await DataStore.deletePlantKit(id, k.photoPath);
+    await loadKits();
+  } catch (err) {
+    errEl.textContent = 'Could not delete. ' + err.message;
+  }
+}
+
+// ── Kit modal ────────────────────────────────────────────────────────────────
+function renderKitPhoto(url) {
+  const wrap = document.getElementById('kt_photo_preview');
+  const thumb = document.getElementById('kt_photo_thumb');
+  if (url) { thumb.src = url; wrap.style.display = 'flex'; }
+  else { wrap.style.display = 'none'; thumb.src = ''; }
+}
+function onKitPhotoChosen(input) {
+  const file = (input.files || [])[0] || null;
+  ktPhotoFile = file;
+  ktPhotoRemove = false;
+  renderKitPhoto(file ? URL.createObjectURL(file)
+    : (ktPhotoCurrentPath ? catalogPhotoSrc(ktPhotoCurrentPath) : ''));
+}
+function removeKitPhoto() {
+  ktPhotoFile = null;
+  ktPhotoRemove = true;
+  document.getElementById('kt_photo').value = '';
+  renderKitPhoto('');
+}
+
+function addKitPlantRow(name, note) {
+  const rows = document.getElementById('kt_plant_rows');
+  const row = document.createElement('div');
+  row.className = 'kit-plant-row';
+  const nameIn = document.createElement('input');
+  nameIn.type = 'text'; nameIn.placeholder = 'Plant name'; nameIn.className = 'kp-name';
+  nameIn.value = name || '';
+  const noteIn = document.createElement('input');
+  noteIn.type = 'text'; noteIn.placeholder = 'Note (optional)'; noteIn.className = 'kp-note';
+  noteIn.value = note || '';
+  const rm = document.createElement('button');
+  rm.type = 'button'; rm.className = 'kp-remove'; rm.setAttribute('aria-label', 'Remove plant');
+  rm.textContent = '×';
+  rm.addEventListener('click', () => row.remove());
+  row.appendChild(nameIn); row.appendChild(noteIn); row.appendChild(rm);
+  rows.appendChild(row);
+}
+function collectKitPlants() {
+  const out = [];
+  document.querySelectorAll('#kt_plant_rows .kit-plant-row').forEach(r => {
+    const name = (r.querySelector('.kp-name').value || '').trim();
+    const note = (r.querySelector('.kp-note').value || '').trim();
+    if (!name) return;
+    out.push(note ? { name, note } : { name });
+  });
+  return out;
+}
+
+function openKitModal(id) {
+  ktEditId = id || null;
+  ktPhotoFile = null;
+  ktPhotoRemove = false;
+  const k = id ? kitById(id) : null;
+  ktPhotoCurrentPath = k ? (k.photoPath || null) : null;
+  document.getElementById('kitModalTitle').textContent = k ? 'Edit kit' : 'Add kit';
+  document.getElementById('kitError').textContent = '';
+  document.getElementById('kt_name').value = k ? (k.name || '') : '';
+  document.getElementById('kt_blurb').value = k ? (k.blurb || '') : '';
+  const rows = document.getElementById('kt_plant_rows');
+  rows.innerHTML = '';
+  const plants = (k && k.plants) ? k.plants : [];
+  if (plants.length) plants.forEach(p => addKitPlantRow(p.name, p.note));
+  else addKitPlantRow('', '');
+  document.getElementById('kt_photo').value = '';
+  renderKitPhoto(ktPhotoCurrentPath ? catalogPhotoSrc(ktPhotoCurrentPath) : '');
+  document.getElementById('kitModal').classList.add('open');
+  document.getElementById('kt_name').focus();
+}
+function closeKitModal() { document.getElementById('kitModal').classList.remove('open'); }
+document.getElementById('kitModal').addEventListener('click', function (e) {
+  if (e.target === this) closeKitModal();
+});
+
+document.getElementById('kitForm').addEventListener('submit', async function (e) {
+  e.preventDefault();
+  const errEl = document.getElementById('kitError');
+  errEl.textContent = '';
+  const name = document.getElementById('kt_name').value.trim();
+  if (!name) { errEl.textContent = 'A kit name is required.'; return; }
+  const changes = {
+    name,
+    blurb: document.getElementById('kt_blurb').value.trim() || null,
+    plants: collectKitPlants(),
+  };
+  let newPath = null;
+  if (ktPhotoFile) {
+    try { newPath = await uploadPlantPhoto(ktPhotoFile); }
+    catch (err) { errEl.textContent = 'Could not upload photo. ' + err.message; return; }
+    changes.photoPath = newPath;
+  } else if (ktPhotoRemove) {
+    changes.photoPath = null;
+  }
+  const btn = document.getElementById('kitSaveBtn');
+  btn.disabled = true;
+  try {
+    if (ktEditId) {
+      await DataStore.updatePlantKit(ktEditId, changes);
+    } else {
+      changes.active = true;
+      changes.sort = kits.length ? Math.max.apply(null, kits.map(k => k.sort || 0)) + 10 : 0;
+      await DataStore.addPlantKit(changes);
+    }
+    if ((newPath || ktPhotoRemove) && ktPhotoCurrentPath && ktPhotoCurrentPath !== newPath) {
+      removePlantPhotoObject(ktPhotoCurrentPath);
+    }
+    closeKitModal();
+    await loadKits();
+  } catch (err) {
+    if (newPath) removePlantPhotoObject(newPath);
+    errEl.textContent = 'Could not save. ' + err.message;
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape') return;
+  closeSpeciesModal();
+  closeKitModal();
+});
+
+// ── Load / render ────────────────────────────────────────────────────────────
+async function loadSpecies() { species = await DataStore.getPlantSpecies(); renderSpecies(); }
+async function loadKits() { kits = await DataStore.getPlantKits(); renderKits(); }
+
+(async function init() {
+  try {
+    await AuthManager.requireAuth();
+    Nav.render();
+    await Promise.all([loadSpecies(), loadKits()]);
+  } catch (err) {
+    document.getElementById('speciesList').innerHTML =
+      '<div class="empty">Could not load the catalog (' + esc(err.message) +
+      '). <a href="javascript:location.reload()">Retry</a></div>';
+  }
+})();
+</script>
+</body>
+</html>
