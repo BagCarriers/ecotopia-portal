@@ -235,6 +235,9 @@
       <div class="form-group"><label>Google My Maps link or ID</label>
         <input type="text" id="eg_map" placeholder="https://www.google.com/maps/d/viewer?mid=... or the mid value">
         <div style="font-size:0.72rem;color:var(--text-dim);margin-top:4px;">Paste the full share link, or just the map ID. Shows an embedded map on the public page.</div></div>
+      <div class="form-group"><label>Get involved link (optional, https)</label>
+        <input type="text" id="eg_form" placeholder="https://docs.google.com/forms/...">
+        <div style="font-size:0.72rem;color:var(--text-dim);margin-top:4px;">A public link (e.g. a Google interest form). Shows a "Suggest a planting site" button on the public page. Must start with https://.</div></div>
       <input type="hidden" id="eg_id">
       <div class="modal-error" id="editGardenError"></div>
       <div class="modal-actions">
@@ -538,6 +541,7 @@ function openEditGarden() {
   document.getElementById('eg_sqft').value = garden.sqft != null ? garden.sqft : '';
   document.getElementById('eg_desc').value = garden.description || '';
   document.getElementById('eg_map').value = garden.mapMid || '';
+  document.getElementById('eg_form').value = garden.formUrl || '';
   document.getElementById('editGardenModal').classList.add('open');
 }
 function closeEditGarden() {
@@ -556,6 +560,10 @@ document.getElementById('editGardenForm').addEventListener('submit', async funct
   const description = document.getElementById('eg_desc').value.trim();
   const parsed = DataStore.parseMapMid(document.getElementById('eg_map').value);
   if (parsed.error) { errEl.textContent = parsed.error; return; }
+  const formUrl = document.getElementById('eg_form').value.trim();
+  if (formUrl && !/^https:\/\//i.test(formUrl)) {
+    errEl.textContent = 'The get involved link must start with https://.'; return;
+  }
   try {
     await DataStore.updateGarden(garden.id, {
       name,
@@ -563,6 +571,7 @@ document.getElementById('editGardenForm').addEventListener('submit', async funct
       sqft: Number(sqftVal) || null,
       description: description || null,
       mapMid: parsed.mid,
+      formUrl: formUrl || null,
     });
     garden = await DataStore.getGarden(garden.id);
     closeEditGarden();

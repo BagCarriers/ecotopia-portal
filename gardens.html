@@ -141,6 +141,11 @@
       <input type="text" id="ag_map" placeholder="https://www.google.com/maps/d/viewer?mid=... or the mid value">
       <div class="form-hint">Paste the full Google My Maps share link, or just the map ID. Shows an embedded map on the public page.</div>
     </div>
+    <div class="form-group">
+      <label>Get involved link (optional, https)</label>
+      <input type="text" id="ag_form" placeholder="https://docs.google.com/forms/...">
+      <div class="form-hint">A public link (e.g. a Google interest form). Shows a "Suggest a planting site" button on the public page. Must start with https://.</div>
+    </div>
     <div class="modal-error" id="addGardenError"></div>
     <div class="form-actions">
       <button class="btn-sm btn-outline-sm" onclick="toggleAddGarden()">Cancel</button>
@@ -230,10 +235,15 @@ async function addGarden() {
   const description = document.getElementById('ag_desc').value.trim();
   const parsed = DataStore.parseMapMid(document.getElementById('ag_map').value);
   if (parsed.error) { errEl.textContent = parsed.error; return; }
+  const formUrl = document.getElementById('ag_form').value.trim();
+  if (formUrl && !/^https:\/\//i.test(formUrl)) {
+    errEl.textContent = 'The get involved link must start with https://.'; return;
+  }
   try {
     await DataStore.addGarden({
       name, address, sqft: Number(sqftVal) || null, qrToken,
       description: description || null, mapMid: parsed.mid,
+      formUrl: formUrl || null,
     });
     const [gardens, tasks] = await Promise.all([DataStore.getGardens(), DataStore.getTasks()]);
     renderGardens(gardens, tasks);
@@ -243,6 +253,7 @@ async function addGarden() {
     document.getElementById('ag_qr').value = '';
     document.getElementById('ag_desc').value = '';
     document.getElementById('ag_map').value = '';
+    document.getElementById('ag_form').value = '';
     document.getElementById('addGardenForm').classList.remove('open');
   } catch (err) {
     errEl.textContent = 'Could not add garden. ' + err.message;

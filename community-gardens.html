@@ -38,10 +38,21 @@
   </section>
   <div class="willow on-cream" data-opacity="0.4"></div>
 
+  <section class="section cream-soft" aria-labelledby="overview-h">
+    <div class="wrap">
+      <h2 id="overview-h" class="display" style="font-size:1.7rem;color:var(--green-dark);letter-spacing:0.04em">Every garden on one map</h2>
+      <p class="lead">Every planting we tend across Blair County and the Ridge and Valley region, mapped in one place. Zoom in to find the garden nearest you.</p>
+      <!-- Overview map: hardcoded page content (NOT data). Google My Maps
+           "Eco-Community Gardens (WildOnes PA Ridge & Valley)", mid verified live. -->
+      <div class="garden-map"><iframe src="https://www.google.com/maps/d/embed?mid=1svkTJPU3IDO2qzA2r2Lezr03P4Ol5Wg" title="Map of every Ecotopian EarthCare community garden" loading="lazy" allowfullscreen></iframe></div>
+      <a class="garden-map-link" href="https://www.google.com/maps/d/viewer?mid=1svkTJPU3IDO2qzA2r2Lezr03P4Ol5Wg" target="_blank" rel="noopener">Open the full map &rarr;</a>
+    </div>
+  </section>
+
   <section class="section" aria-labelledby="gardens-h">
     <div class="wrap">
       <h2 id="gardens-h" class="display" style="font-size:1.7rem;color:var(--green-dark);letter-spacing:0.04em">Our gardens</h2>
-      <div class="garden-grid" id="gardens" aria-live="polite"></div>
+      <div id="gardens" aria-live="polite"></div>
     </div>
   </section>
 
@@ -96,33 +107,98 @@
 <script>
 document.addEventListener('DOMContentLoaded', () => { EcoSite.renderNav('gardens'); loadGardens(); });
 
+// Towns we group cards under, matched (in order) against the address string.
+// Anything with no match falls into "Other gardens".
+const GARDEN_TOWNS = ['Altoona', 'Duncansville', 'Bellwood', 'Hollidaysburg'];
+function townOf(address) {
+  const a = (address || '').toLowerCase();
+  for (const t of GARDEN_TOWNS) { if (a.indexOf(t.toLowerCase()) !== -1) return t; }
+  return 'Other gardens';
+}
+
+// Resolve a garden photo_path to a renderable src, or null.
+// "static:<file>" points at a repo asset under assets/img/gardens/ (filename
+// charset-guarded so it can never escape the folder); any other value is treated
+// as a gallery-bucket path served via its public URL (the events photo pattern).
+function gardenPhotoSrc(photoPath) {
+  if (!photoPath) return null;
+  if (photoPath.slice(0, 7) === 'static:') {
+    const file = photoPath.slice(7);
+    return /^[A-Za-z0-9._-]+$/.test(file) ? 'assets/img/gardens/' + file : null;
+  }
+  return EcoSite.gardenPhotoUrl(photoPath);
+}
+
+// Build the inner content of a garden card (shared by featured + grouped cards).
+function gardenCardInner(g) {
+  const esc = EcoSite.esc;
+  // Only embed a map when map_mid passes the id guard (iframe src safety).
+  const mid = EcoSite.validMapMid(g.mapMid) ? encodeURIComponent(g.mapMid) : null;
+  const photo = gardenPhotoSrc(g.photoPath);
+  // form_url is a public href: require an https:// scheme or refuse to render it.
+  const formUrl = (typeof g.formUrl === 'string' && /^https:\/\//i.test(g.formUrl)) ? g.formUrl : null;
+  const text =
+    '<h3>' + esc(g.name) + '</h3>' +
+    (g.address ? '<p class="addr">📍 ' + esc(g.address) + '</p>' : '') +
+    (g.sqft ? '<p class="sqft">' + esc(g.sqft) + ' sq ft</p>' : '') +
+    (g.description ? '<p class="garden-desc">' + esc(g.description) + '</p>' : '') +
+    (mid
+      ? '<div class="garden-map"><iframe src="https://www.google.com/maps/d/embed?mid=' + mid +
+          '" title="Map of ' + esc(g.name) + '" loading="lazy" allowfullscreen></iframe></div>' +
+        '<a class="garden-map-link" href="https://www.google.com/maps/d/viewer?mid=' + mid +
+          '" target="_blank" rel="noopener">View full map &rarr;</a>'
+      : '') +
+    (formUrl
+      ? '<p class="garden-form"><a class="btn btn-amber" href="' + esc(formUrl) +
+          '" target="_blank" rel="noopener">Suggest a planting site</a></p>'
+      : '');
+  // The sign is a designed poster: contain, never crop (see .garden-photo CSS).
+  const photoHtml = photo
+    ? '<div class="garden-photo"><img src="' + esc(photo) + '" alt="' + esc(g.name) +
+        ' grove sign" loading="lazy"></div>'
+    : '';
+  return { text, photoHtml, hasPhoto: !!photo };
+}
+
 async function loadGardens() {
   const el = document.getElementById('gardens');
   const esc = EcoSite.esc;
   try {
     const gardens = await EcoSite.getGardens();
     if (!gardens.length) {
-      el.outerHTML = '<p class="empty-line">Community garden listings are coming soon. In the meantime, join us at an <a href="happenings.html">upcoming event</a>.</p>';
+      el.innerHTML = '<p class="empty-line">Community garden listings are coming soon. In the meantime, join us at an <a href="happenings.html">upcoming event</a>.</p>';
       return;
     }
-    el.innerHTML = gardens.map(g => {
-      // Only embed a map when map_mid passes the id guard (iframe src safety).
-      const mid = EcoSite.validMapMid(g.mapMid) ? encodeURIComponent(g.mapMid) : null;
-      return '<div class="garden-card reveal"><h3>' + esc(g.name) + '</h3>' +
-        (g.address ? '<p class="addr">📍 ' + esc(g.address) + '</p>' : '') +
-        (g.sqft ? '<p class="sqft">' + esc(g.sqft) + ' sq ft</p>' : '') +
-        (g.description ? '<p class="garden-desc">' + esc(g.description) + '</p>' : '') +
-        (mid
-          ? '<div class="garden-map"><iframe src="https://www.google.com/maps/d/embed?mid=' + mid +
-              '" title="Map of ' + esc(g.name) + '" loading="lazy" allowfullscreen></iframe></div>' +
-            '<a class="garden-map-link" href="https://www.google.com/maps/d/viewer?mid=' + mid +
-              '" target="_blank" rel="noopener">View full map &rarr;</a>'
-          : '') +
-        '</div>';
-    }).join('');
+    // Pawpaw Pathways leads as a featured, full-width card (sign photo + map + form).
+    const isFeatured = g => /pawpaw pathways/i.test(g.name || '');
+    const featured = gardens.filter(isFeatured);
+    const rest = gardens.filter(g => !isFeatured(g));
+
+    let html = '';
+    featured.forEach(g => {
+      const c = gardenCardInner(g);
+      html += '<div class="garden-card featured reveal' + (c.hasPhoto ? ' has-photo' : '') + '">' +
+        '<div class="garden-featured-text">' + c.text + '</div>' + c.photoHtml + '</div>';
+    });
+
+    // Group the remaining cards by town, towns in the fixed order then "Other".
+    const groups = {};
+    rest.forEach(g => { const t = townOf(g.address); (groups[t] = groups[t] || []).push(g); });
+    const order = GARDEN_TOWNS.concat(['Other gardens']);
+    order.forEach(town => {
+      const list = groups[town];
+      if (!list || !list.length) return;
+      html += '<h3 class="garden-town">' + esc(town) + '</h3><div class="garden-grid">' +
+        list.map(g => {
+          const c = gardenCardInner(g);
+          return '<div class="garden-card reveal">' + c.photoHtml + c.text + '</div>';
+        }).join('') + '</div>';
+    });
+
+    el.innerHTML = html;
     EcoSite.decorate();
   } catch (e) {
-    el.outerHTML = '<p class="fallback-line">Gardens are updating. Check back soon.</p>';
+    el.innerHTML = '<p class="fallback-line">Gardens are updating. Check back soon.</p>';
   }
 }
 </script>

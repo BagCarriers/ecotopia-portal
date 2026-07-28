@@ -287,6 +287,34 @@ both fields on the `gardens.html` Add Garden form and the `garden-detail.html` E
 modal. Seeded gardens: Pawpaw Pathways and Zebra Swallowtail Trails (has a map) and
 Reciprocity Community Food Forest.
 
+Migration `0017_garden_links.sql` adds two more `public.gardens` columns (applied live
+via the Management API, so register it with `supabase migration repair --status applied
+0017` before any `supabase db push`):
+
+- `form_url` - a public "get involved" link (e.g. a Google interest form) rendered as an
+  `href` on the community-gardens card. Because it is a live link, the public renderer
+  refuses any value that does not start with `https://` (a simple scheme check), and the
+  portal forms enforce the same rule inline. When present it shows a "Suggest a planting
+  site" button (`btn-amber`, `target=_blank rel=noopener`). NOTE for a Google Form: if the
+  form is set to "restricted to signed-in users" visitors will hit a sign-in wall, so turn
+  "Requires sign in / limit to 1 response" off in the form's settings for a public form.
+- `photo_path` - a card photo. Two forms are supported by the renderer:
+  - `static:<file>` -> a repo static asset served from `assets/img/gardens/<file>`. The
+    filename is guarded against `/^[A-Za-z0-9._-]+$/` so it cannot escape the folder. This
+    is how the Pawpaw Pathways grove sign (`static:pawpaw-sign.jpg`, a designed portrait
+    poster) is served; it renders `object-fit: contain` so the sign is never cropped.
+  - any other value -> a gallery-bucket path served via public URL (the events photo
+    pattern, `EcoSite.gardenPhotoUrl`). No portal upload path for garden photos exists yet;
+    that is future work. Today garden photos are set by hand (static asset + a SQL update).
+
+Overview map: `community-gardens.html` shows a hardcoded "Every garden on one map" section
+ABOVE the per-garden cards, embedding the "Eco-Community Gardens (WildOnes PA Ridge &
+Valley)" Google My Maps (`mid=1svkTJPU3IDO2qzA2r2Lezr03P4Ol5Wg`). It is page content, not
+data, so it lives directly in the HTML with a comment. Below it, the cards lead with Pawpaw
+Pathways as a featured full-width card (sign photo + map + form), then the remaining gardens
+are grouped client-side by town derived from the address (Altoona, Duncansville, Bellwood,
+Hollidaysburg, then "Other gardens").
+
 ## Deploy
 
 The site is a static bundle deployed to Netlify:

@@ -328,6 +328,13 @@
     return sb().storage.from('gallery').getPublicUrl(photoPath).data.publicUrl;
   }
 
+  // Public URL for a gallery-bucket garden photo. Only used by
+  // community-gardens.html for photo_path values that are NOT the 'static:'
+  // repo-asset form (those resolve to a local path without touching storage).
+  function gardenPhotoUrl(photoPath) {
+    return sb().storage.from('gallery').getPublicUrl(photoPath).data.publicUrl;
+  }
+
   async function getGardens() {
     const { data, error } = await sb().from('gardens').select('*')
       .order('name', { ascending: true });
@@ -808,6 +815,7 @@
     decorate: decorate,
     getEvents: getEvents,
     eventPhotoUrl: eventPhotoUrl,
+    gardenPhotoUrl: gardenPhotoUrl,
     getGardens: getGardens,
     getStaffPhotos: getStaffPhotos,
     getServiceSettings: getServiceSettings,
