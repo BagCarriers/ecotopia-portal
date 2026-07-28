@@ -151,7 +151,11 @@ function gardenCardInner(g) {
     (formUrl
       ? '<p class="garden-form"><a class="btn btn-amber" href="' + esc(formUrl) +
           '" target="_blank" rel="noopener">Suggest a planting site</a></p>'
-      : '');
+      : '') +
+    '<div class="garden-volunteer">' +
+      '<p>Want to help this garden grow? Workdays are open to everyone, no experience needed.</p>' +
+      '<a class="btn btn-ghost" href="volunteer-board.html">Volunteer here</a>' +
+    '</div>';
   // The sign is a designed poster: contain, never crop (see .garden-photo CSS).
   const photoHtml = photo
     ? '<div class="garden-photo"><img src="' + esc(photo) + '" alt="' + esc(g.name) +

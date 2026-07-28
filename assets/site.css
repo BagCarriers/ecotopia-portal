@@ -384,6 +384,16 @@ details.past-events[open] > summary::before { transform: rotate(90deg); }
 .garden-map-link { display: inline-block; margin-top: 10px; font-family: var(--font-util); font-weight: 600; font-size: 0.92rem; color: var(--green-dark); }
 .garden-map-link:hover { text-decoration: underline; }
 .garden-form { margin: 18px 0 0; }
+.garden-volunteer {
+  margin-top: 18px; padding-top: 16px;
+  border-top: 1px dashed var(--line);
+  display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px;
+}
+.garden-volunteer p {
+  font-family: var(--font-body); color: var(--ink-soft);
+  font-size: 1rem; line-height: 1.5; margin: 0; flex: 1 1 220px;
+}
+.garden-volunteer .btn { padding: 10px 20px; font-size: 0.95rem; white-space: nowrap; }
 .garden-photo { border-radius: 10px; overflow: hidden; border: 1px solid var(--line); background: var(--cream-soft); }
 .garden-photo img { display: block; width: 100%; max-height: 460px; object-fit: contain; }
 
