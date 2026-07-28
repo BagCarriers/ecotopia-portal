@@ -395,13 +395,15 @@
     var res = await sb().from('plant_kits').select('*')
       .order('sort', { ascending: true }).order('name', { ascending: true });
     if (res.error) throw new Error(res.error.message);
-    return window.EcoMapping.fromDbAll(res.data);
+    // Parity guard: signed-in staff carry a JWT whose RLS also returns
+    // deactivated rows; the public shop must always show active only.
+    return window.EcoMapping.fromDbAll(res.data).filter(function (r) { return r.active !== false; });
   }
   async function loadSpecies() {
     var res = await sb().from('plant_species').select('*')
       .order('sort', { ascending: true }).order('common', { ascending: true });
     if (res.error) throw new Error(res.error.message);
-    return window.EcoMapping.fromDbAll(res.data);
+    return window.EcoMapping.fromDbAll(res.data).filter(function (r) { return r.active !== false; });
   }
 
 
