@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Suggest a Planting Site - Ecotopian EarthCare</title>
+  <link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png">
+<meta name="description" content="Suggest a spot for a new pawpaw grove along Blair County waterways, part of the Pawpaw Pathways corridor for Zebra Swallowtail butterflies.">
+<meta property="og:site_name" content="Ecotopian EarthCare">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Suggest a Planting Site - Ecotopian EarthCare">
+<meta property="og:description" content="Help grow a corridor of pawpaw groves for Zebra Swallowtail butterflies. Suggest a planting site and if it works out, we plant a grove and add it to the map.">
+  <meta property="og:image" content="https://ecotopia.bagcarriers.dev/assets/img/og-pawpaw.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Flamenco:wght@300;400&family=Inter+Tight:wght@400;500;600;700&family=Megrim&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+<script src="assets/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/mapping.js"></script>
+<script src="assets/site.js"></script>
+<script src="assets/data.js"></script>
+<style>
+  /* Page-local layout on top of the shared marketing stylesheet (site.css). */
+  .suggest-intro { max-width: 640px; }
+  .suggest-sign {
+    max-width: 240px; margin: 22px 0 4px;
+    border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow);
+    background: #fff;
+  }
+  .suggest-sign img { display: block; width: 100%; height: auto; object-fit: contain; }
+  .suggest-maplink { display: inline-block; margin-top: 8px; font-family: var(--font-util);
+    font-weight: 600; color: var(--green-dark); }
+  .suggest-card {
+    background: #fff; border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 30px; max-width: 680px; margin-top: 10px; box-shadow: var(--shadow);
+  }
+  .suggest-note {
+    font-family: var(--font-util); font-size: 0.82rem; color: var(--ink-soft); margin: 4px 0 0;
+  }
+  /* Thank-you screen (hidden until submit succeeds). */
+  .suggest-thanks { display: none; }
+  .suggest-thanks.visible { display: block; }
+  .suggest-form.hidden { display: none; }
+  .suggest-thanks .check {
+    font-size: 2.6rem; color: var(--green); line-height: 1;
+  }
+  .suggest-thanks h2 { margin: 12px 0 8px; }
+  .suggest-thanks p { max-width: 520px; }
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header" id="siteHeader"></header>
+
+<main id="main">
+  <section class="section cream">
+    <div class="wrap narrow">
+      <p class="eyebrow">Pawpaw Pathways</p>
+      <h1>Suggest a planting site</h1>
+      <p class="lead suggest-intro">Our goal is a pawpaw grove every half mile along our waterways, so
+        Zebra Swallowtail butterflies have a living corridor to travel through Blair County. The Zebra
+        Swallowtail lays its eggs only on pawpaw, so more groves mean more butterflies.</p>
+      <p class="lead suggest-intro">Know a good spot? Suggest it below. If it works out, we plant a grove
+        and add it to the map. You can watch the corridor grow.</p>
+      <a class="suggest-maplink" href="https://www.google.com/maps/d/viewer?mid=1MWDTLstCAOrHauRWVuwRsVcpFmUaTOQ" target="_blank" rel="noopener">See the Pawpaw Pathways map &rarr;</a>
+      <div class="suggest-sign">
+        <img src="assets/img/gardens/pawpaw-sign.jpg" alt="Pawpaw Pathways and Zebra Swallowtail Trails grove sign" loading="lazy">
+      </div>
+    </div>
+  </section>
+  <div class="willow on-cream" data-opacity="0.4"></div>
+
+  <section class="section cream-soft">
+    <div class="wrap narrow">
+      <div class="suggest-card">
+        <!-- Thank-you screen -->
+        <div class="suggest-thanks" id="thanksScreen">
+          <div class="check" aria-hidden="true">&#10003;</div>
+          <h2>Thank you!</h2>
+          <p class="lead">We will scout the spot and reach out. Watch the map grow.</p>
+          <p class="suggest-note"><a class="suggest-maplink" href="community-gardens.html">Back to community gardens &rarr;</a></p>
+        </div>
+
+        <!-- Suggestion form -->
+        <form class="suggest-form" id="suggestForm" novalidate>
+          <div class="eco-lead-grid">
+            <div class="eco-lead-field eco-lead-full">
+              <label for="s_name">Your name <span class="req">*</span></label>
+              <input type="text" id="s_name" placeholder="Full name" autocomplete="name">
+            </div>
+            <div class="eco-lead-field">
+              <label for="s_phone">Phone</label>
+              <input type="tel" id="s_phone" placeholder="(814) 555-0000" autocomplete="tel">
+            </div>
+            <div class="eco-lead-field">
+              <label for="s_email">Email</label>
+              <input type="email" id="s_email" placeholder="email@example.com" autocomplete="email">
+            </div>
+          </div>
+          <p class="suggest-note">Add a phone number or an email so we can reach you.</p>
+
+          <p class="eco-lead-sub">The spot</p>
+          <div class="eco-lead-grid">
+            <div class="eco-lead-field eco-lead-full">
+              <label for="s_location">Where should we plant? <span class="req">*</span></label>
+              <textarea id="s_location" placeholder="An address, a landmark, or a description of the spot (for example: along the creek behind the ballfields on Main St)."></textarea>
+            </div>
+            <div class="eco-lead-field eco-lead-full">
+              <label for="s_relation">Your connection to the land</label>
+              <select id="s_relation">
+                <option value="">Select...</option>
+                <option value="I own it">I own it</option>
+                <option value="I know the owner">I know the owner</option>
+                <option value="Public land">Public land</option>
+                <option value="Not sure">Not sure</option>
+              </select>
+            </div>
+            <div class="eco-lead-field eco-lead-full">
+              <label for="s_notes">Anything else</label>
+              <textarea id="s_notes" placeholder="Optional: sun, water, size, access, or anything else we should know."></textarea>
+            </div>
+          </div>
+
+          <p class="eco-lead-error" id="suggestError"></p>
+          <button type="submit" class="eco-lead-primary">Suggest this spot</button>
+        </form>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div>
+      <p class="fbrand">Ecotopian EarthCare</p>
+      <p>Ecological landscaping, community gardens, and native plants in Central Pennsylvania.</p>
+      <p>Serving the Altoona area &amp; Blair County. Find us at the Reciprocity Community Food Forest, 211 Browning Ave, Altoona, PA 16602.</p>
+      <p>Call or text <a href="tel:+18146315338">814-631-5338</a> · <a href="mailto:admin@ecotopianearthcare.com">admin@ecotopianearthcare.com</a></p>
+    </div>
+    <div>
+      <h4>Explore</h4>
+      <ul>
+        <li><a href="services.html">Services</a></li>
+        <li><a href="happenings.html">Events</a></li>
+        <li><a href="community-gardens.html">Community Gardens</a></li>
+        <li><a href="photos.html">Photos</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Get involved</h4>
+      <ul>
+        <li><a href="intake.html">Client Request Form</a></li>
+        <li><a href="volunteer-board.html">Volunteer board</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>© 2026 Ecotopian EarthCare</span>
+    <a class="staff" href="login.html">Staff sign in</a>
+  </div>
+</footer>
+
+<div class="credit-band">
+  <div class="credit-inner">
+    <span>© 2026 Ecotopian EarthCare. All rights reserved.</span>
+    <span>Website by <a href="https://bagcarriers.com">BagCarriers Systems</a></span>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => { EcoSite.renderNav(null); });
+
+// Resolve the Pawpaw garden id at runtime by name (do NOT hardcode a uuid).
+// Fail-soft: a null id still stores the suggestion (garden_id is nullable).
+let PAWPAW_GARDEN_ID = null;
+(async function loadPawpawId() {
+  try {
+    const gardens = await EcoSite.getGardens();
+    const g = gardens.find(x => /pawpaw pathways/i.test(x.name || ''));
+    if (g) PAWPAW_GARDEN_ID = g.id;
+  } catch (e) { /* leave null; suggestion still stores */ }
+})();
+
+document.getElementById('suggestForm').addEventListener('submit', async function (e) {
+  e.preventDefault();
+  const errEl = document.getElementById('suggestError');
+  errEl.textContent = '';
+
+  const name = document.getElementById('s_name').value.trim();
+  const phone = document.getElementById('s_phone').value.trim();
+  const email = document.getElementById('s_email').value.trim();
+  const locationText = document.getElementById('s_location').value.trim();
+  const landRelation = document.getElementById('s_relation').value;
+  const notes = document.getElementById('s_notes').value.trim();
+
+  if (!name) { errEl.textContent = 'Please add your name.'; return; }
+  if (!phone && !email) {
+    errEl.textContent = 'Please add a phone number or an email so we can reach you.'; return;
+  }
+  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    errEl.textContent = 'That email address does not look right. Please check it.'; return;
+  }
+  if (!locationText) { errEl.textContent = 'Please tell us where we should plant.'; return; }
+
+  try {
+    // Fire-and-forget anon insert (return=minimal, no .id reads).
+    await DataStore.submitPlantingSuggestion({
+      gardenId: PAWPAW_GARDEN_ID,
+      name, phone, email,
+      locationText,
+      landRelation,
+      notes,
+    });
+    document.getElementById('suggestForm').classList.add('hidden');
+    document.getElementById('thanksScreen').classList.add('visible');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch (err) {
+    errEl.textContent =
+      'Something went wrong sending your suggestion. Please try again, or call us at 814-631-5338.';
+  }
+});
+</script>
+</body>
+</html>

@@ -132,6 +132,31 @@
   .clear-badge { background: var(--sage); color: var(--forest-mid); padding: 2px 8px;
     border-radius: 20px; font-size: 0.72rem; font-weight: 600; }
 
+  /* Planting suggestions (anon public submissions) */
+  .sug-list { display: flex; flex-direction: column; gap: 12px; }
+  .sug-item { background: #fff; border-radius: 10px; border: 1px solid var(--border);
+    padding: 16px; }
+  .sug-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .sug-name { font-weight: 700; font-size: 0.95rem; color: var(--forest); }
+  .sug-contact { font-size: 0.8rem; color: var(--text-dim); margin-top: 2px; }
+  .sug-meta { font-size: 0.78rem; color: var(--text-dim); margin-top: 2px; }
+  .sug-body { font-size: 0.875rem; margin-top: 10px; line-height: 1.5; }
+  .sug-body .sug-label { font-weight: 600; color: var(--text-dim); }
+  .sug-pill { padding: 3px 10px; border-radius: 20px; font-size: 0.72rem; font-weight: 600;
+    white-space: nowrap; }
+  .sug-new { background: #dbeafe; color: #1e40af; }
+  .sug-contacted { background: #fef3c7; color: #92400e; }
+  .sug-planted { background: #d1fae5; color: #065f46; }
+  .sug-dismissed { background: var(--cream-dim); color: var(--text-dim); }
+  .sug-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  .sug-actions .btn-edit { font-size: 0.78rem; }
+  .btn-danger {
+    font-size: 0.78rem; padding: 3px 9px; background: transparent;
+    border: 1px solid #fca5a5; border-radius: 6px; cursor: pointer;
+    color: #dc2626; font-family: 'DM Sans', sans-serif; transition: all 0.15s;
+  }
+  .btn-danger:hover { background: #fee2e2; }
+
   /* QR Modal */
   .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5);
     z-index: 500; align-items: center; justify-content: center; padding: 20px; }
@@ -334,6 +359,7 @@ let walkins = [];
 let checkins = [];
 let observations = [];
 let volunteers = [];
+let suggestions = [];
 let qrInstance = null;
 
 function dueCls(d) { return d === null ? 'green' : d <= 0 ? 'due-red' : d <= 3 ? 'due-amber' : 'due-green'; }
@@ -528,7 +554,71 @@ function renderPage() {
             ${o.flagged ? '<span class="flag-badge">⚑ Flagged</span>' : '<span class="clear-badge">✓ Clear</span>'}
           </div>`).join('')}</div>`}
     </div>
+    ${suggestions.length === 0 ? '' : `
+    <!-- Planting suggestions (anon public submissions - escape rigorously) -->
+    <div class="section">
+      <div class="section-header">
+        <h2>Planting Suggestions</h2>
+        <span style="font-size:0.8rem;color:var(--text-dim)">Suggested by the public</span>
+      </div>
+      <div class="sug-list">${suggestions.map(s => suggestionCard(s)).join('')}</div>
+    </div>`}
   `;
+}
+
+const SUG_STATUS = {
+  new: { cls: 'sug-new', label: 'New' },
+  contacted: { cls: 'sug-contacted', label: 'Contacted' },
+  planted: { cls: 'sug-planted', label: 'Planted' },
+  dismissed: { cls: 'sug-dismissed', label: 'Dismissed' },
+};
+
+function suggestionCard(s) {
+  const st = SUG_STATUS[s.status] || SUG_STATUS.new;
+  const contactBits = [];
+  if (s.phone) contactBits.push(esc(s.phone));
+  if (s.email) contactBits.push(esc(s.email));
+  const contact = contactBits.length ? contactBits.join(' · ') : 'No contact given';
+  return `
+    <div class="sug-item">
+      <div class="sug-top">
+        <div>
+          <div class="sug-name">${esc(s.name)}</div>
+          <div class="sug-contact">${contact}</div>
+          <div class="sug-meta">${DataStore.formatDate(s.createdAt)}${s.landRelation ? ' · ' + esc(s.landRelation) : ''}</div>
+        </div>
+        <span class="sug-pill ${st.cls}">${esc(st.label)}</span>
+      </div>
+      <div class="sug-body"><span class="sug-label">Where:</span> ${esc(s.locationText)}</div>
+      ${s.notes ? `<div class="sug-body"><span class="sug-label">Notes:</span> ${esc(s.notes)}</div>` : ''}
+      <div class="sug-actions">
+        <button class="btn-edit" onclick="setSuggestionStatus('${s.id}', 'contacted')">Contacted</button>
+        <button class="btn-edit" onclick="setSuggestionStatus('${s.id}', 'planted')">Planted</button>
+        <button class="btn-edit" onclick="setSuggestionStatus('${s.id}', 'dismissed')">Dismiss</button>
+        <button class="btn-danger" onclick="deleteSuggestion('${s.id}')">Delete</button>
+      </div>
+    </div>`;
+}
+
+async function setSuggestionStatus(id, status) {
+  try {
+    await DataStore.updatePlantingSuggestion(id, { status });
+    suggestions = await DataStore.getPlantingSuggestionsByGarden(garden.id);
+    renderPage();
+  } catch (err) {
+    alert('Could not update the suggestion. ' + err.message);
+  }
+}
+
+async function deleteSuggestion(id) {
+  if (!confirm('Delete this planting suggestion? This cannot be undone.')) return;
+  try {
+    await DataStore.deletePlantingSuggestion(id);
+    suggestions = await DataStore.getPlantingSuggestionsByGarden(garden.id);
+    renderPage();
+  } catch (err) {
+    alert('Could not delete the suggestion. ' + err.message);
+  }
 }
 
 // ── Edit Garden Details ───────────────────────────────────────────────────────
@@ -772,13 +862,14 @@ function printQR() {
     await AuthManager.requireAuth();
     Nav.render();
     if (!gardenId) { garden = null; renderPage(); return; }
-    [garden, tasks, walkins, checkins, observations, volunteers] = await Promise.all([
+    [garden, tasks, walkins, checkins, observations, volunteers, suggestions] = await Promise.all([
       DataStore.getGarden(gardenId),
       DataStore.getTasksByGarden(gardenId),
       DataStore.getWalkins(),
       DataStore.getCheckinsByGarden(gardenId),
       DataStore.getObservationsByGarden(gardenId),
       DataStore.getVolunteers(),
+      DataStore.getPlantingSuggestionsByGarden(gardenId),
     ]);
     renderPage();
   } catch (err) {

@@ -227,6 +227,21 @@ const DataStore = (() => {
     addVolunteerApplication: (r) => submit('volunteer_applications', r),
     getVolunteerApplications: () => list('volunteer_applications'),
 
+    // Planting-site suggestions (anon public form -> staff review). Anon inserts
+    // use return=minimal (submit) so no anon select policy is needed; reads,
+    // status updates, and deletes are staff-only (authenticated + is_portal_user).
+    submitPlantingSuggestion: (r) => submit('planting_suggestions', r),
+    getPlantingSuggestions: async () =>
+      fromDbAll(unwrap(await sb.from('planting_suggestions').select('*')
+        .order('created_at', { ascending: false }))),
+    getPlantingSuggestionsByGarden: async (gId) =>
+      fromDbAll(unwrap(await sb.from('planting_suggestions').select('*')
+        .eq('garden_id', gId).order('created_at', { ascending: false }))),
+    updatePlantingSuggestion: (id, ch) => update('planting_suggestions', id, ch),
+    deletePlantingSuggestion: async (id) => {
+      unwrap(await sb.from('planting_suggestions').delete().eq('id', id));
+    },
+
     // Sync utilities (unchanged from the demo version)
     esc(v) {
       if (v == null) return '';

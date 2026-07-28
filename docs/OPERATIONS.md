@@ -315,6 +315,62 @@ Pathways as a featured full-width card (sign photo + map + form), then the remai
 are grouped client-side by town derived from the address (Altoona, Duncansville, Bellwood,
 Hollidaysburg, then "Other gardens").
 
+## Planting suggestions (Pawpaw Pathways)
+
+Migration `0018_planting_suggestions.sql` adds `public.planting_suggestions`, a
+portal-native replacement for the old Pawpaw Pathways "Suggest a planting site" Google
+Form. Applied live via the Management API, so register it with `supabase migration repair
+--status applied 0018` before any `supabase db push`.
+
+The mission: a pawpaw grove every half mile along Blair County waterways so Zebra
+Swallowtail butterflies have a corridor. The public suggests spots; Jordan scouts and
+plants, then adds map icons.
+
+Table `public.planting_suggestions` columns:
+
+| column          | notes                                                            |
+| --------------- | ---------------------------------------------------------------- |
+| `garden_id`     | FK to `gardens` (`on delete set null`); the Pawpaw garden row    |
+| `name`          | required                                                         |
+| `phone`         | one of phone/email required (enforced by the public form)        |
+| `email`         | one of phone/email required (enforced by the public form)        |
+| `location_text` | required; address, landmark, or a description of the spot        |
+| `land_relation` | I own it / I know the owner / Public land / Not sure             |
+| `notes`         | optional                                                        |
+| `status`        | `new` (default) / `contacted` / `planted` / `dismissed` (CHECK)  |
+| `created_at`    | default `now()`                                                 |
+| `updated_at`    | maintained by the shared `set_updated_at` trigger                |
+
+RLS: `anon` may INSERT only (`psg_anon_ins`), matching the return=minimal insert pattern
+so no anon read policy is needed; everything else (read, status updates, delete) is
+staff-only (`psg_staff_all`, `authenticated` + `is_portal_user()`).
+
+Where things live:
+
+- Public form: `suggest-a-site.html` (marketing-branded, `EcoSite.renderNav(null)`, loads
+  `data.js` with no auth). It resolves the Pawpaw garden id at runtime by name via
+  `EcoSite.getGardens()` (no hardcoded uuid) and submits through
+  `DataStore.submitPlantingSuggestion` (anon fire-and-forget, no `.id` reads). It links to
+  the Pawpaw map viewer (`mid=1MWDTLstCAOrHauRWVuwRsVcpFmUaTOQ`) and shows the grove sign.
+- Card entry point: the Pawpaw garden row's `form_url` now points at
+  `https://ecotopia.bagcarriers.dev/suggest-a-site.html`, so the existing
+  community-gardens card "Suggest a planting site" button opens the portal-native form.
+- Staff review: `garden-detail.html` shows a "Planting Suggestions" section (hidden when a
+  garden has zero) listing each suggestion (name, contact, location, land relation, notes,
+  date, status pill) with Contacted / Planted / Dismiss status actions and Delete (confirm).
+  These strings are anon-submitted, so every dynamic value is `esc()`'d (stored-XSS class).
+- `dashboard.html` "Needs attention" surfaces an "N new planting suggestion(s)" item
+  (`status = 'new'` count across gardens) linking to `gardens.html`.
+
+Data helpers (`assets/data.js`): `submitPlantingSuggestion` (anon), plus staff
+`getPlantingSuggestions`, `getPlantingSuggestionsByGarden(gardenId)` (both `created_at`
+desc), `updatePlantingSuggestion(id, ch)`, `deletePlantingSuggestion(id)`.
+
+Retired predecessor: the Pawpaw "Suggest a planting site" Google Form
+(`https://docs.google.com/forms/d/e/1FAIpQLSeHJ4xdIjv0Ct_rmucEkuTzOesA62sUCz3p-xdMjirlsO8ffQ/viewform`)
+is no longer linked anywhere and can be closed in Google Forms. Its responses (if any) were
+not migrated.
+
 ## Deploy
 
 The site is a static bundle deployed to Netlify:
