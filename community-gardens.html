@@ -5,12 +5,14 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Community Gardens - Ecotopian EarthCare</title>
   <link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/img/favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/assets/img/favicon-192.png">
 <meta name="description" content="Community gardens and food forests stewarded by Ecotopian EarthCare, including the Reciprocity Community Food Forest in Altoona, Pennsylvania.">
 <meta property="og:site_name" content="Ecotopian EarthCare">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Community Gardens - Ecotopian EarthCare">
 <meta property="og:description" content="Shared spaces where native plants and food grow side by side across Blair County.">
-  <meta property="og:image" content="https://ecotopia.bagcarriers.dev/assets/img/og-pawpaw.jpg">
+  <meta property="og:image" content="https://ecotopianearthcare.com/assets/img/og-pawpaw.jpg">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -132,7 +134,9 @@ function gardenCardInner(g) {
   const mid = EcoSite.validMapMid(g.mapMid) ? encodeURIComponent(g.mapMid) : null;
   const photo = gardenPhotoSrc(g.photoPath);
   // form_url is a public href: require an https:// scheme or refuse to render it.
-  const formUrl = (typeof g.formUrl === 'string' && /^https:\/\//i.test(g.formUrl)) ? g.formUrl : null;
+  // Site-local page name (works on any domain) or an absolute https URL.
+  const formUrl = (typeof g.formUrl === 'string' &&
+    (/^[A-Za-z0-9._-]+\.html$/.test(g.formUrl) || /^https:\/\//i.test(g.formUrl))) ? g.formUrl : null;
   const text =
     '<h3>' + esc(g.name) + '</h3>' +
     (g.address ? '<p class="addr">📍 ' + esc(g.address) + '</p>' : '') +

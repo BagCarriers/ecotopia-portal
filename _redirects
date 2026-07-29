@@ -1,0 +1,13 @@
+# 301s from the old Squarespace site's indexed URLs
+/our-team            /about.html               301
+/an-ecotopian        /about.html               301
+/story               /about.html               301
+/events-2-1          /happenings.html          301
+/events-2-1/*        /happenings.html          301
+/community-gardens   /community-gardens.html   301
+/store               /shop.html                301
+/contact             /intake.html              301
+/services            /services.html            301
+/blog-2-1            /                         301
+/blog-2-1/*          /                         301
+/s/*                 /plants.html              301

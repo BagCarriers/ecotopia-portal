@@ -1,0 +1,32 @@
+User-agent: *
+Allow: /
+# Staff portal and auth pages: not for crawling
+Disallow: /dashboard.html
+Disallow: /jobs.html
+Disallow: /job-detail.html
+Disallow: /clients.html
+Disallow: /gardens.html
+Disallow: /garden-detail.html
+Disallow: /volunteers.html
+Disallow: /volunteer-detail.html
+Disallow: /volunteer-hours-print.html
+Disallow: /calendar.html
+Disallow: /events.html
+Disallow: /gallery.html
+Disallow: /invoices.html
+Disallow: /quotes.html
+Disallow: /quote-print.html
+Disallow: /quote-view.html
+Disallow: /grants.html
+Disallow: /grant-finder.html
+Disallow: /reports.html
+Disallow: /users.html
+Disallow: /manage-services.html
+Disallow: /manage-plants.html
+Disallow: /manage-shop.html
+Disallow: /question-inbox.html
+Disallow: /login.html
+Disallow: /accept-invite.html
+Disallow: /qr-checkin.html
+
+Sitemap: https://ecotopianearthcare.com/sitemap.xml
