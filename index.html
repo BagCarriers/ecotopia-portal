@@ -46,6 +46,21 @@
 <script src="assets/supabase-client.js"></script>
 <script src="assets/mapping.js"></script>
 <script src="assets/site.js"></script>
+<style>
+  /* Homepage testimonials strip (site.css supplies the rest) */
+  .rv-strip { display: grid; gap: 16px; margin-top: 6px; }
+  @media (min-width: 720px) { .rv-strip { grid-template-columns: repeat(3, 1fr); } }
+  .rv-strip .rv-quote { background: #fff; border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 20px 22px; box-shadow: var(--shadow); display: flex; flex-direction: column; }
+  .rv-strip .rv-quote .stars { color: var(--amber); font-size: 1.1rem; letter-spacing: 2px;
+    margin-bottom: 8px; white-space: nowrap; }
+  .rv-strip .rv-quote .stars .empty { color: var(--line); }
+  .rv-strip .rv-quote .body { font-family: var(--font-body); font-size: 1.02rem; line-height: 1.5;
+    color: var(--ink); margin: 0 0 12px; }
+  .rv-strip .rv-quote .who { font-family: var(--font-util); font-weight: 600; color: var(--green-dark);
+    font-size: 0.9rem; margin-top: auto; }
+  .rv-strip .rv-quote .who .loc { font-weight: 400; color: var(--ink-soft); }
+</style>
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
@@ -174,6 +189,19 @@
   </section>
   <div class="willow on-white" data-opacity="0.4"></div>
 
+  <!-- Testimonials strip (live approved reviews; whole section hidden when none) -->
+  <section class="section cream" id="homeReviewsSection" style="display:none" aria-labelledby="rv-h">
+    <div class="wrap">
+      <p class="eyebrow">From our neighbors</p>
+      <h2 id="rv-h">What neighbors say</h2>
+      <div class="rv-strip" id="homeReviews" aria-live="polite"></div>
+      <div class="cta-row">
+        <a class="btn btn-ghost" href="reviews.html">Read all reviews</a>
+        <a class="btn btn-primary" href="reviews.html">Leave a review</a>
+      </div>
+    </div>
+  </section>
+
   <!-- Native plant nursery promo -->
   <section class="section cream" aria-labelledby="np-h">
     <div class="wrap">
@@ -268,6 +296,7 @@
         <li><a href="happenings.html">Events</a></li>
         <li><a href="community-gardens.html">Community Gardens</a></li>
         <li><a href="photos.html">Photos</a></li>
+        <li><a href="reviews.html">Reviews</a></li>
         <li><a href="blog.html">Blog</a></li>
       </ul>
     </div>
@@ -294,7 +323,41 @@ document.addEventListener('DOMContentLoaded', () => {
   loadHomeEvents();
   loadHomeGardens();
   loadHomePhotos();
+  loadHomeReviews();
 });
+
+// Testimonials strip: up to 3 approved reviews. Fail-soft: the whole section stays
+// hidden when there are none or the fetch fails, so the homepage never shows an empty
+// or broken band. Every anon-submitted string is esc()'d (stored-XSS class).
+async function loadHomeReviews() {
+  const section = document.getElementById('homeReviewsSection');
+  const el = document.getElementById('homeReviews');
+  const esc = EcoSite.esc;
+  function starRow(rating) {
+    const n = Math.max(0, Math.min(5, Math.round(Number(rating) || 0)));
+    let out = '';
+    for (let i = 1; i <= 5; i++) out += i <= n ? '★' : '<span class="empty">☆</span>';
+    return out;
+  }
+  try {
+    const reviews = await EcoSite.getApprovedReviews(3);
+    if (!reviews.length) return; // section stays display:none
+    el.innerHTML = reviews.map(r => {
+      const loc = (r.location || '').trim();
+      const rated = Math.round(Number(r.rating) || 0);
+      return '<figure class="rv-quote reveal">' +
+        '<div class="stars" aria-label="' + esc(String(rated)) + ' out of 5 stars">' + starRow(r.rating) + '</div>' +
+        '<blockquote class="body">' + esc(r.body) + '</blockquote>' +
+        '<figcaption class="who">' + esc(r.name) +
+          (loc ? '<span class="loc"> · ' + esc(loc) + '</span>' : '') + '</figcaption>' +
+        '</figure>';
+    }).join('');
+    section.style.display = '';
+    EcoSite.decorate();
+  } catch (e) {
+    /* leave the section hidden on any error */
+  }
+}
 
 async function loadHomeEvents() {
   const el = document.getElementById('homeEvents');

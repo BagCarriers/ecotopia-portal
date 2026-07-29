@@ -357,6 +357,19 @@
     }));
   }
 
+  // Approved first-party reviews (anon read; RLS returns approved rows only).
+  // Newest first. The parity filter (status === 'approved') is a belt-and-suspenders
+  // guard so a signed-in staff JWT rendering a public page never leaks a pending or
+  // dismissed review onto the marketing site.
+  async function getApprovedReviews(limit = 30) {
+    const { data, error } = await sb().from('reviews').select('*')
+      .eq('status', 'approved')
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) throw new Error(error.message);
+    return map().fromDbAll(data).filter((r) => r.status === 'approved');
+  }
+
   // Anon read of service_settings. Fail-soft: caller treats a thrown error as
   // "settings unknown" and falls back to plain intake.html links.
   async function getServiceSettings() {
@@ -822,6 +835,7 @@
     getGardens: getGardens,
     getStaffPhotos: getStaffPhotos,
     getServiceSettings: getServiceSettings,
+    getApprovedReviews: getApprovedReviews,
     initServiceLeads: initServiceLeads,
     openService: openService,
     willowSvg: willowSvg,

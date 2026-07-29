@@ -843,3 +843,12 @@ against production.
   visibility in its edit modal (INTERNAL pill shows on internal cards).
 - The calendar-feed ICS (Jordan's own Google subscription) intentionally includes
   internal events; it is served by service role, not the anon policy.
+
+## Reviews (2026-07-29)
+- First-party reviews (no Google Business Profile yet): public.reviews, anon may
+  INSERT only pending rows and SELECT only approved ones; staff moderate in
+  review-inbox.html (approve / dismiss / delete). Pending count on the dashboard.
+- Display: reviews.html (all approved + submit form) and a homepage testimonials
+  strip (up to 3, hidden when none).
+- Deliberately NO Review/AggregateRating schema markup: Google disallows rich-result
+  markup for self-collected reviews. Revisit if a GBP is created later.

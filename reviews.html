@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reviews - Ecotopian EarthCare</title>
+  <link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/img/favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/assets/img/favicon-192.png">
+<meta name="description" content="Read what neighbors across the Altoona area and Blair County say about their pollinator gardens, food forests, rain gardens, and native plantings from Ecotopian EarthCare, and leave a review of your own.">
+<meta property="og:site_name" content="Ecotopian EarthCare">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Reviews - Ecotopian EarthCare">
+<meta property="og:description" content="See what neighbors say about their native-plant gardens and habitat work with Ecotopian EarthCare, and share how your own project went.">
+  <meta property="og:image" content="https://ecotopianearthcare.com/assets/img/og-pawpaw.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Flamenco:wght@300;400&family=Inter+Tight:wght@400;500;600;700&family=Megrim&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+<script src="assets/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/mapping.js"></script>
+<script src="assets/site.js"></script>
+<script src="assets/data.js"></script>
+<style>
+  /* Page-local layout on top of the shared marketing stylesheet (site.css). */
+  .rv-intro { max-width: 640px; }
+
+  /* Average headline */
+  .rv-headline { display: flex; align-items: baseline; flex-wrap: wrap; gap: 10px;
+    margin: 6px 0 4px; }
+  .rv-headline .avg { font-family: var(--font-display); font-size: 2.4rem; color: var(--green-dark);
+    line-height: 1; }
+  .rv-headline .stars { font-size: 1.35rem; letter-spacing: 2px; }
+  .rv-headline .count { font-family: var(--font-util); font-size: 0.92rem; color: var(--ink-soft); }
+
+  /* Star colour helpers (display) */
+  .stars { color: var(--amber); white-space: nowrap; }
+  .stars .empty { color: var(--line); }
+
+  /* Review list */
+  .rv-list { display: grid; gap: 16px; margin-top: 18px; }
+  @media (min-width: 720px) { .rv-list { grid-template-columns: 1fr 1fr; } }
+  .rv-card { background: #fff; border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 20px 22px; box-shadow: var(--shadow); }
+  .rv-card .rv-stars { font-size: 1.15rem; letter-spacing: 2px; margin-bottom: 8px; }
+  .rv-card .rv-body { font-family: var(--font-body); font-size: 1.05rem; line-height: 1.55;
+    color: var(--ink); margin: 0 0 12px; white-space: pre-wrap; word-break: break-word; }
+  .rv-card .rv-who { font-family: var(--font-util); font-weight: 600; color: var(--green-dark);
+    font-size: 0.95rem; }
+  .rv-card .rv-loc { font-family: var(--font-util); font-weight: 400; color: var(--ink-soft); }
+  .rv-card .rv-service { display: inline-block; margin-top: 8px; font-family: var(--font-util);
+    font-size: 0.78rem; color: var(--green-dark); background: var(--cream-soft);
+    border: 1px solid var(--line); border-radius: 20px; padding: 3px 12px; }
+  .rv-empty { font-family: var(--font-util); color: var(--ink-soft); font-size: 1rem;
+    max-width: 520px; }
+
+  /* Form card */
+  .rv-card-form { background: #fff; border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 30px; max-width: 680px; margin-top: 10px; box-shadow: var(--shadow); }
+  .rv-note { font-family: var(--font-util); font-size: 0.82rem; color: var(--ink-soft); margin: 4px 0 0; }
+
+  /* Star rating input (accessible radio group) */
+  .rv-rating { border: 0; padding: 0; margin: 0 0 4px; }
+  .rv-rating legend { font-family: var(--font-util); font-weight: 600; color: var(--ink);
+    font-size: 0.95rem; margin-bottom: 6px; padding: 0; }
+  .rv-rating .req { color: var(--amber); }
+  .rv-stars-input { display: inline-flex; gap: 4px; }
+  .rv-stars-input input[type="radio"] {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+  .rv-stars-input label { cursor: pointer; font-size: 2rem; line-height: 1; color: var(--line);
+    transition: color 0.1s; }
+  .rv-stars-input label.on { color: var(--amber); }
+  /* Keyboard focus ring on the label whose radio is focused */
+  .rv-stars-input input[type="radio"]:focus-visible + label,
+  .rv-stars-input input[type="radio"]:focus + label {
+    outline: 3px solid var(--amber); outline-offset: 3px; border-radius: 4px;
+  }
+
+  /* Thank-you screen (hidden until submit succeeds). */
+  .rv-thanks { display: none; }
+  .rv-thanks.visible { display: block; }
+  .rv-form.hidden { display: none; }
+  .rv-thanks .check { font-size: 2.6rem; color: var(--green); line-height: 1; }
+  .rv-thanks h2 { margin: 12px 0 8px; }
+  .rv-thanks p { max-width: 520px; }
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header" id="siteHeader"></header>
+
+<main id="main">
+  <section class="section cream">
+    <div class="wrap narrow">
+      <p class="eyebrow">From our neighbors</p>
+      <h1>Reviews</h1>
+      <p class="lead rv-intro">Real words from the people whose land we have worked on across the
+        Altoona area and Blair County. Read how their projects went, then share your own.</p>
+      <div id="rvHeadline" aria-live="polite"></div>
+    </div>
+  </section>
+  <div class="willow on-cream" data-opacity="0.4"></div>
+
+  <section class="section">
+    <div class="wrap">
+      <div id="rvList" class="rv-list" aria-live="polite"></div>
+    </div>
+  </section>
+  <div class="willow on-white" data-opacity="0.4"></div>
+
+  <section class="section cream-soft">
+    <div class="wrap narrow">
+      <p class="eyebrow">Your turn</p>
+      <h2>Leave a review</h2>
+      <div class="rv-card-form">
+        <!-- Thank-you screen -->
+        <div class="rv-thanks" id="thanksScreen">
+          <div class="check" aria-hidden="true">&#10003;</div>
+          <h2>Thank you!</h2>
+          <p class="lead">Your review will appear once we approve it.</p>
+          <p class="rv-note"><a class="suggest-maplink" href="index.html">Back to the homepage &rarr;</a></p>
+        </div>
+
+        <!-- Review form -->
+        <form class="rv-form" id="reviewForm" novalidate>
+          <div class="eco-lead-grid">
+            <div class="eco-lead-field">
+              <label for="r_name">Name <span class="req">*</span></label>
+              <input type="text" id="r_name" placeholder="Your name" autocomplete="name">
+            </div>
+            <div class="eco-lead-field">
+              <label for="r_location">Town</label>
+              <input type="text" id="r_location" placeholder="Optional, e.g. Altoona">
+            </div>
+          </div>
+
+          <fieldset class="rv-rating" id="ratingGroup">
+            <legend>Your rating <span class="req">*</span></legend>
+            <div class="rv-stars-input" id="starsInput" role="radiogroup" aria-label="Your rating, 1 to 5 stars">
+              <input type="radio" name="rating" id="star1" value="1"><label for="star1" aria-label="1 star" title="1 star">&#9733;</label>
+              <input type="radio" name="rating" id="star2" value="2"><label for="star2" aria-label="2 stars" title="2 stars">&#9733;</label>
+              <input type="radio" name="rating" id="star3" value="3"><label for="star3" aria-label="3 stars" title="3 stars">&#9733;</label>
+              <input type="radio" name="rating" id="star4" value="4"><label for="star4" aria-label="4 stars" title="4 stars">&#9733;</label>
+              <input type="radio" name="rating" id="star5" value="5"><label for="star5" aria-label="5 stars" title="5 stars">&#9733;</label>
+            </div>
+          </fieldset>
+
+          <div class="eco-lead-grid">
+            <div class="eco-lead-field eco-lead-full">
+              <label for="r_service">What did we help you with?</label>
+              <input type="text" id="r_service" placeholder="Optional, e.g. pollinator garden, rain garden, tree net">
+            </div>
+            <div class="eco-lead-field eco-lead-full">
+              <label for="r_body">Your review <span class="req">*</span></label>
+              <textarea id="r_body" placeholder="Tell your neighbors how your project went."></textarea>
+            </div>
+          </div>
+          <p class="rv-note">Reviews are checked for spam before they appear.</p>
+
+          <p class="eco-lead-error" id="reviewError"></p>
+          <button type="submit" class="eco-lead-primary" id="reviewSubmit">Submit review</button>
+        </form>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div>
+      <p class="fbrand">Ecotopian EarthCare</p>
+      <p>Ecological landscaping, community gardens, and native plants in Central Pennsylvania.</p>
+      <p>Serving the Altoona area &amp; Blair County. Find us at the Reciprocity Community Food Forest, 211 Browning Ave, Altoona, PA 16602.</p>
+      <p>Call or text <a href="tel:+18146315338">814-631-5338</a> · <a href="mailto:admin@ecotopianearthcare.com">admin@ecotopianearthcare.com</a></p>
+    </div>
+    <div>
+      <h4>Explore</h4>
+      <ul>
+        <li><a href="services.html">Services</a></li>
+        <li><a href="shop.html">Shop</a></li>
+        <li><a href="happenings.html">Events</a></li>
+        <li><a href="community-gardens.html">Community Gardens</a></li>
+        <li><a href="photos.html">Photos</a></li>
+        <li><a href="reviews.html">Reviews</a></li>
+        <li><a href="blog.html">Blog</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Get involved</h4>
+      <ul>
+        <li><a href="intake.html">Client Request Form</a></li>
+        <li><a href="volunteer-board.html">Volunteer board</a></li>
+        <li><a href="questions.html">Ask a question</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>© 2026 Ecotopian EarthCare</span>
+    <a class="staff" href="login.html">Staff sign in</a>
+  </div>
+</footer>
+
+
+<script>
+const esc = EcoSite.esc;
+document.addEventListener('DOMContentLoaded', () => {
+  EcoSite.renderNav(null);
+  loadReviews();
+});
+
+// Read-only star row: n filled of 5, esc-free (static markup, numeric input).
+function starRow(rating) {
+  const n = Math.max(0, Math.min(5, Math.round(Number(rating) || 0)));
+  let out = '';
+  for (let i = 1; i <= 5; i++) {
+    out += i <= n ? '★' : '<span class="empty">☆</span>';
+  }
+  return out;
+}
+
+async function loadReviews() {
+  const listEl = document.getElementById('rvList');
+  const headEl = document.getElementById('rvHeadline');
+  try {
+    const reviews = await EcoSite.getApprovedReviews(30);
+    if (!reviews.length) {
+      listEl.innerHTML = '<p class="rv-empty">Be the first to share how your project went.</p>';
+      return;
+    }
+    // Average + count headline only when there are enough reviews to be meaningful.
+    if (reviews.length >= 3) {
+      const sum = reviews.reduce((a, r) => a + (Number(r.rating) || 0), 0);
+      const avg = sum / reviews.length;
+      const avgStr = (Math.round(avg * 10) / 10).toFixed(1);
+      headEl.innerHTML =
+        '<div class="rv-headline">' +
+          '<span class="avg">' + esc(avgStr) + '</span>' +
+          '<span class="stars">' + starRow(avg) + '</span>' +
+          '<span class="count">' + esc(avgStr) + ' out of 5 from ' + reviews.length + ' neighbor' +
+            (reviews.length === 1 ? '' : 's') + '</span>' +
+        '</div>';
+    }
+    listEl.innerHTML = reviews.map(renderCard).join('');
+    EcoSite.decorate();
+  } catch (e) {
+    listEl.innerHTML = '<p class="rv-empty">Reviews are updating. Check back soon.</p>';
+  }
+}
+
+// Every field is anon-submitted -> esc() before it touches innerHTML (stored-XSS class).
+function renderCard(r) {
+  const loc = (r.location || '').trim();
+  const service = (r.service || '').trim();
+  const who = '<span class="rv-who">' + esc(r.name) + '</span>' +
+    (loc ? '<span class="rv-loc"> · ' + esc(loc) + '</span>' : '');
+  const svc = service ? '<div><span class="rv-service">' + esc(service) + '</span></div>' : '';
+  return '<article class="rv-card reveal">' +
+    '<div class="rv-stars stars" aria-label="' + esc(String(Math.round(Number(r.rating) || 0))) + ' out of 5 stars">' +
+      starRow(r.rating) + '</div>' +
+    '<p class="rv-body">' + esc(r.body) + '</p>' +
+    '<div>' + who + '</div>' + svc +
+    '</article>';
+}
+
+// Star-input visual fill: light up 1..selected. Keyboard works natively (radios).
+const starsInput = document.getElementById('starsInput');
+const starLabels = Array.from(starsInput.querySelectorAll('label'));
+const starRadios = Array.from(starsInput.querySelectorAll('input[type="radio"]'));
+function paintStars() {
+  const checked = starRadios.find(r => r.checked);
+  const val = checked ? Number(checked.value) : 0;
+  starLabels.forEach((lab, i) => lab.classList.toggle('on', i < val));
+}
+starRadios.forEach(r => r.addEventListener('change', paintStars));
+
+document.getElementById('reviewForm').addEventListener('submit', async function (e) {
+  e.preventDefault();
+  const errEl = document.getElementById('reviewError');
+  errEl.textContent = '';
+
+  const name = document.getElementById('r_name').value.trim();
+  const location = document.getElementById('r_location').value.trim();
+  const service = document.getElementById('r_service').value.trim();
+  const body = document.getElementById('r_body').value.trim();
+  const checked = starRadios.find(r => r.checked);
+  const rating = checked ? Number(checked.value) : 0;
+
+  if (!name) { errEl.textContent = 'Please add your name.'; return; }
+  if (!(rating >= 1 && rating <= 5)) { errEl.textContent = 'Please choose a star rating.'; return; }
+  if (!body) { errEl.textContent = 'Please write your review.'; return; }
+
+  const btn = document.getElementById('reviewSubmit');
+  btn.disabled = true;
+  try {
+    // Fire-and-forget anon insert (return=minimal, no .id reads). RLS forces status=pending.
+    await DataStore.submitReview({ name, location, rating, service, body });
+    document.getElementById('reviewForm').classList.add('hidden');
+    document.getElementById('thanksScreen').classList.add('visible');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch (err) {
+    btn.disabled = false;
+    errEl.textContent =
+      'Something went wrong sending your review. Please try again, or call us at 814-631-5338.';
+  }
+});
+</script>
+<!-- Bag Carriers thin powered-by footer (locked attribution component) -->
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Libre+Baskerville:ital@1&display=swap" rel="stylesheet">
+<style>
+body { min-height: 100vh; display: flex; flex-direction: column; }
+.bc-thinfoot { margin-top: auto; }
+.bc-thinfoot {
+  --bc-ink:#0a0c10; --bc-bone:#f0ece4; --bc-sienna:#7a4520; --bc-muted:#8a8172;
+  flex: 0 0 auto;
+  background:var(--bc-ink);
+  font-family:'Bebas Neue',sans-serif;
+  padding:12px 20px;
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  border-top:2px solid var(--bc-sienna);
+  text-align:center;
+}
+.bc-thinfoot__label {
+  font-family:'Libre Baskerville',serif; font-style:italic;
+  font-size:11px; letter-spacing:.02em; color:var(--bc-muted);
+}
+.bc-thinfoot__mark {
+  font-family:'Bebas Neue',sans-serif; letter-spacing:.08em;
+  font-size:15px; line-height:1; color:var(--bc-bone);
+  text-decoration:none;
+}
+.bc-thinfoot__mark:hover { opacity:.85; }
+.bc-thinfoot__mark .bc-systems { color:var(--bc-sienna); }
+.bc-thinfoot__mark .bc-dot { color:var(--bc-sienna); }
+</style>
+<footer class="bc-thinfoot">
+  <span class="bc-thinfoot__label">Powered by</span>
+  <a class="bc-thinfoot__mark" href="https://bagcarriers.com/systems" target="_blank" rel="noopener">
+    BAG CARRIERS <span class="bc-systems">SYSTEMS</span><span class="bc-dot">.</span>
+  </a>
+</footer>
+</body>
+</html>

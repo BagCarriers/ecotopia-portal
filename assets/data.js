@@ -321,6 +321,21 @@ const DataStore = (() => {
     merchPhotoUrl: (photoPath) =>
       sb.storage.from('gallery').getPublicUrl(photoPath).data.publicUrl, // sync
 
+    // First-party reviews (anon "Leave a review" -> staff moderation -> approved
+    // shown publicly). No Google Business Profile, so the site collects its own.
+    // Anon inserts use return=minimal (submit) so no anon select policy is needed
+    // for writes; the anon read policy scopes public reads to approved rows only.
+    // Reads (all statuses), approve/dismiss, and deletes are staff-only
+    // (authenticated + is_portal_user). Status flow: pending -> approved / dismissed.
+    submitReview: (r) => submit('reviews', { ...r, status: 'pending' }),
+    getReviews: async () =>
+      fromDbAll(unwrap(await sb.from('reviews').select('*')
+        .order('created_at', { ascending: false }))),
+    updateReview: (id, ch) => update('reviews', id, ch),
+    deleteReview: async (id) => {
+      unwrap(await sb.from('reviews').delete().eq('id', id));
+    },
+
     // Orders (Supabase-owned; Square only ever sees a computed total). The public
     // plants/shop pages create orders through the square-pay edge function (server-side
     // validation + pricing); these staff methods read and progress them. Staff RLS

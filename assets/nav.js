@@ -21,6 +21,7 @@ const Nav = (() => {
     { href: 'grants.html',     label: 'Grants',      icon: '🏛'  },
     { href: 'grant-finder.html', label: 'Grant Finder', icon: '🔎' },
     { href: 'question-inbox.html', label: 'Questions', icon: '❓' },
+    { href: 'review-inbox.html', label: 'Reviews', icon: '⭐' },
     { href: 'reports.html',    label: 'Reports',     icon: '📊' },
   ];
 

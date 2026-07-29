@@ -154,7 +154,10 @@
       var msg = status === 'completed' ? 'This order is complete. Thank you!'
         : status === 'ready' ? 'Your order is ready. Payment received.'
         : 'Payment received. We are getting your order ready.';
-      return '<div class="status-line">' + esc(msg) + '</div>';
+      var reviewAsk = status === 'completed'
+        ? '<p style="margin:10px 0 0;font-size:0.9rem"><a href="reviews.html">How did we do? Leave a review</a></p>'
+        : '';
+      return '<div class="status-line">' + esc(msg) + '</div>' + reviewAsk;
     }
     // new / link_created without a usable link -> pay at pickup.
     return '<div class="status-line pickup">We will confirm availability and have your order ready. Pay at pickup.</div>';

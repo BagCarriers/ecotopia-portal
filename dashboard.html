@@ -195,12 +195,13 @@ try {
   document.getElementById('dateSubtitle').textContent =
     now.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
 
-  const [gardens, jobs, invoices, unpaidInvoicesList, jordanTasksList, openTasksList, recentCheckins, upcomingEventsList, observations, plantingSuggestions, questionsList, ordersList] =
+  const [gardens, jobs, invoices, unpaidInvoicesList, jordanTasksList, openTasksList, recentCheckins, upcomingEventsList, observations, plantingSuggestions, questionsList, ordersList, reviewsList] =
     await Promise.all([
       DataStore.getGardens(), DataStore.getJobs(), DataStore.getInvoices(),
       DataStore.getUnpaidInvoices(), DataStore.getJordanTasks(), DataStore.getOpenTasks(),
       DataStore.getRecentCheckins(5), DataStore.getUpcomingEvents(), DataStore.getObservations(),
       DataStore.getPlantingSuggestions(), DataStore.getQuestions(), DataStore.getOrders(),
+      DataStore.getReviews(),
     ]);
 
   // Stats
@@ -349,6 +350,14 @@ if (newOrders.length > 0) {
     badge: 'blue', label: 'New Order',
     text: `${newOrders.length} new order${newOrders.length > 1 ? 's' : ''}`,
     link: 'orders.html', linkText: 'View →'
+  });
+}
+const pendingReviews = reviewsList.filter(r => r.status === 'pending');
+if (pendingReviews.length > 0) {
+  attentionItems.push({
+    badge: 'amber', label: 'Review',
+    text: `${pendingReviews.length} pending review${pendingReviews.length > 1 ? 's' : ''}`,
+    link: 'review-inbox.html', linkText: 'Moderate →'
   });
 }
 
