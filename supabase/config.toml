@@ -421,3 +421,6 @@ verify_jwt = false
 
 [functions.grant-scan]
 verify_jwt = false
+
+[functions.square-pay]
+verify_jwt = false

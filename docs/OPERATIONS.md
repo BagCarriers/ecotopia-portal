@@ -268,24 +268,115 @@ deposit + balance). Action panel by state:
 Every dynamic value (client name, line items, `accepted_by`) is `esc()`'d even though
 these are staff/DB strings, because the page renders them publicly.
 
-**Payment processor upgrade path (processor-agnostic).** Deposit instructions come from
-the `PAYMENT_CONFIG` const at the top of `quote-view.html`:
+Deposit payment: online card payment is handled by **Square** (see the "Square deposit
+payments" section below). Until Square credentials are set the deposit panel shows the
+manual check instructions with no code change, so this page is safe to ship before the
+processor is live.
+
+## Square deposit payments
+
+Online deposit payments for accepted quotes, via Square Payment Links. Built to run
+**dark**: the whole flow is deployed and live, but until the five Square secrets are set
+it returns `{configured:false}` and the public quote page falls back to the manual check
+instructions. Setting the secrets lights it up with **zero code changes**.
+
+Migration `0024_square_orders.sql` adds two nullable `public.quotes` columns:
+`square_order_id` and `square_pay_url`. Applied live via the Management API, so register
+it with `supabase migration repair --status applied 0024` before any `supabase db push`.
+No new policies: only the `square-pay` edge function (service role) touches these columns;
+the public page never reads them (it reads the coarse `deposit_status` via the existing
+token-gated `get_quote_by_token` RPC).
+
+`square-pay` edge function (one endpoint, two jobs, told apart by the presence of the
+`x-square-hmacsha256-signature` header):
+
+- **`POST {action:'create_link', token:<share_token>}`** - PUBLIC (anon; the public
+  quote-view page calls it on the accepting client's behalf with the anon `apikey` +
+  `Authorization: Bearer <anon>` headers). Validates the token is >= 32 chars, then looks
+  up the quote via service role: it must be `status = 'accepted'` with `deposit > 0` and
+  not already `deposit_status = 'paid'`. If the quote already has a `square_pay_url` it is
+  returned as-is (idempotent re-click). Otherwise, if `SQUARE_ACCESS_TOKEN` or
+  `SQUARE_LOCATION_ID` is unset it returns `{configured:false}` (dark mode). With both
+  set, it creates a Square Payment Link (`quick_pay` for `Deposit - Quote N of YYYY -
+  Ecotopian EarthCare`, amount `round(deposit*100)` cents, `idempotency_key = <quote
+  id>:deposit`), saves `square_order_id` + `square_pay_url`, flips `deposit_status` to
+  `pending`, and returns `{configured:true, url}`.
+- **Square webhook (`payment.updated`)** - Square POSTs the event JSON signed with an
+  HMAC-SHA256 over (`SQUARE_WEBHOOK_URL` + raw body), base64, in the
+  `x-square-hmacsha256-signature` header. The function verifies that signature
+  (constant-time) against `SQUARE_WEBHOOK_SIGNATURE_KEY`; a missing/unset key or a
+  bad/missing signature is rejected `401`. On a `COMPLETED` payment it looks up the quote
+  by `square_order_id` (= `payment.order_id`) and sets `deposit_status = 'paid'`. Events
+  for unknown orders (or non-completed statuses) are a fast `200` no-op.
+
+Tokens and keys are never logged or returned; Square API error bodies are swallowed (the
+page just falls back to manual). Deployed `--no-verify-jwt` (the create_link path is anon;
+the webhook path authenticates itself via its signature), pinned in
+`supabase/config.toml` (`[functions.square-pay] verify_jwt = false`):
 
 ```
-const PAYMENT_CONFIG = {
-  mode: 'manual',            // 'manual' | 'link'
-  payLinkTemplate: '',       // used only when mode === 'link'; {token} -> share token
-  instructions: 'Please mail a check payable to Open Sesame Designs LLC, ...',
-};
+supabase functions deploy square-pay --no-verify-jwt --project-ref wibnryfinfwbwwgsyojr
 ```
 
-Today `mode: 'manual'` renders the mailing/site-visit instructions. When a processor is
-chosen, set `mode: 'link'` and `payLinkTemplate` to a checkout URL containing the literal
-`{token}` (replaced with the quote's share token at render time, e.g.
-`https://buy.stripe.com/...?client_reference_id={token}`); the deposit panel then renders
-a "Pay deposit online" button instead of the instructions. No other code change is needed.
-`deposit_status` (`pending`, `paid`) is already in the schema for a webhook/reconciliation
-step to flip.
+The function's public URL is:
+`https://wibnryfinfwbwwgsyojr.supabase.co/functions/v1/square-pay`
+
+Public page (`quote-view.html`): when a quote is accepted with a deposit still owing, the
+page calls `create_link` and renders the deposit panel by result -
+
+- `configured:true` -> a prominent green "Pay your deposit online" button (the returned
+  Square url, `target=_blank rel=noopener`), a "Secure card payment via Square" note, and
+  the check-by-mail instructions as a secondary option.
+- `configured:false` (dark) or any error/unreachable -> the manual check instructions
+  (`MANUAL_INSTRUCTIONS` const), unchanged from before Square.
+- `deposit_status = 'pending'` (a link already exists / a return visit) -> a "Payment link
+  created. Already paid? It can take a minute to confirm." line above the same button.
+- `deposit_status = 'paid'` -> a green "Deposit received. Thank you!" banner (no button).
+
+Staff page (`quotes.html`): the `Deposit: unpaid/pending/paid` pill and the manual "Mark
+deposit paid" action are unchanged. A Square payment flips the pill to `paid` on its own
+(webhook); "Mark deposit paid" stays as the manual override for checks / cash / any
+deposit paid outside Square.
+
+### Secrets checklist (set the night Jordan creates his Square account)
+
+In the Square Developer dashboard (https://developer.squareup.com): create/open an
+application, then read its **Sandbox** credentials first to test, and switch to
+**Production** credentials to go live.
+
+1. `SQUARE_ACCESS_TOKEN` - the application's access token (production or sandbox).
+2. `SQUARE_LOCATION_ID` - a location id from the account (Locations in the dashboard, or
+   `GET /v2/locations`).
+3. `SQUARE_ENV` - `sandbox` while testing, `production` when live (defaults to
+   `production` if unset).
+4. `SQUARE_WEBHOOK_SIGNATURE_KEY` - from the webhook subscription (below).
+5. `SQUARE_WEBHOOK_URL` - the function's own public URL, EXACTLY as registered in Square
+   (`https://wibnryfinfwbwwgsyojr.supabase.co/functions/v1/square-pay`). The signature is
+   computed over this string + the body, so it must match the registered notification URL
+   character-for-character.
+
+Webhook setup: in the dashboard's Webhooks (Subscriptions), add a subscription with the
+notification URL above, subscribe to the **`payment.updated`** event, and copy its
+**signature key** into `SQUARE_WEBHOOK_SIGNATURE_KEY`.
+
+Set all five and redeploy the function (secrets are read at invocation, but redeploy to be
+safe):
+
+```
+supabase secrets set --project-ref wibnryfinfwbwwgsyojr \
+  SQUARE_ACCESS_TOKEN=<token> \
+  SQUARE_LOCATION_ID=<location_id> \
+  SQUARE_ENV=sandbox \
+  SQUARE_WEBHOOK_SIGNATURE_KEY=<signature_key> \
+  SQUARE_WEBHOOK_URL=https://wibnryfinfwbwwgsyojr.supabase.co/functions/v1/square-pay
+supabase functions deploy square-pay --no-verify-jwt --project-ref wibnryfinfwbwwgsyojr
+```
+
+Test in sandbox first (accept a test quote, click Pay, complete a sandbox payment, confirm
+the pill flips to `paid`), then swap `SQUARE_ACCESS_TOKEN`/`SQUARE_LOCATION_ID` for the
+production pair, set `SQUARE_ENV=production`, and re-point the webhook to a production
+subscription (new signature key). Manual "Mark deposit paid" is always available as a
+fallback.
 
 ## Volunteer hours certificate
 

@@ -63,7 +63,9 @@
   .pill-sent { background: #dbeafe; color: #1e40af; }
   .pill-accepted { background: #d1fae5; color: #065f46; }
   .pill-invoiced { background: #ede9fe; color: #6d28d9; }
-  /* Deposit reconciliation pills (Jordan marks paid manually until a processor is wired). */
+  /* Deposit reconciliation pills. unpaid = no payment yet; pending = a Square deposit
+     link was created (or Jordan is awaiting a check); paid = confirmed (Square webhook
+     flips it, or Jordan marks it by hand for checks). */
   .pill-unpaid { background: #fef3c7; color: #92400e; }
   .pill-pending { background: #dbeafe; color: #1e40af; }
   .pill-paid { background: #d1fae5; color: #065f46; }
@@ -525,12 +527,13 @@ async function shareQuote(id) {
   }
 }
 
-// Manual deposit reconciliation: Jordan marks a deposit paid by hand until a
-// payment processor is wired.
+// Manual deposit reconciliation: a Square-paid deposit flips to 'paid' automatically
+// via the webhook, but this stays as the manual override for checks / cash / any
+// deposit paid outside Square.
 async function markDepositPaid(id) {
   const q = quotes.find(x => x.id === id);
   const label = q ? (q.quoteNumber + ' of ' + q.quoteYear) : 'this quote';
-  if (!confirm('Mark the deposit for quote ' + label + ' as paid? Deposits are reconciled by hand.')) return;
+  if (!confirm('Mark the deposit for quote ' + label + ' as paid? Use this for checks or cash; Square deposits confirm themselves.')) return;
   const errEl = document.getElementById('pageError');
   errEl.textContent = '';
   try {
