@@ -88,6 +88,16 @@
   .type-walkin { background: #dbeafe; color: #1e40af; }
   .type-manual { background: var(--cream-dim); color: var(--text-dim); }
 
+  /* Certificate range picker */
+  .cert-row { margin-top: 14px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .cert-row label { font-size: 0.8rem; color: var(--text-dim); }
+  .cert-row select { padding: 7px 10px; border-radius: 7px; border: 1.5px solid var(--border);
+    font-family: 'DM Sans', sans-serif; font-size: 0.85rem; }
+  .btn-cert { padding: 8px 16px; border-radius: 8px; border: none; background: var(--forest);
+    color: #fff; font-size: 0.85rem; font-weight: 600; cursor: pointer;
+    font-family: 'DM Sans', sans-serif; transition: background 0.15s; }
+  .btn-cert:hover { background: var(--forest-mid); }
+
   @media (max-width: 600px) {
     .page { padding: 20px 16px; }
     .profile-header { flex-direction: column; }
@@ -102,6 +112,14 @@
 
 <script>
 const esc = DataStore.esc;
+let certVolunteerId = null; // set on render; used by the certificate link
+
+function printCertificate() {
+  if (!certVolunteerId) return;
+  const days = document.getElementById('certRange').value;
+  window.open('volunteer-hours-print.html?id=' + encodeURIComponent(certVolunteerId) +
+    '&days=' + encodeURIComponent(days), '_blank');
+}
 
 function dueCls(d) { return d === null ? 'due-green' : d <= 0 ? 'due-red' : d <= 3 ? 'due-amber' : 'due-green'; }
 function dueLabel(d) {
@@ -118,6 +136,7 @@ function renderPage(volunteer, vTasks, vCheckins, gardens) {
     return;
   }
   document.title = `${volunteer.name} - Ecotopia`;
+  certVolunteerId = volunteer.id;
 
   const initials = volunteer.name.split(' ').map(w => w[0]).join('').slice(0, 2);
   const allCheckins = vCheckins.slice()
@@ -201,6 +220,16 @@ function renderPage(volunteer, vTasks, vCheckins, gardens) {
         <div style="margin-top:8px;font-size:0.8rem;color:var(--text-dim)">
           Total last 30 days: <strong>${hoursLast30.toFixed(1)} hrs</strong>
         </div>
+      </div>
+      <div class="cert-row">
+        <label for="certRange">Certificate range:</label>
+        <select id="certRange">
+          <option value="30">Last 30 days</option>
+          <option value="90">Last 90 days</option>
+          <option value="365">Last 365 days</option>
+          <option value="0">All time</option>
+        </select>
+        <button class="btn-cert" onclick="printCertificate()">Print hours certificate</button>
       </div>
     </div>
 

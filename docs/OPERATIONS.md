@@ -78,6 +78,13 @@ supabase functions deploy calendar-feed --no-verify-jwt --project-ref wibnryfinf
 `supabase/config.toml` pins `[functions.calendar-feed] verify_jwt = false` so a future
 redeploy keeps JWT verification off instead of silently breaking the token-authed feed.
 
+`calendar.html` also has a "+ New Event" button (header, and a "+ Add event on this day"
+affordance in the day panel) that opens the same event form as `events.html` as a modal
+(title, date, garden, type, description, optional photo to `gallery` under `events/`). The
+date prefills from the selected day when the day panel is open, else today; on save it
+re-fetches events and re-renders. Photo upload uses upload-before-insert with orphan cleanup
+on failure, identical to `events.html`.
+
 ## Gallery (photo library)
 
 Migration `0009_gallery.sql` adds a staff photo library plus volunteer photo
@@ -204,6 +211,11 @@ Reconciliation: the administration fee is collected by BagCarriers (the agency).
 Monthly, BagCarriers invoices the client (Open Sesame Designs LLC / Ecotopian
 EarthCare) for the accumulated fees; the YTD figure on `quotes.html` is the running
 tally. The legal entity printed on quotes is Open Sesame Designs LLC.
+
+## Volunteer hours certificate
+
+`volunteer-detail.html` has a "Print hours certificate" button with a range picker (last 30 / 90 / 365 days / all time) that opens the branded, printable `volunteer-hours-print.html?id=<volunteerId>&days=<N>` (days=0 means all recorded service); it lists the volunteer's check-ins (date, garden, task, hours) and a prominent total, plus an "Email it" mailto (save the PDF from the print dialog first, then attach it).
+The verifying signature is drawn per-print on an in-page canvas (mouse or touch) and prints as part of the document; it is never uploaded or stored anywhere.
 
 ## Grant finder
 

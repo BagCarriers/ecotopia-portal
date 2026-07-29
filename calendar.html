@@ -48,6 +48,29 @@
     display: inline-flex; gap: 6px; align-items: center; transition: background 0.15s; }
   .btn-primary { background: var(--forest); color: #fff; }
   .btn-primary:hover { background: var(--forest-mid); }
+  .btn-outline { background: #fff; color: var(--forest); border: 1.5px solid var(--border); }
+  .btn-outline:hover { background: var(--sage); }
+  .header-actions { display: flex; gap: 10px; align-items: center; }
+
+  /* New event form (shared pattern with events.html) */
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .form-group { margin-bottom: 14px; }
+  .form-group label { display: block; font-size: 0.78rem; font-weight: 600;
+    color: var(--text-dim); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .form-group input, .form-group select, .form-group textarea {
+    width: 100%; padding: 9px 11px; border-radius: 7px;
+    border: 1.5px solid var(--border); font-size: 0.875rem; font-family: 'DM Sans', sans-serif; }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+    outline: none; border-color: var(--forest-light); }
+  .photo-preview { margin-top: 8px; display: flex; align-items: center; gap: 12px; }
+  .photo-preview img { width: 72px; height: 72px; object-fit: cover; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--cream-dim); }
+  .photo-preview a { font-size: 0.8rem; color: #b3261e; cursor: pointer; text-decoration: none; }
+  .photo-preview a:hover { text-decoration: underline; }
+  .day-add-btn { padding: 6px 14px; border-radius: 6px; background: var(--sage);
+    color: var(--forest); border: none; font-size: 0.8rem; font-weight: 600;
+    cursor: pointer; font-family: 'DM Sans', sans-serif; transition: background 0.15s; }
+  .day-add-btn:hover { background: var(--sage-dim); }
 
   /* Sync modal */
   .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
@@ -147,6 +170,7 @@
     .cal-grid { display: none; }
     .week-view { display: block; }
     .cal-cell { min-height: 60px; }
+    .form-row { grid-template-columns: 1fr; }
   }
 </style>
 </head>
@@ -154,7 +178,10 @@
 <div class="page">
   <div class="page-header">
     <h1>Calendar</h1>
-    <button class="btn btn-primary" onclick="openSyncModal()">Calendar sync</button>
+    <div class="header-actions">
+      <button class="btn btn-primary" onclick="openNewEvent()">+ New Event</button>
+      <button class="btn btn-outline" onclick="openSyncModal()">Calendar sync</button>
+    </div>
   </div>
   <div class="cal-controls">
     <button class="btn-nav" onclick="prevMonth()">‹</button>
@@ -216,9 +243,50 @@
   </div>
 </div>
 
+<!-- New Event modal (same form as events.html) -->
+<div class="modal-overlay" id="calEventModal">
+  <div class="modal">
+    <h2>New Event</h2>
+    <form id="calEventForm" novalidate>
+      <div class="form-row">
+        <div class="form-group"><label>Title *</label>
+          <input type="text" id="cev_title" placeholder="Event name" required></div>
+        <div class="form-group"><label>Date *</label>
+          <input type="date" id="cev_date" required></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Garden / Location</label>
+          <select id="cev_garden"></select></div>
+        <div class="form-group"><label>Type</label>
+          <select id="cev_type">
+            <option value="workday">Volunteer Workday</option>
+            <option value="plant_sale">Plant Sale</option>
+            <option value="workshop">Workshop</option>
+            <option value="other">Other</option>
+          </select></div>
+      </div>
+      <div class="form-group"><label>Description</label>
+        <textarea id="cev_desc" rows="2" placeholder="Event details…"></textarea></div>
+      <div class="form-group"><label>Photo (optional)</label>
+        <input type="file" id="cev_photo" accept="image/*" onchange="onNewPhotoChosen(this)">
+        <div class="photo-preview" id="cev_photo_preview" style="display:none">
+          <img id="cev_photo_thumb" alt="">
+          <a onclick="clearNewPhoto()">Remove</a>
+        </div>
+      </div>
+      <div class="modal-error" id="calEventError"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" onclick="closeNewEvent()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Create Event</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
 const esc = DataStore.esc;
 let events = [], jobs = [], tasks = [], gardens = [], gcalEvents = [];
+let newPhotoFile = null; // New Event modal: chosen photo file (or null)
 const CAL_FEED_URL = 'https://wibnryfinfwbwwgsyojr.supabase.co/functions/v1/calendar-feed';
 
 let currentYear, currentMonth;
@@ -365,11 +433,12 @@ function selectDate(dateStr) {
   const d = new Date(dateStr + 'T12:00:00');
   panelTitle.textContent = d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
+  let inner;
   if (items.length === 0) {
-    panelContent.innerHTML = '<p style="color:var(--text-dim);font-size:0.875rem;">Nothing scheduled this day.</p>';
+    inner = '<p style="color:var(--text-dim);font-size:0.875rem;">Nothing scheduled this day.</p>';
   } else {
     const typeColor = { task: 'dot-task', event: 'dot-event', job: 'dot-job', gcal: 'dot-gcal' };
-    panelContent.innerHTML = items.map(it => `
+    inner = items.map(it => `
       <div class="day-item">
         <div class="day-type-dot cal-dot ${typeColor[it.type]}"></div>
         <div>
@@ -378,6 +447,10 @@ function selectDate(dateStr) {
         </div>
       </div>`).join('');
   }
+  inner += `<div style="margin-top:14px;">
+      <button class="day-add-btn" onclick="openNewEvent('${dateStr}')">+ Add event on this day</button>
+    </div>`;
+  panelContent.innerHTML = inner;
   panel.classList.add('open');
   renderMonth();
   renderWeekView();
@@ -399,6 +472,97 @@ function goToday() {
   renderMonth();
   renderWeekView();
 }
+
+// ── New Event (same flow as events.html) ────────────────────────────────
+// Resize + upload a picked image to events/<uuid>.jpg in the gallery bucket.
+// Returns the storage path on success; throws on failure (caller shows inline error).
+async function uploadEventPhoto(file) {
+  const blob = await DataStore.resizeImage(file, 1600);
+  const path = `events/${crypto.randomUUID()}.jpg`;
+  const up = await window.ecoSupabase.storage.from('gallery')
+    .upload(path, blob, { contentType: blob.type || 'image/jpeg', upsert: false });
+  if (up.error) throw new Error(up.error.message);
+  return path;
+}
+// Best-effort delete of an orphaned event photo object; ignore any error.
+async function removeEventPhotoObject(path) {
+  if (!path) return;
+  try { await window.ecoSupabase.storage.from('gallery').remove([path]); } catch (e) { /* ignore */ }
+}
+function onNewPhotoChosen(input) {
+  const file = (input.files || [])[0] || null;
+  newPhotoFile = file;
+  const wrap = document.getElementById('cev_photo_preview');
+  const thumb = document.getElementById('cev_photo_thumb');
+  if (file) { thumb.src = URL.createObjectURL(file); wrap.style.display = 'flex'; }
+  else { wrap.style.display = 'none'; }
+}
+function clearNewPhoto() {
+  newPhotoFile = null;
+  document.getElementById('cev_photo').value = '';
+  document.getElementById('cev_photo_preview').style.display = 'none';
+  document.getElementById('cev_photo_thumb').src = '';
+}
+function populateGardenDropdown() {
+  document.getElementById('cev_garden').innerHTML = `<option value="">None / other</option>` +
+    gardens.map(g => `<option value="${g.id}">${esc(g.name)}</option>`).join('');
+}
+// Open the modal. Prefill the date: the passed day (from the day panel),
+// else the selected day when the panel is open, else today.
+function openNewEvent(prefillDate) {
+  document.getElementById('calEventForm').reset();
+  document.getElementById('calEventError').textContent = '';
+  clearNewPhoto();
+  let d = prefillDate;
+  if (!d) {
+    const panelOpen = document.getElementById('dayPanel').classList.contains('open');
+    d = (panelOpen && selectedDate) ? selectedDate : today.toISOString().slice(0, 10);
+  }
+  document.getElementById('cev_date').value = d;
+  document.getElementById('calEventModal').classList.add('open');
+}
+function closeNewEvent() {
+  document.getElementById('calEventModal').classList.remove('open');
+}
+document.getElementById('calEventModal').addEventListener('click', function(e) {
+  if (e.target === this) closeNewEvent();
+});
+document.getElementById('calEventForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const title = document.getElementById('cev_title').value.trim();
+  const date = document.getElementById('cev_date').value;
+  const errEl = document.getElementById('calEventError');
+  errEl.textContent = '';
+  if (!title || !date) { errEl.textContent = 'Title and date are required.'; return; }
+  const gardenId = document.getElementById('cev_garden').value;
+  const garden = gardenId ? gardens.find(g => g.id === gardenId) : null;
+  // Upload the photo first (if any). On failure, abort and keep the modal open;
+  // the event is not created without its photo.
+  let photoPath = null;
+  if (newPhotoFile) {
+    try { photoPath = await uploadEventPhoto(newPhotoFile); }
+    catch (err) { errEl.textContent = 'Could not upload photo. ' + err.message + ' Please try again.'; return; }
+  }
+  try {
+    await DataStore.addEvent({
+      title, date, gardenId: gardenId || null,
+      gardenName: garden ? garden.name : '',
+      type: document.getElementById('cev_type').value,
+      description: document.getElementById('cev_desc').value.trim(),
+      photoPath,
+      openSignup: true, signups: []
+    });
+    events = await DataStore.getEvents();
+    closeNewEvent();
+    renderMonth();
+    renderWeekView();
+    if (selectedDate) selectDate(selectedDate);
+  } catch (err) {
+    // The event row failed after the photo uploaded; clean up the orphan object.
+    if (photoPath) removeEventPhotoObject(photoPath);
+    errEl.textContent = 'Could not create event. ' + err.message;
+  }
+});
 
 // ── Google Calendar sync ────────────────────────────────────────────────
 // Allowlist the ICS URL to a Google Calendar secret address. Mirrors the
@@ -548,6 +712,7 @@ async function removeGcalUrl() {
     [events, jobs, tasks, gardens] = await Promise.all([
       DataStore.getEvents(), DataStore.getJobs(), DataStore.getTasks(), DataStore.getGardens(),
     ]);
+    populateGardenDropdown();
     renderMonth();
     renderWeekView();
     // Overlay the Google Calendar after the main render, without blocking it.

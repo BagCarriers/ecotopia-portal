@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Volunteer Hours - Ecotopian EarthCare</title>
+  <link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Caveat:wght@600;700&display=swap" rel="stylesheet">
+<script src="assets/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/mapping.js"></script>
+<script src="assets/auth.js"></script>
+<script>if (!AuthManager.hasCachedSession()) location.replace('login.html');</script>
+<script src="assets/data.js"></script>
+<style>
+  :root {
+    --gold: #D4A83A;      /* sampled from the reference header band */
+    --gold-dim: #C89B2E;
+    --navy: #1e3a5f;      /* headings + table text */
+    --rust: #9C4A32;      /* accent rule under the table */
+    --olive: #4c5a2e;     /* chevron accent */
+    --paper: #ffffff;
+    --ink-dim: #f7f2e6;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Poppins', system-ui, sans-serif; background: #e7e2d6; color: var(--navy);
+    padding: 24px 16px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+
+  /* Screen-only toolbar */
+  .toolbar { max-width: 8.5in; margin: 0 auto 16px; display: flex; gap: 12px; align-items: center;
+    justify-content: space-between; flex-wrap: wrap; }
+  .tb-right { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  .toolbar a, .toolbar button { font-family: 'Poppins', sans-serif; font-size: 0.85rem; font-weight: 600;
+    padding: 9px 16px; border-radius: 8px; cursor: pointer; text-decoration: none; border: none; }
+  .tb-print { background: var(--navy); color: #fff; }
+  .tb-back { background: #fff; color: var(--navy); border: 1.5px solid var(--navy); }
+  .tb-email { background: var(--gold); color: #fff; }
+  .tb-hint { font-size: 0.78rem; color: #6b6350; font-weight: 500; }
+
+  /* The document sheet */
+  .sheet { max-width: 8.5in; min-height: 11in; margin: 0 auto; background: var(--paper);
+    box-shadow: 0 10px 40px rgba(0,0,0,0.18); overflow: hidden; }
+
+  /* Header band */
+  .head { background: var(--gold); position: relative; padding: 40px 44px 34px; display: flex;
+    justify-content: space-between; gap: 20px; }
+  .head-left { flex: 1; min-width: 0; }
+  .head h1 { font-size: 2.9rem; font-weight: 800; color: #fff; line-height: 0.95; letter-spacing: 0.01em;
+    margin-bottom: 16px; }
+  .meta { color: #fff; }
+  .meta .line { font-size: 0.98rem; margin-bottom: 7px; display: flex; gap: 8px; align-items: baseline;
+    flex-wrap: wrap; }
+  .meta .k { font-weight: 500; opacity: 0.92; }
+  .meta .v { font-weight: 700; font-size: 1.12rem; }
+  .art { width: 150px; height: 150px; flex-shrink: 0; border-radius: 6px; object-fit: cover;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.22); }
+
+  /* Chevron accent strips (approximated) */
+  .chev { position: absolute; top: 0; bottom: 0; width: 30px;
+    background: repeating-linear-gradient(-45deg,
+      var(--olive) 0 8px, transparent 8px 12px, var(--rust) 12px 20px, transparent 20px 24px); }
+  .chev.left { left: 10px; }
+  .chev.right { right: 10px; }
+
+  /* Body */
+  .body { padding: 30px 44px 40px; }
+  .company { text-align: center; font-size: 1.7rem; font-weight: 800; color: var(--navy);
+    letter-spacing: 0.02em; margin-bottom: 22px; }
+
+  table.items { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+  table.items thead th { background: var(--gold); color: #fff; font-size: 0.82rem; font-weight: 700;
+    letter-spacing: 0.05em; padding: 12px 10px; text-align: center; }
+  table.items thead th.lfth { text-align: left; padding-left: 16px; }
+  table.items tbody td { border: 1.5px solid var(--navy); padding: 14px 12px; font-size: 0.92rem;
+    font-weight: 600; color: var(--navy); text-align: center; vertical-align: middle; }
+  table.items tbody td.lft { text-align: left; }
+
+  .empty-note { border: 1.5px solid var(--navy); border-radius: 6px; padding: 26px 16px;
+    text-align: center; font-weight: 600; color: var(--navy); }
+
+  .rule { height: 8px; background: var(--rust); border-radius: 4px; margin: 4px 0 18px; }
+
+  .total-hours { display: flex; justify-content: space-between; align-items: baseline;
+    padding-top: 12px; border-top: 2px solid var(--navy); }
+  .th-label { font-size: 1.4rem; font-weight: 800; color: var(--navy); letter-spacing: 0.03em; }
+  .th-val { font-size: 1.95rem; font-weight: 800; color: var(--rust); }
+
+  /* Signature block */
+  .sig-block { margin-top: 40px; }
+  .sig-label { font-size: 0.95rem; font-weight: 700; color: var(--navy); margin-bottom: 8px;
+    letter-spacing: 0.02em; }
+  .sig-pad-wrap { border: 1.5px solid var(--navy); border-radius: 6px; background: #fff; max-width: 420px; }
+  canvas#sigPad { display: block; width: 100%; height: auto; touch-action: none; cursor: crosshair; }
+  .sig-clear { font-size: 0.8rem; color: var(--rust); cursor: pointer; text-decoration: none;
+    display: inline-block; margin-top: 6px; }
+  .sig-clear:hover { text-decoration: underline; }
+  .sig-name { margin-top: 18px; max-width: 420px; border-top: 1.5px solid var(--navy); padding-top: 6px;
+    font-weight: 700; color: var(--navy); }
+  .sig-role { font-size: 0.88rem; font-weight: 500; color: var(--navy); }
+  .sig-date { font-size: 0.9rem; color: var(--navy); margin-top: 8px; }
+
+  /* Footer chevron strip */
+  .foot-band { height: 44px; background: var(--gold);
+    background-image: repeating-linear-gradient(-45deg,
+      var(--olive) 0 9px, transparent 9px 14px, var(--rust) 14px 23px, transparent 23px 28px);
+    background-position: center; margin-top: 30px; }
+
+  .notfound { max-width: 520px; margin: 60px auto; background: #fff; border-radius: 14px;
+    padding: 40px 32px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.12); }
+  .notfound h2 { color: var(--navy); margin-bottom: 10px; }
+  .notfound a { color: var(--navy); font-weight: 600; }
+
+  @media print {
+    body { background: #fff; padding: 0; }
+    .toolbar { display: none !important; }
+    .sig-clear { display: none !important; }
+    .sheet { box-shadow: none; max-width: none; min-height: auto; margin: 0; }
+    @page { margin: 0.35in; }
+  }
+  @media (max-width: 600px) {
+    .head { flex-direction: column-reverse; align-items: flex-start; }
+    .art { width: 110px; height: 110px; }
+  }
+</style>
+</head>
+<body>
+<div class="toolbar" id="toolbar">
+  <a class="tb-back" id="backLink" href="volunteers.html">← Back</a>
+  <div class="tb-right">
+    <span class="tb-hint" id="rangeInfo"></span>
+    <span class="tb-hint">Save as PDF first, then attach it to the email.</span>
+    <span id="emailSlot"></span>
+    <button class="tb-print" onclick="window.print()">Print / Save as PDF</button>
+  </div>
+</div>
+
+<div id="root"></div>
+
+<script>
+const esc = DataStore.esc;
+
+// Format hours with up to 2 decimals, trailing zeros trimmed, minimum one decimal
+// place (X.X). Examples: 3.75 -> "3.75", 3.8 -> "3.8", 3 -> "3.0", 0 -> "0.0".
+function fmtHours(n) {
+  let s = (Number(n) || 0).toFixed(2).replace(/0+$/, '');
+  if (s.endsWith('.')) s += '0';
+  return s;
+}
+function fmtLong(d) {
+  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+}
+
+function notFound() {
+  document.getElementById('toolbar').style.display = 'none';
+  document.getElementById('root').innerHTML =
+    '<div class="notfound"><h2>Volunteer not found</h2>' +
+    '<p style="margin-bottom:16px;color:#5A5A5A">That volunteer could not be loaded. They may have been removed.</p>' +
+    '<a href="volunteers.html">← Back to volunteers</a></div>';
+}
+
+function renderCert(volunteer, inRange, total, periodLabel) {
+  const rows = inRange.map(c => `
+    <tr>
+      <td>${esc(DataStore.formatDate(c.checkInTime))}</td>
+      <td class="lft">${esc(c.gardenName || '-')}</td>
+      <td class="lft">${esc(c.taskTitle || '-')}</td>
+      <td>${esc(fmtHours(c.hoursLogged))}</td>
+    </tr>`).join('');
+
+  const tableBlock = inRange.length
+    ? `<table class="items">
+        <thead><tr>
+          <th>DATE</th><th class="lfth">GARDEN</th><th class="lfth">TASK</th><th>HOURS</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`
+    : `<div class="empty-note">No recorded hours in this period.</div>`;
+
+  const todayStr = fmtLong(new Date());
+
+  document.getElementById('root').innerHTML = `
+  <div class="sheet">
+    <div class="head">
+      <div class="chev left"></div>
+      <div class="chev right"></div>
+      <div class="head-left">
+        <h1>VOLUNTEER HOURS</h1>
+        <div class="meta">
+          <div class="line"><span class="k">Volunteer:</span><span class="v">${esc(volunteer.name)}</span></div>
+          <div class="line"><span class="k">Period:</span><span class="v">${esc(periodLabel)}</span></div>
+          <div class="line"><span class="k">Issued:</span><span class="v">${esc(todayStr)}</span></div>
+        </div>
+      </div>
+      <img class="art" src="/assets/img/pawpaw-hands-sm.jpg" alt="Ecotopian EarthCare artwork">
+    </div>
+
+    <div class="body">
+      <div class="company">ECOTOPIAN EARTHCARE</div>
+      ${tableBlock}
+      <div class="rule"></div>
+
+      <div class="total-hours">
+        <span class="th-label">TOTAL HOURS</span>
+        <span class="th-val">${esc(fmtHours(total))}</span>
+      </div>
+
+      <div class="sig-block">
+        <div class="sig-label">Verified by</div>
+        <div class="sig-pad-wrap"><canvas id="sigPad" width="840" height="240"></canvas></div>
+        <a class="sig-clear" onclick="clearSignature()">Clear signature</a>
+        <div class="sig-name">Jordan Sesame Wild
+          <div class="sig-role">Ecotopian EarthCare</div>
+        </div>
+        <div class="sig-date">Date: ${esc(todayStr)}</div>
+      </div>
+    </div>
+
+    <div class="foot-band"></div>
+  </div>`;
+  document.title = 'Volunteer Hours - ' + volunteer.name;
+}
+
+// Signature pad: mouse + touch. The drawn strokes live on the canvas bitmap, so
+// they print as part of the document.
+function initSignaturePad() {
+  const canvas = document.getElementById('sigPad');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  ctx.lineWidth = 3; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#1e3a5f';
+  let drawing = false;
+  function pos(e) {
+    const r = canvas.getBoundingClientRect();
+    const src = (e.touches && e.touches[0]) ? e.touches[0] : e;
+    return {
+      x: (src.clientX - r.left) * (canvas.width / r.width),
+      y: (src.clientY - r.top) * (canvas.height / r.height),
+    };
+  }
+  function start(e) { drawing = true; const p = pos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); if (e.cancelable) e.preventDefault(); }
+  function move(e) { if (!drawing) return; const p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); if (e.cancelable) e.preventDefault(); }
+  function end() { drawing = false; }
+  canvas.addEventListener('mousedown', start);
+  canvas.addEventListener('mousemove', move);
+  window.addEventListener('mouseup', end);
+  canvas.addEventListener('touchstart', start, { passive: false });
+  canvas.addEventListener('touchmove', move, { passive: false });
+  canvas.addEventListener('touchend', end);
+  window.clearSignature = function() { ctx.clearRect(0, 0, canvas.width, canvas.height); };
+}
+
+(async function init() {
+  try {
+    await AuthManager.requireAuth();
+    const params = new URLSearchParams(window.location.search);
+    const id = params.get('id');
+    const days = Math.max(0, parseInt(params.get('days'), 10) || 0);
+    if (!id) { notFound(); return; }
+
+    const [volunteer, checkins] = await Promise.all([
+      DataStore.getVolunteer(id), DataStore.getCheckinsByVolunteer(id),
+    ]);
+    if (!volunteer) { notFound(); return; }
+
+    // Filter check-ins to the requested window (days=0 means all recorded service).
+    const cutoffMs = days > 0 ? Date.now() - days * 86400000 : null;
+    const inRange = (checkins || [])
+      .filter(c => cutoffMs === null || new Date(c.checkInTime).getTime() >= cutoffMs)
+      .sort((a, b) => new Date(a.checkInTime) - new Date(b.checkInTime));
+    const total = inRange.reduce((s, c) => s + (Number(c.hoursLogged) || 0), 0);
+
+    const periodLabel = days > 0
+      ? fmtLong(new Date(cutoffMs)) + ' to ' + fmtLong(new Date())
+      : 'All recorded service';
+
+    renderCert(volunteer, inRange, total, periodLabel);
+
+    // Toolbar wiring.
+    document.getElementById('backLink').href = 'volunteer-detail.html?id=' + encodeURIComponent(id);
+    document.getElementById('rangeInfo').textContent =
+      days > 0 ? ('Range: last ' + days + ' days') : 'Range: all time';
+    if (volunteer.email) {
+      const subject = 'Your volunteer hours with Ecotopian EarthCare';
+      const body = 'Hi ' + volunteer.name + ',\n\n' +
+        'Thank you for volunteering with Ecotopian EarthCare. Your certificate of volunteer hours is attached as a PDF.\n\n' +
+        'With gratitude,\nJordan Sesame Wild\nEcotopian EarthCare';
+      const mailto = 'mailto:' + encodeURIComponent(volunteer.email) +
+        '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+      document.getElementById('emailSlot').innerHTML =
+        '<a class="tb-email" href="' + esc(mailto) + '">Email it</a>';
+    }
+
+    initSignaturePad();
+  } catch (err) {
+    document.getElementById('toolbar').style.display = 'none';
+    document.getElementById('root').innerHTML =
+      '<div class="notfound"><h2>Could not load certificate</h2>' +
+      '<p style="margin-bottom:16px;color:#5A5A5A">' + esc(err.message) + '</p>' +
+      '<a href="volunteers.html">← Back to volunteers</a></div>';
+  }
+})();
+</script>
+</body>
+</html>
