@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shop - Ecotopia</title>
+  <link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/mapping.js"></script>
+<script src="assets/auth.js"></script>
+<script>if (!AuthManager.hasCachedSession()) location.replace('login.html');</script>
+<script src="assets/data.js"></script>
+<script src="assets/nav.js"></script>
+<style>
+  :root {
+    --forest: #1B4332; --forest-mid: #2D6A4F; --forest-light: #52B788;
+    --sage: #D8F3DC; --sage-dim: #B7E4C7; --earth: #8B5E3C;
+    --earth-light: #C68642; --gold: #F4A261; --cream: #F9F6F0;
+    --cream-dim: #E8E0D5; --text: #1C1C1C; --text-dim: #5A5A5A;
+    --border: rgba(45,106,79,0.2); --amber: #B8730A; --amber-bg: #FDF0DA;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--text); }
+  .page { padding: 28px 32px; max-width: 1000px; }
+  .page-header { display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; margin-bottom: 8px; }
+  h1 { font-family: 'Fraunces', serif; font-size: 1.9rem; color: var(--forest); }
+  .page-intro { font-size: 0.9rem; color: var(--text-dim); margin-bottom: 20px;
+    max-width: 680px; line-height: 1.6; }
+
+  .btn { padding: 10px 18px; border-radius: 8px; border: none; font-size: 0.875rem;
+    font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif;
+    text-decoration: none; display: inline-flex; gap: 6px; align-items: center;
+    transition: background 0.15s; }
+  .btn-primary { background: var(--forest); color: #fff; }
+  .btn-primary:hover { background: var(--forest-mid); }
+  .btn-cancel { background: var(--cream-dim); color: var(--text); padding: 10px 18px;
+    border-radius: 8px; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+  .btn-sm { font-size: 0.78rem; padding: 5px 10px; background: transparent;
+    border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
+    color: var(--text-dim); font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+  .btn-sm:hover { color: var(--forest); border-color: var(--forest-light); background: var(--sage); }
+  .btn-sm:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-sm.btn-danger { color: #b3261e; }
+  .btn-sm.btn-danger:hover { color: #fff; background: #b3261e; border-color: #b3261e; }
+
+  .toolbar { display: flex; justify-content: flex-end; margin-bottom: 14px; }
+
+  /* List rows */
+  .list { display: flex; flex-direction: column; gap: 10px; }
+  .row { background: #fff; border: 1px solid var(--border); border-radius: 12px;
+    padding: 12px 14px; display: flex; align-items: center; gap: 14px; }
+  .row.inactive { opacity: 0.62; }
+  .row-thumb { width: 52px; height: 52px; flex-shrink: 0; border-radius: 8px;
+    object-fit: cover; background: var(--cream-dim); border: 1px solid var(--border); }
+  .row-thumb.placeholder { display: flex; align-items: center; justify-content: center;
+    font-size: 1.3rem; color: var(--forest-light); }
+  .row-main { flex: 1; min-width: 0; }
+  .row-title { font-weight: 600; color: var(--forest); font-size: 0.98rem; }
+  .row-sub { font-size: 0.82rem; color: var(--text-dim); overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap; }
+  .row-sub2 { font-size: 0.78rem; color: var(--text-dim); margin-top: 2px; }
+  .status-pill { display: inline-block; padding: 2px 10px; border-radius: 20px;
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+  .status-on { background: var(--sage); color: var(--forest); }
+  .status-off { background: var(--amber-bg); color: var(--amber); }
+  .chip-soft { display: inline-block; padding: 2px 9px; border-radius: 20px;
+    font-size: 0.68rem; font-weight: 600; background: var(--cream-dim); color: var(--text-dim);
+    margin-left: 4px; }
+  .row-sort { display: flex; flex-direction: column; gap: 2px; }
+  .row-sort button { width: 26px; height: 22px; line-height: 1; }
+  .row-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+
+  .empty { padding: 30px 16px; color: var(--text-dim); font-size: 0.9rem; text-align: center; }
+  .modal-error { color: #b3261e; font-size: 0.85rem; margin-top: 8px; }
+  #pageError { margin-bottom: 14px; }
+  #pageError:empty { display: none; }
+
+  /* Photo picker */
+  .photo-preview { margin-top: 8px; display: flex; align-items: center; gap: 12px; }
+  .photo-preview img { width: 72px; height: 72px; object-fit: cover; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--cream-dim); }
+  .photo-preview a { font-size: 0.8rem; color: #b3261e; cursor: pointer; text-decoration: none; }
+  .photo-preview a:hover { text-decoration: underline; }
+
+  /* Modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+    z-index: 500; align-items: center; justify-content: center; padding: 20px; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: #fff; border-radius: 16px; padding: 28px; width: 100%;
+    max-width: 520px; max-height: 90vh; overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.25); }
+  .modal h2 { font-family: 'Fraunces', serif; color: var(--forest); margin-bottom: 18px; }
+  .form-group { margin-bottom: 14px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .form-group label { display: block; font-size: 0.78rem; font-weight: 600;
+    color: var(--text-dim); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .form-group input, .form-group textarea, .form-group select {
+    width: 100%; padding: 9px 11px; border-radius: 7px; border: 1.5px solid var(--border);
+    font-size: 0.875rem; font-family: 'DM Sans', sans-serif; color: var(--text); background: #fff; }
+  .form-group textarea { min-height: 70px; resize: vertical; }
+  .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+    outline: none; border-color: var(--forest-light); }
+  .field-note { font-size: 0.76rem; color: var(--text-dim); margin-top: 4px; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 6px; }
+
+  @media (max-width: 700px) {
+    .page { padding: 20px 16px; }
+    .row { flex-wrap: wrap; }
+    .form-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="page-header">
+    <h1>Shop</h1>
+  </div>
+  <p class="page-intro">Edit the items shown on the public
+    <a href="shop.html" target="_blank" rel="noopener">Shop</a> page. Price and status are free text
+    ("US $40", "From $15"; "Pre-order", "In stock", "Coming soon"). Add a buy link to send shoppers to
+    an external store, or leave it blank to use the pre-order / ask form. Deactivate to hide an item
+    without deleting it.</p>
+
+  <div class="modal-error" id="pageError"></div>
+
+  <div class="toolbar">
+    <button class="btn btn-primary" onclick="openModal(null)">+ Add item</button>
+  </div>
+  <div class="list" id="itemList"><div class="empty">Loading…</div></div>
+</div>
+
+<!-- Item modal -->
+<div class="modal-overlay" id="itemModal">
+  <div class="modal">
+    <h2 id="itemModalTitle">Add item</h2>
+    <form id="itemForm" novalidate>
+      <div class="form-group"><label>Name *</label>
+        <input type="text" id="mi_name" placeholder="Ecotopian EarthCare: The Card Game"></div>
+      <div class="form-group"><label>Blurb</label>
+        <textarea id="mi_blurb" placeholder="A short description of the item…"></textarea></div>
+      <div class="form-row">
+        <div class="form-group"><label>Price (free text)</label>
+          <input type="text" id="mi_price" placeholder="US $40"></div>
+        <div class="form-group"><label>Status (free text)</label>
+          <input type="text" id="mi_status" placeholder="Pre-order"></div>
+      </div>
+      <div class="form-group"><label>Buy link (optional)</label>
+        <input type="url" id="mi_link" placeholder="https://store.example.com/item">
+        <div class="field-note">If set (must start with https://), the card shows a "Buy" button that
+          opens this link. Leave blank to use the pre-order / ask form instead.</div>
+      </div>
+      <div class="form-group"><label>Photo</label>
+        <input type="file" id="mi_photo" accept="image/*" onchange="onPhotoChosen(this)">
+        <div class="photo-preview" id="mi_photo_preview" style="display:none">
+          <img id="mi_photo_thumb" alt="">
+          <a onclick="removePhoto()">Remove photo</a>
+        </div>
+        <div class="field-note" id="mi_photo_static" style="display:none">Uses a built-in image. Upload
+          one to replace it.</div>
+      </div>
+      <div class="modal-error" id="itemError"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="itemSaveBtn">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+const esc = DataStore.esc;
+
+let items = [];
+let editId = null, photoFile = null, photoRemove = false, photoCurrentPath = null;
+
+// Resolve a stored photo_path to a renderable src, or null. 'static:<path>' is a
+// repo asset under assets/img/ (each path segment charset-guarded and '..' rejected
+// so it cannot escape the folder); any other value is a gallery-bucket object served
+// via its public URL.
+function merchPhotoSrc(photoPath) {
+  if (!photoPath) return null;
+  const s = String(photoPath);
+  if (s.slice(0, 7) === 'static:') {
+    const rest = s.slice(7);
+    if (!rest) return null;
+    const segs = rest.split('/');
+    for (const seg of segs) {
+      if (!seg || seg === '..' || !/^[A-Za-z0-9._-]+$/.test(seg)) return null;
+    }
+    return 'assets/img/' + rest;
+  }
+  return DataStore.merchPhotoUrl(s);
+}
+function isStatic(path) { return !!path && String(path).slice(0, 7) === 'static:'; }
+
+async function uploadMerchPhoto(file) {
+  const blob = await DataStore.resizeImage(file, 1600);
+  const path = `shop/${crypto.randomUUID()}.jpg`;
+  const up = await window.ecoSupabase.storage.from('gallery')
+    .upload(path, blob, { contentType: blob.type || 'image/jpeg', upsert: false });
+  if (up.error) throw new Error(up.error.message);
+  return path;
+}
+// Best-effort delete of a gallery-bucket object; static: assets are never removed.
+async function removeMerchPhotoObject(path) {
+  if (!path || isStatic(path)) return;
+  try { await window.ecoSupabase.storage.from('gallery').remove([path]); } catch (e) { /* ignore */ }
+}
+
+// ── List ─────────────────────────────────────────────────────────────────────
+function itemById(id) { return items.find(m => m.id === id); }
+
+function render() {
+  const el = document.getElementById('itemList');
+  if (!items.length) { el.innerHTML = '<div class="empty">No items yet. Add the first one.</div>'; return; }
+  el.innerHTML = items.map((m, i) => {
+    const src = merchPhotoSrc(m.photoPath);
+    const thumb = src
+      ? `<img class="row-thumb" src="${esc(src)}" alt="" loading="lazy">`
+      : `<div class="row-thumb placeholder">🛍</div>`;
+    const pill = m.active
+      ? '<span class="status-pill status-on">Live</span>'
+      : '<span class="status-pill status-off">Hidden</span>';
+    const status = m.statusText ? `<span class="chip-soft">${esc(m.statusText)}</span>` : '';
+    const price = m.priceText ? esc(m.priceText) : 'No price set';
+    const link = m.linkUrl ? ' · external buy link' : '';
+    return `
+      <div class="row ${m.active ? '' : 'inactive'}">
+        <div class="row-sort">
+          <button class="btn-sm" onclick="move('${esc(m.id)}',-1)" ${i === 0 ? 'disabled' : ''} aria-label="Move up">▲</button>
+          <button class="btn-sm" onclick="move('${esc(m.id)}',1)" ${i === items.length - 1 ? 'disabled' : ''} aria-label="Move down">▼</button>
+        </div>
+        ${thumb}
+        <div class="row-main">
+          <div class="row-title">${esc(m.name)} ${pill}</div>
+          <div class="row-sub">${price}${status}</div>
+          <div class="row-sub2">${esc(m.blurb || '')}${link}</div>
+        </div>
+        <div class="row-actions">
+          <button class="btn-sm" onclick="openModal('${esc(m.id)}')">Edit</button>
+          <button class="btn-sm" onclick="toggleActive('${esc(m.id)}')">${m.active ? 'Deactivate' : 'Reactivate'}</button>
+          <button class="btn-sm btn-danger" onclick="deleteItem('${esc(m.id)}')">Delete</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+async function move(id, dir) {
+  const i = items.findIndex(m => m.id === id);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= items.length) return;
+  const a = items[i], b = items[j];
+  const errEl = document.getElementById('pageError');
+  errEl.textContent = '';
+  try {
+    // Swap the two sort values so the pair trades places in the ordering.
+    await Promise.all([
+      DataStore.updateMerchItem(a.id, { sort: b.sort }),
+      DataStore.updateMerchItem(b.id, { sort: a.sort }),
+    ]);
+    await load();
+  } catch (err) {
+    errEl.textContent = 'Could not reorder. ' + err.message;
+  }
+}
+
+async function toggleActive(id) {
+  const m = itemById(id);
+  if (!m) return;
+  const errEl = document.getElementById('pageError');
+  errEl.textContent = '';
+  try {
+    await DataStore.updateMerchItem(id, { active: !m.active });
+    await load();
+  } catch (err) {
+    errEl.textContent = 'Could not update. ' + err.message;
+  }
+}
+
+async function deleteItem(id) {
+  const m = itemById(id);
+  if (!m) return;
+  if (!confirm(`Delete "${m.name}"? This permanently removes it from the shop.`)) return;
+  const errEl = document.getElementById('pageError');
+  errEl.textContent = '';
+  try {
+    await DataStore.deleteMerchItem(id, m.photoPath);
+    await load();
+  } catch (err) {
+    errEl.textContent = 'Could not delete. ' + err.message;
+  }
+}
+
+// ── Modal ──────────────────────────────────────────────────────────────────────
+function renderPhoto(url, staticNote) {
+  const wrap = document.getElementById('mi_photo_preview');
+  const thumb = document.getElementById('mi_photo_thumb');
+  const note = document.getElementById('mi_photo_static');
+  if (url) { thumb.src = url; wrap.style.display = 'flex'; }
+  else { wrap.style.display = 'none'; thumb.src = ''; }
+  note.style.display = staticNote ? 'block' : 'none';
+}
+function onPhotoChosen(input) {
+  const file = (input.files || [])[0] || null;
+  photoFile = file;
+  photoRemove = false;
+  renderPhoto(file ? URL.createObjectURL(file)
+    : (photoCurrentPath ? merchPhotoSrc(photoCurrentPath) : ''),
+    !file && isStatic(photoCurrentPath));
+}
+function removePhoto() {
+  photoFile = null;
+  photoRemove = true;
+  document.getElementById('mi_photo').value = '';
+  renderPhoto('', false);
+}
+
+function openModal(id) {
+  editId = id || null;
+  photoFile = null;
+  photoRemove = false;
+  const m = id ? itemById(id) : null;
+  photoCurrentPath = m ? (m.photoPath || null) : null;
+  document.getElementById('itemModalTitle').textContent = m ? 'Edit item' : 'Add item';
+  document.getElementById('itemError').textContent = '';
+  document.getElementById('mi_name').value = m ? (m.name || '') : '';
+  document.getElementById('mi_blurb').value = m ? (m.blurb || '') : '';
+  document.getElementById('mi_price').value = m ? (m.priceText || '') : '';
+  document.getElementById('mi_status').value = m ? (m.statusText || '') : '';
+  document.getElementById('mi_link').value = m ? (m.linkUrl || '') : '';
+  document.getElementById('mi_photo').value = '';
+  renderPhoto(photoCurrentPath ? merchPhotoSrc(photoCurrentPath) : '', isStatic(photoCurrentPath));
+  document.getElementById('itemModal').classList.add('open');
+  document.getElementById('mi_name').focus();
+}
+function closeModal() { document.getElementById('itemModal').classList.remove('open'); }
+document.getElementById('itemModal').addEventListener('click', function (e) {
+  if (e.target === this) closeModal();
+});
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
+
+document.getElementById('itemForm').addEventListener('submit', async function (e) {
+  e.preventDefault();
+  const errEl = document.getElementById('itemError');
+  errEl.textContent = '';
+  const name = document.getElementById('mi_name').value.trim();
+  if (!name) { errEl.textContent = 'A name is required.'; return; }
+  const link = document.getElementById('mi_link').value.trim();
+  if (link && !/^https:\/\//i.test(link)) {
+    errEl.textContent = 'The buy link must start with https:// (or leave it blank).';
+    return;
+  }
+  const changes = {
+    name,
+    blurb: document.getElementById('mi_blurb').value.trim() || null,
+    priceText: document.getElementById('mi_price').value.trim() || null,
+    statusText: document.getElementById('mi_status').value.trim() || null,
+    linkUrl: link || null,
+  };
+  // Resolve photo change: new upload replaces; "remove" clears; else keep.
+  let newPath = null;
+  if (photoFile) {
+    try { newPath = await uploadMerchPhoto(photoFile); }
+    catch (err) { errEl.textContent = 'Could not upload photo. ' + err.message; return; }
+    changes.photoPath = newPath;
+  } else if (photoRemove) {
+    changes.photoPath = null;
+  }
+  const btn = document.getElementById('itemSaveBtn');
+  btn.disabled = true;
+  try {
+    if (editId) {
+      await DataStore.updateMerchItem(editId, changes);
+    } else {
+      changes.active = true;
+      changes.sort = items.length ? Math.max.apply(null, items.map(m => m.sort || 0)) + 10 : 0;
+      await DataStore.addMerchItem(changes);
+    }
+    // Photo swapped/removed: delete the old gallery object best-effort (never static).
+    if ((newPath || photoRemove) && photoCurrentPath && photoCurrentPath !== newPath) {
+      removeMerchPhotoObject(photoCurrentPath);
+    }
+    closeModal();
+    await load();
+  } catch (err) {
+    if (newPath) removeMerchPhotoObject(newPath); // row write failed; clean orphan
+    errEl.textContent = 'Could not save. ' + err.message;
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// ── Load / render ────────────────────────────────────────────────────────────
+async function load() { items = await DataStore.getMerchItems(); render(); }
+
+(async function init() {
+  try {
+    await AuthManager.requireAuth();
+    Nav.render();
+    await load();
+  } catch (err) {
+    document.getElementById('itemList').innerHTML =
+      '<div class="empty">Could not load the shop (' + esc(err.message) +
+      '). <a href="javascript:location.reload()">Retry</a></div>';
+  }
+})();
+</script>
+
+<!-- Bag Carriers thin powered-by footer (locked attribution component) -->
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Libre+Baskerville:ital@1&display=swap" rel="stylesheet">
+<style>
+.bc-thinfoot {
+  --bc-ink:#0a0c10; --bc-bone:#f0ece4; --bc-sienna:#7a4520; --bc-muted:#8a8172;
+  flex: 0 0 auto;
+  background:var(--bc-ink);
+  font-family:'Bebas Neue',sans-serif;
+  padding:12px 20px;
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  border-top:2px solid var(--bc-sienna);
+  text-align:center;
+}
+.bc-thinfoot__label {
+  font-family:'Libre Baskerville',serif; font-style:italic;
+  font-size:11px; letter-spacing:.02em; color:var(--bc-muted);
+}
+.bc-thinfoot__mark {
+  font-family:'Bebas Neue',sans-serif; letter-spacing:.08em;
+  font-size:15px; line-height:1; color:var(--bc-bone);
+  text-decoration:none;
+}
+.bc-thinfoot__mark:hover { opacity:.85; }
+.bc-thinfoot__mark .bc-systems { color:var(--bc-sienna); }
+.bc-thinfoot__mark .bc-dot { color:var(--bc-sienna); }
+</style>
+<footer class="bc-thinfoot">
+  <span class="bc-thinfoot__label">Powered by</span>
+  <a class="bc-thinfoot__mark" href="https://bagcarriers.com/systems" target="_blank" rel="noopener">
+    BAG CARRIERS <span class="bc-systems">SYSTEMS</span><span class="bc-dot">.</span>
+  </a>
+</footer>
+</body>
+</html>

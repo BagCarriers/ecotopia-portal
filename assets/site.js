@@ -397,6 +397,7 @@
     { href: 'about.html', label: 'About', key: 'about' },
     { href: 'services.html', label: 'Services', key: 'services' },
     { href: 'plants.html', label: 'Native Plants', key: 'plants' },
+    { href: 'shop.html', label: 'Shop', key: 'shop' },
     { href: 'happenings.html', label: 'Events', key: 'events' },
     { href: 'community-gardens.html', label: 'Community Gardens', key: 'gardens' },
     { href: 'photos.html', label: 'Photos', key: 'photos' },

@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ask Us Anything - Ecotopian EarthCare</title>
+  <link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png">
+<meta name="description" content="Have a question about native plants, what to plant where, pawpaws, or how to get involved? Ask Ecotopian EarthCare. No question is too small and we read every one.">
+<meta property="og:site_name" content="Ecotopian EarthCare">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Ask Us Anything - Ecotopian EarthCare">
+<meta property="og:description" content="Ask us about native plants, what to plant where, pawpaws, or how to get involved. No question is too small.">
+  <meta property="og:image" content="https://ecotopia.bagcarriers.dev/assets/img/og-pawpaw.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Flamenco:wght@300;400&family=Inter+Tight:wght@400;500;600;700&family=Megrim&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+<script src="assets/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/mapping.js"></script>
+<script src="assets/site.js"></script>
+<script src="assets/data.js"></script>
+<style>
+  /* Page-local layout on top of the shared marketing stylesheet (site.css). */
+  .ask-intro { max-width: 640px; }
+  .ask-card {
+    background: #fff; border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 30px; max-width: 680px; margin-top: 10px; box-shadow: var(--shadow);
+  }
+  .ask-note {
+    font-family: var(--font-util); font-size: 0.82rem; color: var(--ink-soft); margin: 4px 0 0;
+  }
+  .ask-thanks { display: none; }
+  .ask-thanks.visible { display: block; }
+  .ask-form.hidden { display: none; }
+  .ask-thanks .check { font-size: 2.6rem; color: var(--green); line-height: 1; }
+  .ask-thanks h2 { margin: 12px 0 8px; }
+  .ask-thanks p { max-width: 520px; }
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header" id="siteHeader"></header>
+
+<main id="main">
+  <section class="section cream">
+    <div class="wrap narrow">
+      <p class="eyebrow">Questions welcome</p>
+      <h1>Ask us anything</h1>
+      <p class="lead ask-intro">Curious about native plants, what to plant where, pawpaws, or how to
+        get involved? Ask us. No question is too small, and we read every one.</p>
+      <p class="lead ask-intro">Leave your email if you would like a direct answer. Some questions and
+        answers may appear in a future public Q&amp;A to help other gardeners.</p>
+    </div>
+  </section>
+  <div class="willow on-cream" data-opacity="0.4"></div>
+
+  <section class="section cream-soft">
+    <div class="wrap narrow">
+      <div class="ask-card">
+        <!-- Thank-you screen -->
+        <div class="ask-thanks" id="thanksScreen">
+          <div class="check" aria-hidden="true">&#10003;</div>
+          <h2>Thanks! We read every question.</h2>
+          <p class="lead">If you left your email, we will answer you directly. Some answers may appear
+            in a future public Q&amp;A.</p>
+          <p class="ask-note"><a class="suggest-maplink" href="index.html">Back to the homepage &rarr;</a></p>
+        </div>
+
+        <!-- Question form -->
+        <form class="ask-form" id="askForm" novalidate>
+          <div class="eco-lead-grid">
+            <div class="eco-lead-field eco-lead-full">
+              <label for="q_question">Your question <span class="req">*</span></label>
+              <textarea id="q_question" placeholder="For example: what can I plant in a shady spot, or when do pawpaws ripen?"></textarea>
+            </div>
+            <div class="eco-lead-field">
+              <label for="q_name">Name</label>
+              <input type="text" id="q_name" placeholder="Optional" autocomplete="name">
+            </div>
+            <div class="eco-lead-field">
+              <label for="q_email">Email</label>
+              <input type="email" id="q_email" placeholder="Optional, so we can answer you directly" autocomplete="email">
+            </div>
+          </div>
+          <p class="ask-note">Name and email are optional. Add an email if you would like a direct answer.</p>
+
+          <p class="eco-lead-error" id="askError"></p>
+          <button type="submit" class="eco-lead-primary">Send my question</button>
+        </form>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div>
+      <p class="fbrand">Ecotopian EarthCare</p>
+      <p>Ecological landscaping, community gardens, and native plants in Central Pennsylvania.</p>
+      <p>Serving the Altoona area &amp; Blair County. Find us at the Reciprocity Community Food Forest, 211 Browning Ave, Altoona, PA 16602.</p>
+      <p>Call or text <a href="tel:+18146315338">814-631-5338</a> · <a href="mailto:admin@ecotopianearthcare.com">admin@ecotopianearthcare.com</a></p>
+    </div>
+    <div>
+      <h4>Explore</h4>
+      <ul>
+        <li><a href="services.html">Services</a></li>
+        <li><a href="shop.html">Shop</a></li>
+        <li><a href="happenings.html">Events</a></li>
+        <li><a href="community-gardens.html">Community Gardens</a></li>
+        <li><a href="photos.html">Photos</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Get involved</h4>
+      <ul>
+        <li><a href="intake.html">Client Request Form</a></li>
+        <li><a href="volunteer-board.html">Volunteer board</a></li>
+        <li><a href="questions.html">Ask a question</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>© 2026 Ecotopian EarthCare</span>
+    <a class="staff" href="login.html">Staff sign in</a>
+  </div>
+</footer>
+
+
+<script>
+document.addEventListener('DOMContentLoaded', () => { EcoSite.renderNav(null); });
+
+document.getElementById('askForm').addEventListener('submit', async function (e) {
+  e.preventDefault();
+  const errEl = document.getElementById('askError');
+  errEl.textContent = '';
+
+  const question = document.getElementById('q_question').value.trim();
+  const name = document.getElementById('q_name').value.trim();
+  const email = document.getElementById('q_email').value.trim();
+
+  if (!question) { errEl.textContent = 'Please write your question.'; return; }
+  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    errEl.textContent = 'That email address does not look right. Please check it.'; return;
+  }
+
+  try {
+    // Fire-and-forget anon insert (return=minimal, no .id reads).
+    await DataStore.submitQuestion({ question, name, email });
+    document.getElementById('askForm').classList.add('hidden');
+    document.getElementById('thanksScreen').classList.add('visible');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch (err) {
+    errEl.textContent =
+      'Something went wrong sending your question. Please try again, or call us at 814-631-5338.';
+  }
+});
+</script>
+<!-- Bag Carriers thin powered-by footer (locked attribution component) -->
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Libre+Baskerville:ital@1&display=swap" rel="stylesheet">
+<style>
+.bc-thinfoot {
+  --bc-ink:#0a0c10; --bc-bone:#f0ece4; --bc-sienna:#7a4520; --bc-muted:#8a8172;
+  flex: 0 0 auto;
+  background:var(--bc-ink);
+  font-family:'Bebas Neue',sans-serif;
+  padding:12px 20px;
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  border-top:2px solid var(--bc-sienna);
+  text-align:center;
+}
+.bc-thinfoot__label {
+  font-family:'Libre Baskerville',serif; font-style:italic;
+  font-size:11px; letter-spacing:.02em; color:var(--bc-muted);
+}
+.bc-thinfoot__mark {
+  font-family:'Bebas Neue',sans-serif; letter-spacing:.08em;
+  font-size:15px; line-height:1; color:var(--bc-bone);
+  text-decoration:none;
+}
+.bc-thinfoot__mark:hover { opacity:.85; }
+.bc-thinfoot__mark .bc-systems { color:var(--bc-sienna); }
+.bc-thinfoot__mark .bc-dot { color:var(--bc-sienna); }
+</style>
+<footer class="bc-thinfoot">
+  <span class="bc-thinfoot__label">Powered by</span>
+  <a class="bc-thinfoot__mark" href="https://bagcarriers.com/systems" target="_blank" rel="noopener">
+    BAG CARRIERS <span class="bc-systems">SYSTEMS</span><span class="bc-dot">.</span>
+  </a>
+</footer>
+</body>
+</html>

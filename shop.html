@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shop - Ecotopian EarthCare</title>
+  <link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png">
+<meta name="description" content="Shop Ecotopian EarthCare: the Ecotopian EarthCare card game and other goods that support native-plant restoration in Central Pennsylvania. Nothing is charged online.">
+<meta property="og:site_name" content="Ecotopian EarthCare">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Shop - Ecotopian EarthCare">
+<meta property="og:description" content="The Ecotopian EarthCare card game and other goods that support native-plant restoration in Central Pennsylvania.">
+  <meta property="og:image" content="https://ecotopia.bagcarriers.dev/assets/img/og-pawpaw.jpg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Flamenco:wght@300;400&family=Inter+Tight:wght@400;500;600;700&family=Megrim&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/site.css">
+<script src="assets/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/mapping.js"></script>
+<script src="assets/site.js"></script>
+<style>
+/* ── Shop page (marketing) ──────────────────────────────────────────────── */
+.shop-grid {
+  display: grid; gap: 24px; margin-top: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+}
+.shop-card {
+  background: #fff; border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 24px 24px 26px; box-shadow: var(--shadow);
+  display: flex; flex-direction: column;
+}
+.section.cream .shop-card { background: #fff; }
+.shop-photo {
+  width: calc(100% + 48px); margin: -24px -24px 18px;
+  border-radius: var(--radius) var(--radius) 0 0;
+  aspect-ratio: 4 / 3; object-fit: cover; display: block; background: var(--cream);
+}
+.shop-card h3 {
+  font-family: var(--font-util); font-weight: 700; font-size: 1.32rem;
+  color: var(--green-dark); margin: 0 0 6px;
+}
+.shop-blurb { margin: 0 0 14px; font-size: 1.04rem; line-height: 1.55; color: var(--ink-soft); }
+.shop-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 0 0 16px; }
+.shop-price { font-family: var(--font-util); font-weight: 700; font-size: 1.25rem; color: var(--green-dark); }
+.shop-status {
+  font-family: var(--font-util); font-weight: 600; text-transform: uppercase;
+  letter-spacing: 0.12em; font-size: 0.72rem; color: var(--amber-dark);
+  background: hsl(38.6, 100%, 90%); padding: 5px 12px; border-radius: 999px;
+}
+.shop-thumbs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 0 0 18px; }
+.shop-thumbs img {
+  width: 100%; aspect-ratio: 3 / 4; object-fit: cover; display: block;
+  border-radius: 10px; box-shadow: var(--shadow); background: var(--cream);
+}
+.shop-card .shop-cta {
+  margin-top: auto; width: 100%; padding: 12px; border: 0; border-radius: 999px;
+  background: var(--green); color: #fff; font-family: var(--font-util);
+  font-weight: 600; font-size: 1rem; cursor: pointer; text-align: center;
+  text-decoration: none; display: inline-block; transition: background 0.16s ease;
+}
+.shop-card .shop-cta:hover { background: var(--green-dark); }
+.shop-empty {
+  font-family: var(--font-util); color: var(--ink-soft); font-size: 1rem;
+  padding: 24px 0; text-align: center;
+}
+@media (prefers-reduced-motion: reduce) { .shop-card .shop-cta { transition: none !important; } }
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="site-header" id="siteHeader"></header>
+
+<main id="main">
+  <section class="section cream">
+    <div class="wrap">
+      <p class="eyebrow">Shop</p>
+      <h1>Shop Ecotopian EarthCare</h1>
+      <p class="lead">Goods that carry our work into the world, from the Ecotopian EarthCare card game to
+        other native-plant projects in the making. Reserve or pre-order below. Nothing is charged online;
+        we reach out to arrange the rest.</p>
+    </div>
+  </section>
+  <div class="willow on-cream" data-opacity="0.4"></div>
+
+  <section class="section" aria-labelledby="shop-h">
+    <div class="wrap">
+      <p class="eyebrow">In the shop</p>
+      <h2 id="shop-h">Merch and goods</h2>
+      <div class="shop-grid" id="shopGrid"><p class="shop-empty">Loading the shop…</p></div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div>
+      <p class="fbrand">Ecotopian EarthCare</p>
+      <p>Ecological landscaping, community gardens, and native plants in Central Pennsylvania.</p>
+      <p>Serving the Altoona area &amp; Blair County. Find us at the Reciprocity Community Food Forest, 211 Browning Ave, Altoona, PA 16602.</p>
+      <p>Call or text <a href="tel:+18146315338">814-631-5338</a> · <a href="mailto:admin@ecotopianearthcare.com">admin@ecotopianearthcare.com</a></p>
+    </div>
+    <div>
+      <h4>Explore</h4>
+      <ul>
+        <li><a href="services.html">Services</a></li>
+        <li><a href="shop.html">Shop</a></li>
+        <li><a href="happenings.html">Events</a></li>
+        <li><a href="community-gardens.html">Community Gardens</a></li>
+        <li><a href="photos.html">Photos</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Get involved</h4>
+      <ul>
+        <li><a href="intake.html">Client Request Form</a></li>
+        <li><a href="volunteer-board.html">Volunteer board</a></li>
+        <li><a href="questions.html">Ask a question</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>© 2026 Ecotopian EarthCare</span>
+    <a class="staff" href="login.html">Staff sign in</a>
+  </div>
+</footer>
+
+
+<script>
+/* ==========================================================================
+   Shop page runtime. Reads active merch_items over anon (RLS scopes it), and
+   the "Pre-order / Ask about this" modal fire-and-forgets anon inserts to
+   intake_submissions (service_type 'merch') + jobs (status 'inquiry'), exactly
+   mirroring the plants.html flows. No online payment.
+   ========================================================================== */
+(function () {
+  'use strict';
+  var esc = EcoSite.esc;
+  var sb = function () { return window.ecoSupabase; };
+
+  var MERCH = [];
+  var MERCH_BY_ID = {};
+
+  // Resolve a stored photo_path to a renderable src, or null. 'static:<path>' is a
+  // repo asset under assets/img/ (each path segment charset-guarded and '..'
+  // rejected so it cannot escape the folder); any other value is a gallery-bucket
+  // object served via its public URL.
+  function shopPhotoSrc(photoPath) {
+    if (!photoPath) return null;
+    var s = String(photoPath);
+    if (s.slice(0, 7) === 'static:') {
+      var rest = s.slice(7);
+      if (!rest) return null;
+      var segs = rest.split('/');
+      for (var i = 0; i < segs.length; i++) {
+        var seg = segs[i];
+        if (!seg || seg === '..' || !/^[A-Za-z0-9._-]+$/.test(seg)) return null;
+      }
+      return 'assets/img/' + rest;
+    }
+    return sb().storage.from('gallery').getPublicUrl(s).data.publicUrl;
+  }
+
+  // Only https external links are ever rendered as a buy link.
+  function validLink(url) {
+    return typeof url === 'string' && /^https:\/\//i.test(url.trim());
+  }
+
+  async function loadMerch() {
+    var res = await sb().from('merch_items').select('*')
+      .order('sort', { ascending: true }).order('name', { ascending: true });
+    if (res.error) throw new Error(res.error.message);
+    // Parity guard: signed-in staff carry a JWT whose RLS also returns inactive
+    // rows; the public shop must always show active only.
+    return window.EcoMapping.fromDbAll(res.data).filter(function (r) { return r.active !== false; });
+  }
+
+  // ── Render the grid ───────────────────────────────────────────────────────
+  // The card game entry (a 'static:game/...' photo) carries three hardcoded
+  // card-art thumbnails; generic items just get their one photo. These three
+  // files are static repo assets, so hardcoding them here is fine.
+  var GAME_THUMBS = [
+    { src: 'assets/img/game/game-pawpaw.jpg', alt: 'Pawpaw card artwork from the Ecotopian EarthCare card game' },
+    { src: 'assets/img/game/game-layout.jpg', alt: 'A spread of cards from the Ecotopian EarthCare card game' },
+    { src: 'assets/img/game/game-roles.jpg', alt: 'The player role cards from the Ecotopian EarthCare card game' }
+  ];
+  function isCardGame(item) {
+    return String(item.photoPath || '').slice(0, 12) === 'static:game/';
+  }
+
+  function renderMerch() {
+    var grid = document.getElementById('shopGrid');
+    if (!MERCH.length) {
+      grid.innerHTML = '<p class="shop-empty">The shop is being stocked. Check back soon.</p>';
+      return;
+    }
+    grid.innerHTML = MERCH.map(function (m) {
+      var src = shopPhotoSrc(m.photoPath);
+      var photo = src
+        ? '<img class="shop-photo" src="' + esc(src) + '" alt="' + esc(m.name) + '" loading="lazy" width="640" height="480">'
+        : '';
+      var thumbs = isCardGame(m)
+        ? '<div class="shop-thumbs">' + GAME_THUMBS.map(function (t) {
+            return '<img src="' + esc(t.src) + '" alt="' + esc(t.alt) + '" loading="lazy" width="681" height="900">';
+          }).join('') + '</div>'
+        : '';
+      var meta = '';
+      if (m.priceText || m.statusText) {
+        meta = '<div class="shop-meta">' +
+          (m.priceText ? '<span class="shop-price">' + esc(m.priceText) + '</span>' : '') +
+          (m.statusText ? '<span class="shop-status">' + esc(m.statusText) + '</span>' : '') +
+          '</div>';
+      }
+      var cta = validLink(m.linkUrl)
+        ? '<a class="shop-cta" href="' + esc(m.linkUrl.trim()) + '" target="_blank" rel="noopener">Buy</a>'
+        : '<button type="button" class="shop-cta" data-id="' + esc(m.id) + '">Pre-order / Ask about this</button>';
+      return '<article class="shop-card reveal">' +
+        photo +
+        '<h3>' + esc(m.name) + '</h3>' +
+        (m.blurb ? '<p class="shop-blurb">' + esc(m.blurb) + '</p>' : '') +
+        thumbs +
+        meta +
+        cta +
+        '</article>';
+    }).join('');
+    grid.querySelectorAll('.shop-cta[data-id]').forEach(function (btn) {
+      btn.addEventListener('click', function () { openInquiry(btn.getAttribute('data-id')); });
+    });
+    EcoSite.decorate();
+  }
+
+  // ── Modal shell (page-local, styled with .eco-lead-* classes) ────────────
+  var lastFocused = null;
+  function ensureModal() {
+    if (document.getElementById('shopOverlay')) return;
+    var overlay = document.createElement('div');
+    overlay.className = 'eco-lead-overlay';
+    overlay.id = 'shopOverlay';
+    overlay.innerHTML =
+      '<div class="eco-lead-modal" role="dialog" aria-modal="true" aria-labelledby="shopModalTitle">' +
+        '<button type="button" class="eco-lead-close" id="shopModalClose" aria-label="Close">&times;</button>' +
+        '<div class="eco-lead-body" id="shopModalBody"></div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) closeModal(); });
+    document.getElementById('shopModalClose').addEventListener('click', closeModal);
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && overlay.classList.contains('open')) closeModal();
+    });
+  }
+  function showModal() {
+    var overlay = document.getElementById('shopOverlay');
+    lastFocused = document.activeElement;
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    var first = overlay.querySelector('input, select, textarea, button.eco-lead-primary');
+    if (first) first.focus();
+  }
+  function closeModal() {
+    var overlay = document.getElementById('shopOverlay');
+    if (!overlay) return;
+    overlay.classList.remove('open');
+    document.body.style.overflow = '';
+    if (lastFocused && lastFocused.focus) { try { lastFocused.focus(); } catch (e) { /* ignore */ } }
+    lastFocused = null;
+  }
+
+  // ── Pre-order / ask modal ────────────────────────────────────────────────
+  // Name required; email OR phone required; quantity 1-5; optional note. Anon
+  // fire-and-forget to intake_submissions (service_type 'merch') + jobs (inquiry).
+  function openInquiry(id) {
+    var item = MERCH_BY_ID[id];
+    if (!item) return; // allowlist: only known merch ids
+    ensureModal();
+    var body = document.getElementById('shopModalBody');
+    var qtyOpts = [1, 2, 3, 4, 5].map(function (n) {
+      return '<option value="' + n + '">' + n + '</option>';
+    }).join('');
+    body.innerHTML =
+      '<p class="eco-lead-eyebrow">Pre-order or ask</p>' +
+      '<h2 id="shopModalTitle">' + esc(item.name) + '</h2>' +
+      (item.priceText ? '<p class="eco-lead-tinynote">' + esc(item.priceText) + '. Nothing is charged online; we will reach out to arrange it.</p>'
+        : '<p class="eco-lead-tinynote">Nothing is charged online; we will reach out to arrange it.</p>') +
+      '<form id="shopForm" novalidate>' +
+        '<div class="eco-lead-grid">' +
+          '<div class="eco-lead-field eco-lead-full"><label for="sh-name">Name <span class="req">*</span></label>' +
+            '<input type="text" id="sh-name" placeholder="Full name"></div>' +
+          '<div class="eco-lead-field"><label for="sh-email">Email</label>' +
+            '<input type="email" id="sh-email" placeholder="email@example.com"></div>' +
+          '<div class="eco-lead-field"><label for="sh-phone">Phone</label>' +
+            '<input type="tel" id="sh-phone" placeholder="(814) 555-0000"></div>' +
+          '<div class="eco-lead-field"><label for="sh-qty">Quantity</label>' +
+            '<select id="sh-qty">' + qtyOpts + '</select></div>' +
+          '<div class="eco-lead-field eco-lead-full"><label for="sh-note">Anything to add?</label>' +
+            '<textarea id="sh-note" placeholder="Optional. A question, a delivery preference, anything else."></textarea></div>' +
+        '</div>' +
+        '<p class="eco-lead-tinynote">Add an email or a phone number so we can reach you.</p>' +
+        '<p class="eco-lead-error" id="shopModalError"></p>' +
+        '<button type="submit" class="eco-lead-primary">Send</button>' +
+      '</form>';
+    document.getElementById('shopForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      submitInquiry(item);
+    });
+    showModal();
+  }
+
+  async function submitInquiry(item) {
+    var errEl = document.getElementById('shopModalError');
+    errEl.textContent = '';
+    var name = (document.getElementById('sh-name').value || '').trim();
+    var email = (document.getElementById('sh-email').value || '').trim();
+    var phone = (document.getElementById('sh-phone').value || '').trim();
+    var note = (document.getElementById('sh-note').value || '').trim();
+    var qty = parseInt(document.getElementById('sh-qty').value, 10);
+    if (!(qty >= 1 && qty <= 5)) qty = 1;
+    if (!name) { errEl.textContent = 'Please add your name.'; return; }
+    if (!email && !phone) {
+      errEl.textContent = 'Please add an email or a phone number so we can reach you.';
+      return;
+    }
+    var pref = (email && !phone) ? 'email' : 'phone';
+    var descr = 'Shop item: ' + item.name +
+      (item.priceText ? ' (' + item.priceText + ')' : '') +
+      '\nQuantity: ' + qty +
+      '\nContact: ' + (phone || '(no phone)') + (email ? ' / ' + email : '') +
+      (note ? '\nMessage: ' + note : '') +
+      '\nNothing charged online.';
+    var notes = 'Submitted via shop page.\n\n' + descr;
+    try {
+      var ins1 = await sb().from('intake_submissions').insert({
+        name: name, phone: phone, email: email, address: '',
+        service_type: 'merch', size: qty + ' units', description: descr,
+        contact_preference: pref, submitted_at: new Date().toISOString()
+      });
+      if (ins1.error) throw new Error(ins1.error.message);
+      var ins2 = await sb().from('jobs').insert({
+        status: 'inquiry',
+        title: item.name + ' Order Request',
+        client_name: name,
+        address: '',
+        type: 'merch',
+        notes: notes,
+        activity_log: [{ ts: new Date().toISOString(), note: 'Received via shop page.' }]
+      });
+      if (ins2.error) throw new Error(ins2.error.message);
+      showSuccess('Thanks, we got it.', 'We will reach out to arrange your order. Nothing is charged online.');
+    } catch (err) {
+      errEl.textContent = 'Something went wrong sending your request. Please try again, or email us at admin@ecotopianearthcare.com or call 814-631-5338.';
+    }
+  }
+
+  function showSuccess(title, sub) {
+    var body = document.getElementById('shopModalBody');
+    body.innerHTML =
+      '<div class="eco-lead-success">' +
+        '<div class="eco-lead-check" aria-hidden="true">✓</div>' +
+        '<h2 id="shopModalTitle">' + esc(title) + '</h2>' +
+        '<p>' + esc(sub) + '</p>' +
+        '<button type="button" class="eco-lead-primary" id="shopModalDone">Close</button>' +
+      '</div>';
+    var done = document.getElementById('shopModalDone');
+    done.addEventListener('click', closeModal);
+    done.focus();
+  }
+
+  // ── Init ─────────────────────────────────────────────────────────────────
+  async function loadAndRender() {
+    try {
+      MERCH = await loadMerch();
+      MERCH_BY_ID = {};
+      MERCH.forEach(function (m) { MERCH_BY_ID[m.id] = m; });
+      renderMerch();
+    } catch (e) {
+      document.getElementById('shopGrid').innerHTML =
+        '<p class="shop-empty">The shop is updating. Check back soon.</p>';
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    EcoSite.renderNav('shop');
+    loadAndRender();
+    EcoSite.decorate();
+  });
+})();
+</script>
+<!-- Bag Carriers thin powered-by footer (locked attribution component) -->
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Libre+Baskerville:ital@1&display=swap" rel="stylesheet">
+<style>
+.bc-thinfoot {
+  --bc-ink:#0a0c10; --bc-bone:#f0ece4; --bc-sienna:#7a4520; --bc-muted:#8a8172;
+  flex: 0 0 auto;
+  background:var(--bc-ink);
+  font-family:'Bebas Neue',sans-serif;
+  padding:12px 20px;
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  border-top:2px solid var(--bc-sienna);
+  text-align:center;
+}
+.bc-thinfoot__label {
+  font-family:'Libre Baskerville',serif; font-style:italic;
+  font-size:11px; letter-spacing:.02em; color:var(--bc-muted);
+}
+.bc-thinfoot__mark {
+  font-family:'Bebas Neue',sans-serif; letter-spacing:.08em;
+  font-size:15px; line-height:1; color:var(--bc-bone);
+  text-decoration:none;
+}
+.bc-thinfoot__mark:hover { opacity:.85; }
+.bc-thinfoot__mark .bc-systems { color:var(--bc-sienna); }
+.bc-thinfoot__mark .bc-dot { color:var(--bc-sienna); }
+</style>
+<footer class="bc-thinfoot">
+  <span class="bc-thinfoot__label">Powered by</span>
+  <a class="bc-thinfoot__mark" href="https://bagcarriers.com/systems" target="_blank" rel="noopener">
+    BAG CARRIERS <span class="bc-systems">SYSTEMS</span><span class="bc-dot">.</span>
+  </a>
+</footer>
+</body>
+</html>

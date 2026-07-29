@@ -438,6 +438,122 @@ first, then the row. New rows get `sort = max(existing) + 10`. Data helpers live
 `addPlantSpecies` / `updatePlantSpecies` / `deletePlantSpecies` (and the kit equivalents),
 plus `plantPhotoUrl` for gallery-bucket paths.
 
+## Public questions ("Ask us anything")
+
+Migration `0020_questions.sql` adds `public.questions`, a public "Ask us anything"
+form that feeds a staff inbox. Applied live via the Management API, so register it
+with `supabase migration repair --status applied 0020` before any `supabase db push`.
+
+Table `public.questions` columns:
+
+| column       | notes                                                            |
+| ------------ | ---------------------------------------------------------------- |
+| `name`       | optional                                                        |
+| `email`      | optional (encouraged, so staff can answer directly)              |
+| `question`   | required                                                        |
+| `answer`     | staff-entered answer (nullable)                                  |
+| `status`     | `new` (default) / `answered` / `published` / `dismissed` (CHECK) |
+| `created_at` | default `now()`                                                 |
+| `updated_at` | maintained by the shared `set_updated_at` trigger                |
+
+`status = 'published'` is reserved for a FUTURE public Q&A built from answered
+questions. There is **no public (anon) read policy yet** - marking a question
+published only sets the status today; it does not expose it publicly.
+
+RLS: `anon` may INSERT only (`qs_anon_ins`, `with check (true)`), matching the
+return=minimal insert pattern so no anon read policy is needed; everything else
+(read, answer, status updates, delete) is staff-only (`qs_staff_all`,
+`authenticated` + `is_portal_user()`).
+
+Where things live:
+
+- Public form: `questions.html` (marketing-branded, `EcoSite.renderNav(null)`, loads
+  `data.js` with no auth). Fields: question (textarea, required), name (optional),
+  email (optional, encouraged). Submits through `DataStore.submitQuestion` (anon
+  fire-and-forget, no `.id` reads). Success note mentions a future Q&A.
+- Entry points: the homepage "Ask a question" band (green callout near the volunteer
+  band) and an "Ask a question" link in the "Get involved" footer on every marketing
+  page. The public nav is deliberately NOT extended (it is already crowded).
+- Staff inbox: `question-inbox.html` (the "Questions" nav link after Grant Finder).
+  Groups questions by status (new first, then answered, published, dismissed). Each
+  card shows the question, a name/email line (mailto when an email is present), the
+  date, an Answer textarea (Save marks it `answered`), and Mark published / Dismiss /
+  Delete (confirm) actions. Every anon-submitted string is `esc()`'d (stored-XSS class).
+- `dashboard.html` "Needs attention" surfaces an "N new question(s)" item
+  (`status = 'new'` count) linking `question-inbox.html`.
+
+Data helpers (`assets/data.js`): `submitQuestion` (anon), plus staff `getQuestions`
+(`created_at` desc), `updateQuestion(id, ch)`, `deleteQuestion(id)`.
+
+## Shop (non-plant merch)
+
+Migration `0021_merch.sql` adds `public.merch_items`, the catalog behind the standalone
+Shop page. The card game moved out of the Native Plants page (`plants.html`) and into
+this shop as the first item. Applied live via the Management API, so register it with
+`supabase migration repair --status applied 0021` before any `supabase db push`.
+
+Table `public.merch_items` columns:
+
+| column        | notes                                                             |
+| ------------- | ----------------------------------------------------------------- |
+| `name`        | required                                                         |
+| `blurb`       | optional description                                             |
+| `price_text`  | free text ("US $40", "From $15")                                  |
+| `status_text` | free text ("Pre-order", "In stock", "Coming soon")                |
+| `photo_path`  | `static:<path>` repo asset, or a gallery-bucket object (see below) |
+| `link_url`    | optional external buy link; the public card renders it ONLY when it starts with `https://` |
+| `sort`        | integer, ascending                                              |
+| `active`      | boolean; anon sees active only                                   |
+| `created_at`  | default `now()`                                                 |
+| `updated_at`  | maintained by the shared `set_updated_at` trigger                |
+
+RLS: `mi_anon_read` lets anon SELECT only `active` rows; `mi_staff_all` gives
+authenticated portal users full CRUD (and their reads return inactive rows too).
+Carries the shared `set_updated_at` trigger.
+
+Photo convention (rooted at `assets/img/`, subdirectories allowed):
+
+- `static:<path>` -> a repo static asset served from `assets/img/<path>`. The path may
+  contain subdirectories; each segment is charset-guarded (`/^[A-Za-z0-9._-]+$/`) and
+  `..` is rejected, so it cannot escape `assets/img/`. The seeded card game uses
+  `static:game/game-playing.jpg` (the four card-art files stay in `assets/img/game/`;
+  they were NOT moved). Static assets are never touched in storage on delete or replace.
+- any other value -> a gallery-bucket object served via its public URL. Staff photo
+  uploads on `manage-shop.html` go through `DataStore.resizeImage` (long edge <= 1600px,
+  JPEG q0.85) and land in the `gallery` bucket under `shop/<uuid>.jpg` (the existing
+  `gallery_staff_all` object policy covers these writes; public bucket read serves them).
+
+Seed: the card game was seeded via the Management API as the first item
+(`name = 'Ecotopian EarthCare: The Card Game'`, blurb from the old plants.html copy,
+`price_text = 'US $40'`, `status_text = 'Pre-order'`, `photo_path =
+'static:game/game-playing.jpg'`).
+
+Where things live:
+
+- Public page: `shop.html` (marketing-branded, `EcoSite.renderNav('shop')`; "Shop" is
+  in the public nav between Native Plants and Events, and in the "Explore" footer). It
+  reads active rows over anon (ordered `sort` then name) with a parity guard so a
+  signed-in staff JWT never leaks inactive rows onto the public grid. Each card shows the
+  photo, name, blurb, price, and a status chip. CTA: if `link_url` is `https://`, a "Buy"
+  link (new tab); otherwise a "Pre-order / Ask about this" button opens a modal
+  (name required; email OR phone required; quantity 1-5; optional note). On submit it does
+  two anon inserts, mirroring the plants flows: an `intake_submissions` row
+  (`service_type = 'merch'`) and a `jobs` row (`status = 'inquiry'`, title
+  `"<item> Order Request"`, type `merch`, activity log "Received via shop page."). The card
+  game entry (a `static:game/...` photo) also renders three hardcoded card-art thumbnails.
+- The card game section was removed from `plants.html`; a small cross-link in the intro
+  ("Looking for the card game? It moved to our new Shop.") points at `shop.html`.
+- Staff page: `manage-shop.html` (the "Shop" nav link after Plants). A single compact list
+  (thumb, name, price, status chip, Live/Hidden pill, external-link note) with up/down
+  arrows that swap `sort` values, an Edit modal (name, blurb, price, status, https-validated
+  buy link, photo upload), Add item, Deactivate/Reactivate, and Delete (confirm; a
+  gallery-bucket photo object is removed best-effort first, never a `static:` asset). New
+  rows get `sort = max(existing) + 10`.
+
+Data helpers (`assets/data.js`): `getMerchItems` (staff read, inactive included, ordered
+`sort` then name), `addMerchItem` / `updateMerchItem` / `deleteMerchItem(id, photoPath)`,
+plus `merchPhotoUrl` for gallery-bucket paths.
+
 ## Deploy
 
 The site is a static bundle deployed to Netlify:

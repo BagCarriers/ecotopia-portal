@@ -13,11 +13,13 @@ const Nav = (() => {
     { href: 'gallery.html',    label: 'Gallery',     icon: '📷' },
     { href: 'manage-services.html', label: 'Services', icon: '🛠' },
     { href: 'manage-plants.html', label: 'Plants', icon: '🌼' },
+    { href: 'manage-shop.html', label: 'Shop', icon: '🛍' },
     { href: 'calendar.html',   label: 'Calendar',    icon: '🗓'  },
     { href: 'invoices.html',   label: 'Invoices',    icon: '💵' },
     { href: 'quotes.html',     label: 'Quotes',      icon: '📄' },
     { href: 'grants.html',     label: 'Grants',      icon: '🏛'  },
     { href: 'grant-finder.html', label: 'Grant Finder', icon: '🔎' },
+    { href: 'question-inbox.html', label: 'Questions', icon: '❓' },
     { href: 'reports.html',    label: 'Reports',     icon: '📊' },
   ];
 

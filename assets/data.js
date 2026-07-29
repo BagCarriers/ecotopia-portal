@@ -275,6 +275,41 @@ const DataStore = (() => {
     plantPhotoUrl: (photoPath) =>
       sb.storage.from('gallery').getPublicUrl(photoPath).data.publicUrl, // sync
 
+    // Public questions (anon "Ask us anything" -> staff inbox). Anon inserts use
+    // return=minimal (submit) so no anon select policy is needed; reads, answers,
+    // status updates, and deletes are staff-only (authenticated + is_portal_user).
+    // Status flow: new -> answered / published / dismissed. 'published' is reserved
+    // for a future public Q&A (there is no public read policy yet).
+    submitQuestion: (r) => submit('questions', r),
+    getQuestions: async () =>
+      fromDbAll(unwrap(await sb.from('questions').select('*')
+        .order('created_at', { ascending: false }))),
+    updateQuestion: (id, ch) => update('questions', id, ch),
+    deleteQuestion: async (id) => {
+      unwrap(await sb.from('questions').delete().eq('id', id));
+    },
+
+    // Merch catalog (non-plant shop items). The public shop.html reads active rows
+    // directly over anon (RLS scopes it); these staff methods use the authenticated
+    // policy, which returns inactive rows too, so the portal can manage hidden items.
+    // Photo uploads land in the gallery bucket under shop/<uuid>.jpg; 'static:<path>'
+    // photo_paths are repo assets (assets/img/) and are never touched in storage.
+    getMerchItems: async () =>
+      fromDbAll(unwrap(await sb.from('merch_items').select('*')
+        .order('sort', { ascending: true }).order('name', { ascending: true }))),
+    addMerchItem: (r) => insert('merch_items', r),
+    updateMerchItem: (id, ch) => update('merch_items', id, ch),
+    deleteMerchItem: async (id, photoPath) => {
+      if (photoPath && String(photoPath).slice(0, 7) !== 'static:') {
+        try { await sb.storage.from('gallery').remove([photoPath]); } catch (e) { /* ignore */ }
+      }
+      unwrap(await sb.from('merch_items').delete().eq('id', id));
+    },
+    // Public URL for a gallery-bucket merch photo (NOT the 'static:' repo-asset form,
+    // which resolves to a local path without touching storage).
+    merchPhotoUrl: (photoPath) =>
+      sb.storage.from('gallery').getPublicUrl(photoPath).data.publicUrl, // sync
+
     // Sync utilities (unchanged from the demo version)
     esc(v) {
       if (v == null) return '';

@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Questions - Ecotopia</title>
+  <link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/mapping.js"></script>
+<script src="assets/auth.js"></script>
+<script>if (!AuthManager.hasCachedSession()) location.replace('login.html');</script>
+<script src="assets/data.js"></script>
+<script src="assets/nav.js"></script>
+<style>
+  :root {
+    --forest: #1B4332; --forest-mid: #2D6A4F; --forest-light: #52B788;
+    --sage: #D8F3DC; --sage-dim: #B7E4C7; --earth: #8B5E3C;
+    --earth-light: #C68642; --gold: #F4A261; --cream: #F9F6F0;
+    --cream-dim: #E8E0D5; --text: #1C1C1C; --text-dim: #5A5A5A;
+    --border: rgba(45,106,79,0.2); --amber: #B8730A; --amber-bg: #FDF0DA;
+    --blue: #1d4ed8; --blue-bg: #dbeafe;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--text); }
+  .page { padding: 28px 32px; max-width: 900px; }
+  .page-header { margin-bottom: 6px; }
+  h1 { font-family: 'Fraunces', serif; font-size: 1.9rem; color: var(--forest); }
+  .page-intro { font-size: 0.9rem; color: var(--text-dim); margin-bottom: 22px;
+    max-width: 680px; line-height: 1.6; }
+
+  .btn-sm { font-size: 0.78rem; padding: 6px 12px; background: transparent;
+    border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
+    color: var(--text-dim); font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+  .btn-sm:hover { color: var(--forest); border-color: var(--forest-light); background: var(--sage); }
+  .btn-sm.btn-primary { background: var(--forest); color: #fff; border-color: var(--forest); }
+  .btn-sm.btn-primary:hover { background: var(--forest-mid); color: #fff; }
+  .btn-sm.btn-danger { color: #b3261e; }
+  .btn-sm.btn-danger:hover { color: #fff; background: #b3261e; border-color: #b3261e; }
+
+  .group-h { font-family: 'Fraunces', serif; font-size: 1.15rem; color: var(--forest);
+    margin: 26px 0 12px; display: flex; align-items: center; gap: 10px; }
+  .group-h .count { font-family: 'DM Sans', sans-serif; font-size: 0.8rem; color: var(--text-dim);
+    font-weight: 600; }
+  .group-h:first-of-type { margin-top: 8px; }
+
+  .q-list { display: flex; flex-direction: column; gap: 12px; }
+  .q-card { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+  .q-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 8px; }
+  .status-pill { display: inline-block; padding: 2px 10px; border-radius: 20px;
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+  .status-new { background: var(--blue-bg); color: var(--blue); }
+  .status-answered { background: var(--sage); color: var(--forest); }
+  .status-published { background: #ede9fe; color: #6d28d9; }
+  .status-dismissed { background: var(--cream-dim); color: var(--text-dim); }
+  .q-date { font-size: 0.78rem; color: var(--text-dim); margin-left: auto; }
+  .q-who { font-size: 0.82rem; color: var(--text-dim); margin-bottom: 8px; }
+  .q-who a { color: var(--forest-mid); text-decoration: none; }
+  .q-who a:hover { text-decoration: underline; }
+  .q-text { font-size: 0.98rem; line-height: 1.55; white-space: pre-wrap; word-break: break-word;
+    background: var(--cream); border-radius: 8px; padding: 12px 14px; margin-bottom: 12px; }
+  .q-answer-existing { font-size: 0.9rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
+    background: var(--sage); border-radius: 8px; padding: 10px 14px; margin-bottom: 12px; }
+  .q-answer-existing b { display: block; font-size: 0.72rem; text-transform: uppercase;
+    letter-spacing: 0.04em; color: var(--forest); margin-bottom: 4px; }
+  .q-answer label { display: block; font-size: 0.74rem; font-weight: 600; color: var(--text-dim);
+    margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .q-answer textarea { width: 100%; padding: 9px 11px; border-radius: 7px; border: 1.5px solid var(--border);
+    font-size: 0.9rem; font-family: 'DM Sans', sans-serif; color: var(--text); background: #fff;
+    min-height: 66px; resize: vertical; }
+  .q-answer textarea:focus { outline: none; border-color: var(--forest-light); }
+  .q-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+  .q-actions .spacer { flex: 1; }
+
+  .empty { padding: 40px 16px; color: var(--text-dim); font-size: 0.95rem; text-align: center; }
+  #pageError { color: #b3261e; font-size: 0.85rem; margin-bottom: 14px; }
+  #pageError:empty { display: none; }
+
+  @media (max-width: 700px) {
+    .page { padding: 20px 16px; }
+    .q-date { margin-left: 0; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="page-header">
+    <h1>Questions</h1>
+  </div>
+  <p class="page-intro">Public questions from the "Ask us anything"
+    (<a href="questions.html" target="_blank" rel="noopener">questions</a>) page. Answer one to mark it
+    answered, mark it published to earmark it for a future public Q&amp;A, dismiss the ones that need no
+    reply, or delete. New questions are shown first.</p>
+
+  <div id="pageError"></div>
+  <div id="inbox"><div class="empty">Loading…</div></div>
+</div>
+
+<script>
+const esc = DataStore.esc;
+
+// Group order + labels. 'new' first, then answered, published, dismissed.
+const GROUPS = [
+  { key: 'new',       label: 'New' },
+  { key: 'answered',  label: 'Answered' },
+  { key: 'published', label: 'Published (future Q&A)' },
+  { key: 'dismissed', label: 'Dismissed' },
+];
+const STATUS_ALLOW = { new: 1, answered: 1, published: 1, dismissed: 1 };
+
+let questions = [];
+
+function whoLine(q) {
+  const name = (q.name || '').trim();
+  const email = (q.email || '').trim();
+  if (!name && !email) return 'Anonymous';
+  let out = name ? esc(name) : 'No name given';
+  if (email) {
+    out += ' · <a href="mailto:' + encodeURIComponent(email) + '">' + esc(email) + '</a>';
+  } else {
+    out += ' · no email';
+  }
+  return out;
+}
+
+function card(q) {
+  const cls = STATUS_ALLOW[q.status] ? q.status : 'new';
+  const answered = (q.answer || '').trim();
+  const existing = answered
+    ? '<div class="q-answer-existing"><b>Answer on file</b>' + esc(answered) + '</div>'
+    : '';
+  return `
+    <div class="q-card">
+      <div class="q-top">
+        <span class="status-pill status-${cls}">${esc(GROUPS.find(g => g.key === cls).label)}</span>
+        <span class="q-date">${esc(DataStore.formatDate(q.createdAt))}</span>
+      </div>
+      <div class="q-who">${whoLine(q)}</div>
+      <div class="q-text">${esc(q.question)}</div>
+      ${existing}
+      <div class="q-answer">
+        <label for="ans_${esc(q.id)}">Answer</label>
+        <textarea id="ans_${esc(q.id)}" placeholder="Write an answer (saving marks this question answered)…">${esc(answered)}</textarea>
+      </div>
+      <div class="q-actions">
+        <button class="btn-sm btn-primary" onclick="saveAnswer('${esc(q.id)}')">Save answer</button>
+        <button class="btn-sm" onclick="setStatus('${esc(q.id)}','published')">Mark published</button>
+        <button class="btn-sm" onclick="setStatus('${esc(q.id)}','dismissed')">Dismiss</button>
+        <span class="spacer"></span>
+        <button class="btn-sm btn-danger" onclick="removeQuestion('${esc(q.id)}')">Delete</button>
+      </div>
+    </div>`;
+}
+
+function render() {
+  const el = document.getElementById('inbox');
+  if (!questions.length) {
+    el.innerHTML = '<div class="empty">No questions yet. When someone asks on the public page, it lands here.</div>';
+    return;
+  }
+  let html = '';
+  GROUPS.forEach(g => {
+    const rows = questions.filter(q => (STATUS_ALLOW[q.status] ? q.status : 'new') === g.key);
+    if (!rows.length) return;
+    html += `<h2 class="group-h">${esc(g.label)} <span class="count">${rows.length}</span></h2>` +
+      '<div class="q-list">' + rows.map(card).join('') + '</div>';
+  });
+  el.innerHTML = html;
+}
+
+function questionById(id) { return questions.find(q => q.id === id); }
+
+async function saveAnswer(id) {
+  const q = questionById(id);
+  if (!q) return;
+  const errEl = document.getElementById('pageError');
+  errEl.textContent = '';
+  const ta = document.getElementById('ans_' + id);
+  const answer = (ta ? ta.value : '').trim();
+  if (!answer) { errEl.textContent = 'Write an answer before saving, or use Dismiss.'; return; }
+  try {
+    await DataStore.updateQuestion(id, { answer, status: 'answered' });
+    await load();
+  } catch (err) {
+    errEl.textContent = 'Could not save the answer. ' + err.message;
+  }
+}
+
+async function setStatus(id, status) {
+  if (!STATUS_ALLOW[status]) return;
+  const errEl = document.getElementById('pageError');
+  errEl.textContent = '';
+  try {
+    await DataStore.updateQuestion(id, { status });
+    await load();
+  } catch (err) {
+    errEl.textContent = 'Could not update. ' + err.message;
+  }
+}
+
+async function removeQuestion(id) {
+  const q = questionById(id);
+  if (!q) return;
+  if (!confirm('Delete this question permanently?')) return;
+  const errEl = document.getElementById('pageError');
+  errEl.textContent = '';
+  try {
+    await DataStore.deleteQuestion(id);
+    await load();
+  } catch (err) {
+    errEl.textContent = 'Could not delete. ' + err.message;
+  }
+}
+
+async function load() {
+  questions = await DataStore.getQuestions();
+  render();
+}
+
+(async function init() {
+  try {
+    await AuthManager.requireAuth();
+    Nav.render();
+    await load();
+  } catch (err) {
+    document.getElementById('inbox').innerHTML =
+      '<div class="empty">Could not load questions (' + esc(err.message) +
+      '). <a href="javascript:location.reload()">Retry</a></div>';
+  }
+})();
+</script>
+
+<!-- Bag Carriers thin powered-by footer (locked attribution component) -->
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Libre+Baskerville:ital@1&display=swap" rel="stylesheet">
+<style>
+.bc-thinfoot {
+  --bc-ink:#0a0c10; --bc-bone:#f0ece4; --bc-sienna:#7a4520; --bc-muted:#8a8172;
+  flex: 0 0 auto;
+  background:var(--bc-ink);
+  font-family:'Bebas Neue',sans-serif;
+  padding:12px 20px;
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  border-top:2px solid var(--bc-sienna);
+  text-align:center;
+}
+.bc-thinfoot__label {
+  font-family:'Libre Baskerville',serif; font-style:italic;
+  font-size:11px; letter-spacing:.02em; color:var(--bc-muted);
+}
+.bc-thinfoot__mark {
+  font-family:'Bebas Neue',sans-serif; letter-spacing:.08em;
+  font-size:15px; line-height:1; color:var(--bc-bone);
+  text-decoration:none;
+}
+.bc-thinfoot__mark:hover { opacity:.85; }
+.bc-thinfoot__mark .bc-systems { color:var(--bc-sienna); }
+.bc-thinfoot__mark .bc-dot { color:var(--bc-sienna); }
+</style>
+<footer class="bc-thinfoot">
+  <span class="bc-thinfoot__label">Powered by</span>
+  <a class="bc-thinfoot__mark" href="https://bagcarriers.com/systems" target="_blank" rel="noopener">
+    BAG CARRIERS <span class="bc-systems">SYSTEMS</span><span class="bc-dot">.</span>
+  </a>
+</footer>
+</body>
+</html>
