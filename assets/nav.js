@@ -57,6 +57,7 @@ const Nav = (() => {
         font-family: 'DM Sans', sans-serif;
       }
       #eco-sidebar .sidebar-logo {
+        display: block; color: inherit; text-decoration: none;
         padding: 24px 20px 16px;
         font-family: 'Fraunces', serif;
         font-size: 1.3rem; font-weight: 700;
@@ -154,7 +155,7 @@ const Nav = (() => {
     const sidebar = document.createElement('div');
     sidebar.id = 'eco-sidebar';
     sidebar.innerHTML = `
-      <div class="sidebar-logo">🌿 Ecotopia</div>
+      <a class="sidebar-logo" href="index.html" title="View the public website">🌿 Ecotopia</a>
       <nav>
         ${links.map(l => `
           <a href="${l.href}" class="${isActive(l.href) ? 'active' : ''}">

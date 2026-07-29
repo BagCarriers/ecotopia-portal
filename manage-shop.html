@@ -413,6 +413,8 @@ async function load() { items = await DataStore.getMerchItems(); render(); }
 <!-- Bag Carriers thin powered-by footer (locked attribution component) -->
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Libre+Baskerville:ital@1&display=swap" rel="stylesheet">
 <style>
+body { min-height: 100vh; display: flex; flex-direction: column; }
+.bc-thinfoot { margin-top: auto; }
 .bc-thinfoot {
   --bc-ink:#0a0c10; --bc-bone:#f0ece4; --bc-sienna:#7a4520; --bc-muted:#8a8172;
   flex: 0 0 auto;
