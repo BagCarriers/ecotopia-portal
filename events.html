@@ -199,6 +199,12 @@
       <div class="form-group"><label>Description</label>
         <textarea id="ee_desc" rows="3" placeholder="Event details…"
           style="width:100%;padding:9px 11px;border-radius:7px;border:1.5px solid var(--border);font-size:0.875rem;font-family:'DM Sans',sans-serif;"></textarea></div>
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0">
+          <input type="checkbox" id="ee_public" style="width:auto">
+          Published on the public Events page
+        </label>
+      </div>
       <div class="form-group"><label>Volunteer Count Target</label>
         <input type="number" id="ee_vol_count" min="0" placeholder="e.g. 10"
           style="width:100%;padding:9px 11px;border-radius:7px;border:1.5px solid var(--border);font-size:0.875rem;font-family:'DM Sans',sans-serif;"></div>
@@ -300,7 +306,9 @@ function renderEvents() {
         ${ev.photoPath ? `<img class="event-photo" src="${esc(DataStore.eventPhotoUrl(ev.photoPath))}" loading="lazy" alt="">` : ''}
         <div class="event-info">
           <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:10px;">
-            <div class="event-title">${esc(ev.title)}</div>
+            <div class="event-title">${esc(ev.title)}${ev.isPublic === false
+              ? ' <span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:20px;font-size:0.68rem;font-weight:600;vertical-align:middle">INTERNAL</span>'
+              : ''}</div>
             <button class="btn-edit" onclick="openEditEvent('${ev.id}')">✏️ Edit</button>
           </div>
           <span class="event-type-pill type-${ev.type}">${typeLabel(ev.type)}</span>
@@ -361,6 +369,7 @@ document.getElementById('eventFormEl').addEventListener('submit', async function
       type: document.getElementById('ev_type').value,
       description: document.getElementById('ev_desc').value.trim(),
       photoPath,
+      isPublic: true,
       openSignup: true, signups: []
     });
     events = await DataStore.getEvents();
@@ -415,6 +424,7 @@ function openEditEvent(id) {
   document.getElementById('ee_date').value = ev.date || '';
   document.getElementById('ee_location').value = ev.location || ev.gardenName || '';
   document.getElementById('ee_desc').value = ev.description || '';
+  document.getElementById('ee_public').checked = ev.isPublic !== false;
   document.getElementById('ee_vol_count').value = ev.volunteerCount || '';
   editPhotoFile = null;
   editPhotoRemove = false;
@@ -446,7 +456,8 @@ document.getElementById('editEventForm').addEventListener('submit', async functi
     location: document.getElementById('ee_location').value.trim(),
     gardenName: document.getElementById('ee_location').value.trim(),
     description: document.getElementById('ee_desc').value.trim(),
-    volunteerCount: parseInt(document.getElementById('ee_vol_count').value) || null
+    volunteerCount: parseInt(document.getElementById('ee_vol_count').value) || null,
+    isPublic: document.getElementById('ee_public').checked
   };
   let newPath = null; // uploaded this save (for cleanup / old-object removal)
   if (editPhotoFile) {

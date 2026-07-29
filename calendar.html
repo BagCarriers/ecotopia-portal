@@ -267,6 +267,15 @@
       </div>
       <div class="form-group"><label>Description</label>
         <textarea id="cev_desc" rows="2" placeholder="Event details…"></textarea></div>
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:8px;text-transform:none;letter-spacing:0">
+          <input type="checkbox" id="cev_public" style="width:auto">
+          Publish to the public Events page
+        </label>
+        <div style="font-size:0.78rem;color:var(--text-dim);margin-top:4px">
+          Leave unchecked for internal scheduling: crew days, site visits, reminders.
+        </div>
+      </div>
       <div class="form-group"><label>Photo (optional)</label>
         <input type="file" id="cev_photo" accept="image/*" onchange="onNewPhotoChosen(this)">
         <div class="photo-preview" id="cev_photo_preview" style="display:none">
@@ -550,6 +559,7 @@ document.getElementById('calEventForm').addEventListener('submit', async functio
       type: document.getElementById('cev_type').value,
       description: document.getElementById('cev_desc').value.trim(),
       photoPath,
+      isPublic: document.getElementById('cev_public').checked,
       openSignup: true, signups: []
     });
     events = await DataStore.getEvents();

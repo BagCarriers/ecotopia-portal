@@ -320,7 +320,9 @@
     const { data, error } = await sb().from('events').select('*')
       .order('date', { ascending: true });
     if (error) throw new Error(error.message);
-    return map().fromDbAll(data);
+    // Parity guard: signed-in staff RLS also returns internal events; the
+    // public site must only ever show published ones.
+    return map().fromDbAll(data).filter((e) => e.isPublic !== false);
   }
 
   // Public URL for an event photo (same public gallery bucket, events/ prefix).

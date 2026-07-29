@@ -650,3 +650,12 @@ netlify deploy --prod --dir=.
 
 `supabase/seed-dev.sql` seeds demo data for local development only. NEVER run it
 against production.
+
+## Event visibility (2026-07-29)
+- `events.is_public` (default true). Anon RLS only returns public rows; site.js also
+  filters `isPublic !== false` for signed-in staff parity.
+- Calendar page "+ New Event" defaults INTERNAL (unchecked publish toggle) for crew
+  days / site visits / reminders. The Events page creates public events and can flip
+  visibility in its edit modal (INTERNAL pill shows on internal cards).
+- The calendar-feed ICS (Jordan's own Google subscription) intentionally includes
+  internal events; it is served by service role, not the anon policy.
