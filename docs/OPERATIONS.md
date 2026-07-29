@@ -212,6 +212,81 @@ Monthly, BagCarriers invoices the client (Open Sesame Designs LLC / Ecotopian
 EarthCare) for the accumulated fees; the YTD figure on `quotes.html` is the running
 tally. The legal entity printed on quotes is Open Sesame Designs LLC.
 
+## Public quote acceptance and deposits
+
+Migration `0022_quote_acceptance.sql` lets a client open a sent quote from a private
+link, accept it online, and see deposit instructions. Applied live via the Management
+API, so register it with `supabase migration repair --status applied 0022` before any
+`supabase db push`.
+
+New `public.quotes` columns: `share_token` (unique, nullable), `accepted_at`,
+`accepted_by`, and `deposit_status` (`unpaid` default / `pending` / `paid`, CHECK).
+
+**No anon table policy.** The public page never selects `quotes` directly. Two
+token-gated `security definer` RPCs (granted to `anon` + `authenticated`) are the only
+public entry points:
+
+- `get_quote_by_token(p_token)` -> returns the quote body plus `accepted_at`,
+  `accepted_by`, and `deposit_status`, but ONLY for quotes in status
+  `sent`/`accepted`/`invoiced` (drafts never resolve) whose token is >= 32 chars.
+  Returns no row for a missing/short/unknown token.
+- `accept_quote(p_token, p_name)` -> flips a still-`sent` quote to `accepted`, stamping
+  `accepted_at = now()` and `accepted_by = left(p_name, 200)`. Idempotent: it only acts
+  when `status = 'sent' and accepted_at is null`, and returns `true` only when THIS call
+  performed the acceptance (a second call returns `false`).
+
+Note: the `get_quote_by_token` signature returns two more columns than the original
+spec (`accepted_by`, `deposit_status`) so the public page can render the "Accepted by
+<name>" banner and the deposit panel. Both are safe to expose (a client's own typed
+name; a coarse paid/unpaid flag).
+
+Share token: generated on `quotes.html` as two dash-stripped `crypto.randomUUID()`
+values concatenated (64 hex chars). It is minted automatically the first time a quote
+is moved to `sent`, or on demand via the per-row "Share link" action (any non-draft
+quote). The public link is `https://ecotopia.bagcarriers.dev/quote-view.html?t=<token>`
+(shown in a copy-to-clipboard modal). `PUBLIC_BASE` lives at the top of `quotes.html`.
+
+Staff row surface (`quotes.html`): each row shows the acceptance state
+("Accepted by <name> on <date>") once accepted, a `Deposit: unpaid/pending/paid` pill
+(when the quote has a deposit), and a manual "Mark deposit paid" action
+(`deposit_status = 'paid'`). Jordan reconciles deposits by hand until a processor is
+wired; there is no automated payment capture yet.
+
+Public page (`quote-view.html`): a standalone, marketing-branded document (NO `auth.js`,
+`noindex`). It reads `?t=`, calls `get_quote_by_token`, and renders the branded quote
+(gold header, line-item table, quiet "Processing and administration" line above TOTAL,
+deposit + balance). Action panel by state:
+
+- `sent`: an "Accept this quote" button reveals a "Type your name to accept" input and a
+  confirm button that calls `accept_quote`, then re-fetches and shows the accepted state.
+- `accepted`/`invoiced`: a green "Accepted by <name> on <date>" banner, then a Deposit
+  panel (when `deposit > 0` and `deposit_status != 'paid'`) showing "Deposit due: $X" and
+  payment instructions; a paid deposit shows a "Deposit received" confirmation instead.
+- invalid/expired/unknown token: a friendly "This quote link is not available" screen with
+  the `814-631-5338` phone number.
+
+Every dynamic value (client name, line items, `accepted_by`) is `esc()`'d even though
+these are staff/DB strings, because the page renders them publicly.
+
+**Payment processor upgrade path (processor-agnostic).** Deposit instructions come from
+the `PAYMENT_CONFIG` const at the top of `quote-view.html`:
+
+```
+const PAYMENT_CONFIG = {
+  mode: 'manual',            // 'manual' | 'link'
+  payLinkTemplate: '',       // used only when mode === 'link'; {token} -> share token
+  instructions: 'Please mail a check payable to Open Sesame Designs LLC, ...',
+};
+```
+
+Today `mode: 'manual'` renders the mailing/site-visit instructions. When a processor is
+chosen, set `mode: 'link'` and `payLinkTemplate` to a checkout URL containing the literal
+`{token}` (replaced with the quote's share token at render time, e.g.
+`https://buy.stripe.com/...?client_reference_id={token}`); the deposit panel then renders
+a "Pay deposit online" button instead of the instructions. No other code change is needed.
+`deposit_status` (`pending`, `paid`) is already in the schema for a webhook/reconciliation
+step to flip.
+
 ## Volunteer hours certificate
 
 `volunteer-detail.html` has a "Print hours certificate" button with a range picker (last 30 / 90 / 365 days / all time) that opens the branded, printable `volunteer-hours-print.html?id=<volunteerId>&days=<N>` (days=0 means all recorded service); it lists the volunteer's check-ins (date, garden, task, hours) and a prominent total, plus an "Email it" mailto (save the PDF from the print dialog first, then attach it).

@@ -166,6 +166,17 @@ const DataStore = (() => {
         .eq('quote_year', year).in('status', ['sent', 'accepted', 'invoiced']));
       return (rows || []).reduce((sum, q) => sum + (Number(q.admin_fee) || 0), 0);
     },
+    // Public quote acceptance (anon-safe, token-gated RPCs; no anon table policy on
+    // quotes). getQuoteByToken resolves only sent/accepted/invoiced quotes (never
+    // drafts) and returns null for a missing/short/unknown token. acceptQuote flips a
+    // still-'sent' quote to 'accepted' and returns true only when THIS call did it (a
+    // second call returns false). Used by the public quote-view.html page.
+    getQuoteByToken: async (token) => {
+      const rows = unwrap(await sb.rpc('get_quote_by_token', { p_token: token }));
+      return rows && rows.length ? fromDb(rows[0]) : null;
+    },
+    acceptQuote: async (token, name) =>
+      unwrap(await sb.rpc('accept_quote', { p_token: token, p_name: name })),
 
     // Grants
     getGrants: () => list('grants'),

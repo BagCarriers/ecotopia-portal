@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Your Quote - Ecotopian EarthCare</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&family=Caveat:wght@600;700&display=swap" rel="stylesheet">
+<!-- Public page: NO auth.js and NO login redirect. It reaches quotes ONLY through the
+     anon, token-gated get_quote_by_token / accept_quote RPCs (data.js). -->
+<script src="assets/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/mapping.js"></script>
+<script src="assets/data.js"></script>
+<style>
+  :root {
+    --gold: #D4A83A; --gold-dim: #C89B2E; --navy: #1e3a5f; --rust: #9C4A32;
+    --olive: #4c5a2e; --paper: #ffffff; --ink-dim: #f7f2e6;
+    --green: #2D6A4F; --green-soft: #d1fae5; --green-ink: #065f46;
+    --text-dim: #5A5A5A;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Poppins', system-ui, sans-serif; background: #e7e2d6; color: var(--navy);
+    padding: 24px 16px; min-height: 100vh; display: flex; flex-direction: column; }
+
+  .wrap { max-width: 8.5in; margin: 0 auto; width: 100%; }
+
+  /* The document sheet (mirrors quote-print.html) */
+  .sheet { background: var(--paper); box-shadow: 0 10px 40px rgba(0,0,0,0.18); overflow: hidden;
+    border-radius: 4px; }
+  .head { background: var(--gold); position: relative; padding: 40px 44px 34px; display: flex;
+    justify-content: space-between; gap: 20px; }
+  .head-left { flex: 1; min-width: 0; }
+  .head h1 { font-size: 4.4rem; font-weight: 800; color: #fff; line-height: 0.9; letter-spacing: 0.01em;
+    margin-bottom: 14px; }
+  .meta { color: #fff; }
+  .meta .line { font-size: 0.98rem; margin-bottom: 7px; display: flex; gap: 8px; align-items: baseline;
+    flex-wrap: wrap; }
+  .meta .k { font-weight: 500; opacity: 0.92; }
+  .meta .v { font-weight: 700; font-size: 1.12rem; }
+  .art { width: 150px; height: 150px; flex-shrink: 0; border-radius: 6px; object-fit: cover;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.22); }
+  .chev { position: absolute; top: 0; bottom: 0; width: 30px;
+    background: repeating-linear-gradient(-45deg,
+      var(--olive) 0 8px, transparent 8px 12px, var(--rust) 12px 20px, transparent 20px 24px); }
+  .chev.left { left: 10px; }
+  .chev.right { right: 10px; }
+
+  .body { padding: 30px 44px 40px; }
+  .company { text-align: center; font-size: 1.7rem; font-weight: 800; color: var(--navy);
+    letter-spacing: 0.02em; margin-bottom: 22px; }
+
+  table.items { width: 100%; border-collapse: collapse; margin-bottom: 6px; }
+  table.items thead th { background: var(--gold); color: #fff; font-size: 0.82rem; font-weight: 700;
+    letter-spacing: 0.05em; padding: 12px 10px; text-align: center; }
+  table.items thead th.desc { text-align: left; padding-left: 16px; }
+  table.items tbody td { border: 1.5px solid var(--navy); padding: 16px 12px; font-size: 0.92rem;
+    font-weight: 600; color: var(--navy); text-align: center; vertical-align: middle; }
+  table.items tbody td.desc { text-align: left; text-transform: uppercase; letter-spacing: 0.02em; }
+  table.items tbody td.mat { text-transform: uppercase; font-size: 0.82rem; letter-spacing: 0.02em; }
+  table.items tbody td.amt { white-space: nowrap; }
+  .items-scroll { overflow-x: auto; }
+
+  .rule { height: 8px; background: var(--rust); border-radius: 4px; margin: 4px 0 22px; }
+
+  .totals { margin-left: auto; width: 100%; }
+  .totals .trow { display: flex; justify-content: space-between; align-items: baseline; padding: 5px 2px; }
+  .totals .lbl { font-weight: 700; letter-spacing: 0.03em; }
+  .trow.deposit .lbl, .trow.deposit .val { font-size: 1.35rem; }
+  .trow.admin { color: #7a7259; }
+  .trow.admin .lbl { font-weight: 500; font-size: 0.92rem; letter-spacing: 0.01em; }
+  .trow.admin .val { font-weight: 600; font-size: 0.92rem; }
+  .trow.total .lbl, .trow.total .val { font-size: 1.55rem; font-weight: 800; }
+  .trow.balance { border-top: 2px solid var(--navy); margin-top: 6px; padding-top: 10px; }
+  .trow.balance .lbl, .trow.balance .val { font-size: 1.3rem; font-weight: 800; color: var(--rust); }
+
+  .signoff { text-align: center; margin-top: 34px; }
+  .signoff .thanks { font-family: 'Caveat', cursive; font-size: 2.6rem; font-weight: 700; color: var(--navy);
+    line-height: 1; margin-bottom: 16px; }
+  .signoff .payable { font-size: 1.15rem; font-weight: 600; color: var(--navy); }
+  .signoff .company-name { font-size: 1.25rem; font-weight: 800; color: var(--navy); margin: 2px 0 6px; }
+  .signoff .addr { font-size: 0.92rem; font-weight: 600; letter-spacing: 0.04em; color: var(--navy);
+    text-transform: uppercase; }
+  .foot-band { height: 44px; background: var(--gold);
+    background-image: repeating-linear-gradient(-45deg,
+      var(--olive) 0 9px, transparent 9px 14px, var(--rust) 14px 23px, transparent 23px 28px);
+    background-position: center; margin-top: 30px; }
+
+  /* ── Action panel (below the document) ────────────────────────────────── */
+  .panel { background: var(--paper); border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.12);
+    padding: 26px 28px; margin-top: 22px; }
+  .panel h2 { font-size: 1.25rem; font-weight: 800; color: var(--navy); margin-bottom: 8px; }
+  .panel p { font-size: 0.95rem; color: var(--text-dim); line-height: 1.55; }
+
+  .btn { display: inline-flex; align-items: center; gap: 6px; font-family: 'Poppins', sans-serif;
+    font-size: 0.95rem; font-weight: 700; padding: 12px 22px; border-radius: 9px; border: none;
+    cursor: pointer; text-decoration: none; transition: background 0.15s, opacity 0.15s; }
+  .btn-primary { background: var(--green); color: #fff; }
+  .btn-primary:hover { background: #245c43; }
+  .btn-primary:disabled { opacity: 0.6; cursor: default; }
+  .btn-gold { background: var(--navy); color: #fff; }
+  .btn-gold:hover { background: #16304f; }
+
+  .accept-input { display: block; width: 100%; max-width: 360px; padding: 11px 14px; margin: 14px 0 10px;
+    border-radius: 8px; border: 1.5px solid rgba(30,58,95,0.3); font-size: 1rem;
+    font-family: 'Poppins', sans-serif; color: var(--navy); }
+  .accept-input:focus { outline: none; border-color: var(--green); }
+  .hidden { display: none; }
+  .form-error { color: var(--rust); font-size: 0.9rem; font-weight: 600; margin-top: 6px; min-height: 1em; }
+
+  .accepted-banner { background: var(--green-soft); border: 1px solid #a7d7bf; border-radius: 10px;
+    padding: 16px 18px; display: flex; gap: 12px; align-items: center; }
+  .accepted-banner .check { font-size: 1.6rem; color: var(--green-ink); line-height: 1; }
+  .accepted-banner .msg { font-size: 1rem; font-weight: 700; color: var(--green-ink); }
+
+  .deposit-panel { margin-top: 18px; border-top: 1px solid rgba(30,58,95,0.12); padding-top: 18px; }
+  .deposit-due { font-size: 1.15rem; font-weight: 800; color: var(--rust); margin-bottom: 4px; }
+  .deposit-balance { font-size: 0.9rem; color: var(--text-dim); margin-bottom: 12px; }
+  .pay-instructions { background: var(--ink-dim); border-radius: 10px; padding: 16px 18px; font-size: 0.95rem;
+    color: var(--navy); line-height: 1.6; font-weight: 500; }
+  .deposit-paid { background: var(--green-soft); border: 1px solid #a7d7bf; border-radius: 10px;
+    padding: 14px 18px; font-weight: 700; color: var(--green-ink); }
+
+  .unavailable { background: var(--paper); border-radius: 14px; box-shadow: 0 10px 40px rgba(0,0,0,0.12);
+    padding: 44px 34px; text-align: center; max-width: 560px; margin: 40px auto; }
+  .unavailable h2 { color: var(--navy); font-size: 1.5rem; font-weight: 800; margin-bottom: 12px; }
+  .unavailable p { color: var(--text-dim); font-size: 1rem; line-height: 1.6; margin-bottom: 8px; }
+  .unavailable a { color: var(--navy); font-weight: 700; text-decoration: none; }
+
+  .contact-note { text-align: center; font-size: 0.85rem; color: #6b6656; margin: 20px auto 0; }
+  .contact-note a { color: var(--navy); font-weight: 600; }
+
+  @media (max-width: 600px) {
+    .head { padding: 28px 22px; flex-direction: column; }
+    .head h1 { font-size: 3.2rem; }
+    .art { width: 110px; height: 110px; }
+    .body { padding: 24px 22px 30px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap" id="root"></div>
+
+<script>
+const esc = DataStore.esc;
+const CONTACT_PHONE = '814-631-5338';
+
+// ── Payment configuration (PROCESSOR-AGNOSTIC) ─────────────────────────────────
+// Deposits are handled manually today. When a payment processor is chosen later,
+// flip `mode` to 'link' and set `payLinkTemplate` to a checkout URL containing the
+// literal string {token} (replaced with this quote's share token at render time,
+// e.g. 'https://buy.stripe.com/abc?client_reference_id={token}'). The deposit panel
+// will then render a "Pay deposit online" button INSTEAD of the mailing
+// instructions below. No other code change is needed to switch processors.
+const PAYMENT_CONFIG = {
+  mode: 'manual',            // 'manual' | 'link'
+  payLinkTemplate: '',       // used only when mode === 'link'; {token} -> share token
+  instructions: 'Please mail a check payable to Open Sesame Designs LLC, 1530 Lakeside Dr, Altoona, PA 16601, or pay at your site visit. Card payment online is coming soon.',
+};
+
+const params = new URLSearchParams(location.search);
+const token = params.get('t') || '';
+
+function money(n) {
+  return '$' + (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+// Date-only value (yyyy-mm-dd) -> m/dd/yy, echoing the printed quote.
+function fmtQuoteDate(dateStr) {
+  if (!dateStr) return '';
+  const p = String(dateStr).slice(0, 10).split('-');
+  if (p.length < 3) return esc(dateStr);
+  return Number(p[1]) + '/' + p[2] + '/' + p[0].slice(2);
+}
+// Timestamp -> friendly date for the acceptance banner.
+function fmtAcceptedDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+}
+
+function renderUnavailable() {
+  document.getElementById('root').innerHTML =
+    '<div class="unavailable">' +
+      '<h2>This quote link is not available</h2>' +
+      '<p>The link may have expired or the quote is no longer shared. Reach out and we will send a fresh one.</p>' +
+      '<p>Call or text <a href="tel:+1' + CONTACT_PHONE.replace(/-/g, '') + '">' + CONTACT_PHONE + '</a></p>' +
+    '</div>';
+}
+
+// The branded document (client-facing view of the quote).
+function documentHtml(q) {
+  const items = Array.isArray(q.lineItems) ? q.lineItems : [];
+  const rows = items.map(li => `
+    <tr>
+      <td class="desc">${esc(li.description || '')}</td>
+      <td>${esc(li.hours || '')}</td>
+      <td class="mat">${esc(li.material || '')}</td>
+      <td class="amt">${li.amount != null && li.amount !== '' ? money(li.amount) : ''}</td>
+    </tr>`).join('');
+  const blanks = '<tr><td class="desc">&nbsp;</td><td></td><td></td><td></td></tr>';
+  const deposit = Number(q.deposit) || 0;
+  const depositRow = deposit > 0
+    ? `<div class="trow deposit"><span class="lbl">DEPOSIT RECEIVED:</span><span class="val">${money(deposit)}</span></div>`
+    : '';
+  const balanceRow = deposit > 0
+    ? `<div class="trow balance"><span class="lbl">BALANCE DUE:</span><span class="val">${money((Number(q.total) || 0) - deposit)}</span></div>`
+    : '';
+
+  return `
+  <div class="sheet">
+    <div class="head">
+      <div class="chev left"></div>
+      <div class="chev right"></div>
+      <div class="head-left">
+        <h1>QUOTE</h1>
+        <div class="meta">
+          <div class="line"><span class="k">Quote #:</span><span class="v">${esc(q.quoteNumber)} of ${esc(q.quoteYear)}</span></div>
+          <div class="line"><span class="k">Quote to:</span><span class="v">${esc(q.clientName)}</span></div>
+          <div class="line"><span class="k">Invoice Date:</span><span class="v">${esc(fmtQuoteDate(q.quoteDate))}</span></div>
+        </div>
+      </div>
+      <img class="art" src="/assets/img/pawpaw-hands-sm.jpg" alt="Ecotopian Earthcare artwork">
+    </div>
+    <div class="body">
+      <div class="company">ECOTOPIAN EARTHCARE</div>
+      <div class="items-scroll">
+      <table class="items">
+        <thead><tr>
+          <th class="desc">DESCRIPTION</th><th>HOURS</th><th>MATERIAL</th><th>TOTAL</th>
+        </tr></thead>
+        <tbody>${rows}${blanks}</tbody>
+      </table>
+      </div>
+      <div class="rule"></div>
+      <div class="totals">
+        ${depositRow}
+        <div class="trow admin"><span class="lbl">Processing and administration:</span><span class="val">${money(q.adminFee)}</span></div>
+        <div class="trow total"><span class="lbl">TOTAL ESTIMATE:</span><span class="val">${money(q.total)}</span></div>
+        ${balanceRow}
+      </div>
+      <div class="signoff">
+        <div class="thanks">Thanks for caring</div>
+        <div class="payable">Please make checks payable to:</div>
+        <div class="company-name">Open Sesame Designs LLC</div>
+        <div class="addr">1530 Lakeside Dr, Altoona, PA 16601</div>
+      </div>
+    </div>
+    <div class="foot-band"></div>
+  </div>`;
+}
+
+// The deposit panel (shown once a quote is accepted). Processor-agnostic: renders
+// either a Pay button (mode 'link') or the manual instructions (mode 'manual').
+function depositPanelHtml(q) {
+  const deposit = Number(q.deposit) || 0;
+  if (deposit <= 0) return '';
+  const depStatus = q.depositStatus || 'unpaid';
+  if (depStatus === 'paid') {
+    return `<div class="deposit-panel"><div class="deposit-paid">Deposit of ${money(deposit)} received. Thank you!</div></div>`;
+  }
+  const balance = (Number(q.total) || 0) - deposit;
+  let payBlock;
+  if (PAYMENT_CONFIG.mode === 'link' && PAYMENT_CONFIG.payLinkTemplate) {
+    // token is a local const (URL-safe hex); encode defensively anyway.
+    const url = PAYMENT_CONFIG.payLinkTemplate.replace('{token}', encodeURIComponent(token));
+    payBlock = `<a class="btn btn-gold" href="${esc(url)}" target="_blank" rel="noopener">Pay deposit online</a>`;
+  } else {
+    payBlock = `<div class="pay-instructions">${esc(PAYMENT_CONFIG.instructions)}</div>`;
+  }
+  return `
+    <div class="deposit-panel">
+      <div class="deposit-due">Deposit due: ${money(deposit)}</div>
+      <div class="deposit-balance">Remaining balance after deposit: ${money(balance)}</div>
+      ${payBlock}
+    </div>`;
+}
+
+function renderQuote(q) {
+  document.title = 'Quote ' + q.quoteNumber + ' of ' + q.quoteYear + ' - Ecotopian EarthCare';
+  let panel = '';
+
+  if (q.status === 'sent') {
+    // Not yet accepted: show the accept action (name-confirm).
+    panel = `
+      <div class="panel" id="actionPanel">
+        <h2>Ready to move forward?</h2>
+        <p>Review the quote above. When it looks good, accept it online and we will follow up with next steps.</p>
+        <button class="btn btn-primary" id="acceptStartBtn" onclick="showAcceptForm()">Accept this quote</button>
+        <div class="hidden" id="acceptForm">
+          <input type="text" class="accept-input" id="acceptName" placeholder="Type your name to accept" autocomplete="name">
+          <button class="btn btn-primary" id="acceptBtn" onclick="doAccept()">Confirm acceptance</button>
+          <div class="form-error" id="acceptError"></div>
+        </div>
+      </div>`;
+  } else if (q.status === 'accepted' || q.status === 'invoiced') {
+    // Accepted (or later invoiced): green banner + deposit panel.
+    const bannerMsg = q.acceptedAt
+      ? 'Accepted' + (q.acceptedBy ? ' by ' + esc(q.acceptedBy) : '') + ' on ' + esc(fmtAcceptedDate(q.acceptedAt))
+      : 'This quote has been accepted';
+    panel = `
+      <div class="panel">
+        <div class="accepted-banner">
+          <span class="check" aria-hidden="true">&#10003;</span>
+          <span class="msg">${bannerMsg}</span>
+        </div>
+        ${depositPanelHtml(q)}
+      </div>`;
+  }
+
+  document.getElementById('root').innerHTML =
+    documentHtml(q) + panel +
+    '<p class="contact-note">Questions? Call or text <a href="tel:+1' + CONTACT_PHONE.replace(/-/g, '') +
+    '">' + CONTACT_PHONE + '</a> &middot; Ecotopian EarthCare</p>';
+}
+
+function showAcceptForm() {
+  document.getElementById('acceptStartBtn').classList.add('hidden');
+  document.getElementById('acceptForm').classList.remove('hidden');
+  document.getElementById('acceptName').focus();
+}
+
+async function doAccept() {
+  const name = document.getElementById('acceptName').value.trim();
+  const errEl = document.getElementById('acceptError');
+  errEl.textContent = '';
+  if (!name) { errEl.textContent = 'Please type your name to accept.'; return; }
+  const btn = document.getElementById('acceptBtn');
+  btn.disabled = true;
+  try {
+    await DataStore.acceptQuote(token, name);
+    // Re-fetch and re-render the current state (accept_quote is idempotent, so this
+    // shows the accepted state whether or not this call performed the flip).
+    const fresh = await DataStore.getQuoteByToken(token);
+    if (fresh) renderQuote(fresh); else renderUnavailable();
+  } catch (e) {
+    errEl.textContent = 'Something went wrong accepting the quote. Please try again, or call ' + CONTACT_PHONE + '.';
+    btn.disabled = false;
+  }
+}
+
+(async function init() {
+  if (!token) { renderUnavailable(); return; }
+  try {
+    const q = await DataStore.getQuoteByToken(token);
+    if (!q) { renderUnavailable(); return; }
+    renderQuote(q);
+  } catch (e) {
+    renderUnavailable();
+  }
+})();
+</script>
+
+<!-- Bag Carriers thin powered-by footer (locked attribution component) -->
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Libre+Baskerville:ital@1&display=swap" rel="stylesheet">
+<style>
+.bc-thinfoot { margin-top: auto; }
+.bc-thinfoot {
+  --bc-ink:#0a0c10; --bc-bone:#f0ece4; --bc-sienna:#7a4520; --bc-muted:#8a8172;
+  flex: 0 0 auto;
+  background:var(--bc-ink);
+  font-family:'Bebas Neue',sans-serif;
+  padding:12px 20px;
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  border-top:2px solid var(--bc-sienna);
+  text-align:center;
+  margin-left:-16px; margin-right:-16px; margin-bottom:-24px;
+}
+.bc-thinfoot__label {
+  font-family:'Libre Baskerville',serif; font-style:italic;
+  font-size:11px; letter-spacing:.02em; color:var(--bc-muted);
+}
+.bc-thinfoot__mark {
+  font-family:'Bebas Neue',sans-serif; letter-spacing:.08em;
+  font-size:15px; line-height:1; color:var(--bc-bone);
+  text-decoration:none;
+}
+.bc-thinfoot__mark:hover { opacity:.85; }
+.bc-thinfoot__mark .bc-systems { color:var(--bc-sienna); }
+.bc-thinfoot__mark .bc-dot { color:var(--bc-sienna); }
+</style>
+<footer class="bc-thinfoot">
+  <span class="bc-thinfoot__label">Powered by</span>
+  <a class="bc-thinfoot__mark" href="https://bagcarriers.com/systems" target="_blank" rel="noopener">
+    BAG CARRIERS <span class="bc-systems">SYSTEMS</span><span class="bc-dot">.</span>
+  </a>
+</footer>
+</body>
+</html>

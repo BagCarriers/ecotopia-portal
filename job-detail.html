@@ -242,6 +242,7 @@ function render() {
     <!-- Actions -->
     <div class="actions-row">
       ${nextStatus ? `<button class="btn btn-primary" onclick="moveToStatus('${nextStatus}')">Move to ${STATUS_LABELS[nextStatus]}</button>` : ''}
+      <a class="btn btn-outline" href="quotes.html?job=${encodeURIComponent(job.id)}">📄 Generate Quote</a>
       <button class="btn btn-outline" onclick="openInvoiceModal()">💵 Create Invoice</button>
       <button class="btn btn-outline" onclick="openEditJob()">✏️ Edit Job</button>
     </div>

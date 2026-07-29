@@ -63,6 +63,18 @@
   .pill-sent { background: #dbeafe; color: #1e40af; }
   .pill-accepted { background: #d1fae5; color: #065f46; }
   .pill-invoiced { background: #ede9fe; color: #6d28d9; }
+  /* Deposit reconciliation pills (Jordan marks paid manually until a processor is wired). */
+  .pill-unpaid { background: #fef3c7; color: #92400e; }
+  .pill-pending { background: #dbeafe; color: #1e40af; }
+  .pill-paid { background: #d1fae5; color: #065f46; }
+  .dep-pill { margin-left: 6px; }
+  .accept-note { font-size: 0.72rem; color: var(--forest-mid); margin-top: 5px; }
+
+  /* Share-link modal */
+  .share-row { display: flex; gap: 8px; margin: 10px 0 4px; }
+  .share-row input { flex: 1; padding: 9px 12px; border-radius: 7px; border: 1.5px solid var(--border);
+    font-size: 0.85rem; font-family: 'DM Sans', sans-serif; color: var(--text); background: var(--cream); }
+  .share-hint { font-size: 0.78rem; color: var(--text-dim); line-height: 1.5; margin-top: 8px; }
 
   .actions-cell { display: flex; gap: 6px; flex-wrap: wrap; }
   .btn-edit { font-size: 0.75rem; padding: 4px 9px; background: transparent;
@@ -217,10 +229,35 @@
   </div>
 </div>
 
+<!-- Share-link Modal -->
+<div class="modal-overlay" id="shareModal">
+  <div class="modal" style="max-width:520px;">
+    <h2>Public quote link</h2>
+    <p class="modal-sub" id="shareSub"></p>
+    <div class="share-row">
+      <input type="text" id="shareLinkInput" readonly onclick="this.select()">
+      <button type="button" class="btn btn-primary" id="shareCopyBtn" onclick="copyShareLink()">Copy</button>
+    </div>
+    <p class="share-hint">Send this to the client. They can review the quote and accept it online, then
+      see deposit instructions. Only sent, accepted, and invoiced quotes open from this link; drafts stay private.</p>
+    <div class="modal-actions">
+      <button type="button" class="btn-cancel" onclick="closeShareModal()">Close</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const esc = DataStore.esc;
 // The administration fee rate lives here and nowhere else.
 const ADMIN_FEE_RATE = 0.05;
+// Public quote-view base (matches the live domain in supabase/functions + docs).
+const PUBLIC_BASE = 'https://ecotopia.bagcarriers.dev';
+// Share token = two dash-stripped UUIDs concatenated (64 hex chars, well over the
+// 32-char minimum the token-gated RPCs enforce).
+function newShareToken() {
+  return crypto.randomUUID().replace(/-/g, '') + crypto.randomUUID().replace(/-/g, '');
+}
+function shareLink(token) { return PUBLIC_BASE + '/quote-view.html?t=' + token; }
 
 let quotes = [];
 let jobs = [];
@@ -261,18 +298,33 @@ function renderTable() {
   body.innerHTML = quotes.map(q => {
     const label = esc(q.quoteNumber + ' of ' + q.quoteYear);
     const isInvoiced = q.status === 'invoiced';
+    const isDraft = q.status === 'draft';
     const nextStatus = q.status === 'draft' ? 'sent' : (q.status === 'sent' ? 'accepted' : null);
     const advanceLabel = q.status === 'draft' ? 'Mark sent' : (q.status === 'sent' ? 'Mark accepted' : null);
+    const deposit = Number(q.deposit) || 0;
+    const depStatus = q.depositStatus || 'unpaid';
+    const acceptLine = q.acceptedAt
+      ? `<div class="accept-note">Accepted${q.acceptedBy ? ' by ' + esc(q.acceptedBy) : ''} on ${DataStore.formatDate(q.acceptedAt)}</div>`
+      : '';
+    const depPill = deposit > 0
+      ? `<span class="status-pill dep-pill pill-${esc(depStatus)}">Deposit: ${esc(depStatus)}</span>`
+      : '';
     return `
     <tr>
       <td class="q-num">${label}</td>
       <td><strong>${esc(q.clientName)}</strong></td>
       <td>${q.quoteDate ? DataStore.formatDate(q.quoteDate + 'T00:00:00') : '-'}</td>
       <td><strong>${money(q.total)}</strong></td>
-      <td><span class="status-pill pill-${esc(q.status)}">${esc(q.status.charAt(0).toUpperCase() + q.status.slice(1))}</span></td>
+      <td>
+        <span class="status-pill pill-${esc(q.status)}">${esc(q.status.charAt(0).toUpperCase() + q.status.slice(1))}</span>
+        ${depPill}
+        ${acceptLine}
+      </td>
       <td>
         <div class="actions-cell">
           ${nextStatus ? `<button class="btn-edit" onclick="advanceStatus('${q.id}','${nextStatus}')">${advanceLabel}</button>` : ''}
+          ${isDraft ? '' : `<button class="btn-edit" onclick="shareQuote('${q.id}')">Share link</button>`}
+          ${deposit > 0 && depStatus !== 'paid' ? `<button class="btn-edit" onclick="markDepositPaid('${q.id}')">Mark deposit paid</button>` : ''}
           <button class="btn-edit" onclick="openBuilder('${q.id}')">Edit</button>
           <a class="btn-edit" href="quote-print.html?id=${encodeURIComponent(q.id)}" target="_blank" rel="noopener">Print</a>
           ${isInvoiced ? '' : `<button class="btn-edit" onclick="convertToInvoice('${q.id}')">Convert to invoice</button>`}
@@ -438,11 +490,100 @@ async function advanceStatus(id, status) {
   const errEl = document.getElementById('pageError');
   errEl.textContent = '';
   try {
-    await DataStore.updateQuote(id, { status });
+    const q = quotes.find(x => x.id === id);
+    const changes = { status };
+    // Moving a quote to 'sent' mints its public share token (once) so staff can
+    // hand the client a quote-view link. Later status moves keep the same token.
+    if (status === 'sent' && q && !q.shareToken) changes.shareToken = newShareToken();
+    await DataStore.updateQuote(id, changes);
     await refresh();
+    if (status === 'sent') {
+      const updated = quotes.find(x => x.id === id);
+      if (updated && updated.shareToken) showShareModal(updated);
+    }
   } catch (err) {
     errEl.textContent = 'Could not update status. ' + err.message;
   }
+}
+
+// Share-link action: mint a token if the quote has none, then show the copyable
+// public link. Available on any non-draft quote.
+async function shareQuote(id) {
+  const errEl = document.getElementById('pageError');
+  errEl.textContent = '';
+  try {
+    let q = quotes.find(x => x.id === id);
+    if (!q) return;
+    if (!q.shareToken) {
+      await DataStore.updateQuote(id, { shareToken: newShareToken() });
+      await refresh();
+      q = quotes.find(x => x.id === id);
+    }
+    if (q) showShareModal(q);
+  } catch (err) {
+    errEl.textContent = 'Could not create a share link. ' + err.message;
+  }
+}
+
+// Manual deposit reconciliation: Jordan marks a deposit paid by hand until a
+// payment processor is wired.
+async function markDepositPaid(id) {
+  const q = quotes.find(x => x.id === id);
+  const label = q ? (q.quoteNumber + ' of ' + q.quoteYear) : 'this quote';
+  if (!confirm('Mark the deposit for quote ' + label + ' as paid? Deposits are reconciled by hand.')) return;
+  const errEl = document.getElementById('pageError');
+  errEl.textContent = '';
+  try {
+    await DataStore.updateQuote(id, { depositStatus: 'paid' });
+    await refresh();
+  } catch (err) {
+    errEl.textContent = 'Could not update the deposit status. ' + err.message;
+  }
+}
+
+// ── Share modal ─────────────────────────────────────────────────────────────
+function showShareModal(q) {
+  // textContent (not innerHTML), so the client name needs no escaping here.
+  document.getElementById('shareSub').textContent =
+    'Quote ' + q.quoteNumber + ' of ' + q.quoteYear + ' for ' + q.clientName;
+  const inp = document.getElementById('shareLinkInput');
+  inp.value = shareLink(q.shareToken);
+  document.getElementById('shareCopyBtn').textContent = 'Copy';
+  document.getElementById('shareModal').classList.add('open');
+  inp.focus();
+  inp.select();
+}
+function closeShareModal() { document.getElementById('shareModal').classList.remove('open'); }
+async function copyShareLink() {
+  const inp = document.getElementById('shareLinkInput');
+  inp.select();
+  const btn = document.getElementById('shareCopyBtn');
+  try {
+    await navigator.clipboard.writeText(inp.value);
+    btn.textContent = 'Copied';
+  } catch (e) {
+    try { document.execCommand('copy'); btn.textContent = 'Copied'; }
+    catch (e2) { btn.textContent = 'Copy failed'; }
+  }
+}
+document.getElementById('shareModal').addEventListener('click', function(e) {
+  if (e.target === this) closeShareModal();
+});
+
+// Open the builder prefilled from a job (?job=<id> deep link from job-detail).
+function openBuilderForJob(jid) {
+  const job = jobs.find(j => j.id === jid);
+  if (!job) return;
+  openBuilder(); // fresh builder (resets fields, populates job select)
+  document.getElementById('q_client').value = job.clientName || '';
+  document.getElementById('q_address').value = job.address || '';
+  document.getElementById('q_job').value = job.id;
+  // First line item seeded from the job title; amount left blank for staff to fill.
+  const liBody = document.getElementById('liBody');
+  liBody.innerHTML = '';
+  addLineRow({ description: job.title || '' });
+  addLineRow();
+  recalc();
 }
 
 async function convertToInvoice(id) {
@@ -490,7 +631,9 @@ async function deleteQuote(id) {
   }
 }
 
-document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeBuilder(); });
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') { closeBuilder(); closeShareModal(); }
+});
 
 (async function init() {
   try {
@@ -498,6 +641,9 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Escape') close
     Nav.render();
     jobs = await DataStore.getJobs();
     await refresh();
+    // Deep link from job-detail.html: quotes.html?job=<jobId> opens a prefilled builder.
+    const jobParam = new URLSearchParams(location.search).get('job');
+    if (jobParam) openBuilderForJob(jobParam);
   } catch (err) {
     document.getElementById('quoteBody').innerHTML =
       '<tr><td colspan="6" class="empty">Could not load quotes (' + esc(err.message) +
