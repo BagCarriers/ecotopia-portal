@@ -311,6 +311,7 @@ async function loadPayOptions(q) {
     const heading = depStatus === 'pending'
       ? '<div class="pay-status">Payment link created. Already paid? It can take a minute to confirm.</div>'
       : '';
+    if (!/^https:\/\//i.test(resp.url || '')) { area.innerHTML = '<div class="pay-instructions">' + esc(MANUAL_INSTRUCTIONS) + '</div>'; return; }
     area.innerHTML =
       heading +
       '<a class="btn btn-pay" href="' + esc(resp.url) + '" target="_blank" rel="noopener">Pay your deposit online</a>' +

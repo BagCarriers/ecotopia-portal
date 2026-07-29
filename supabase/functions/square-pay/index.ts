@@ -121,7 +121,7 @@ async function handleCreateLink(body: any): Promise<Response> {
     .eq('share_token', token).maybeSingle();
 
   // Must be an accepted quote with a real deposit still owing.
-  if (!quote || quote.status !== 'accepted' || !(Number(quote.deposit) > 0)) {
+  if (!quote || quote.!['accepted', 'invoiced'].includes(quote.status) || !(Number(quote.deposit) > 0)) {
     return json({ error: 'Not found' }, 404);
   }
   if (quote.deposit_status === 'paid') {
