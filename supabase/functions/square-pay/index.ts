@@ -255,7 +255,17 @@ async function handleCreateOrder(body: any): Promise<Response> {
   const lines: Array<{ kind: string; id: string; name: string; qty: number; unit_cents: number; tier?: string }> = [];
   let subtotal = 0;
 
+  // Merge duplicate lines (same kind:id:tier) so per-line stock checks see the
+  // aggregate quantity; a crafted payload cannot split its way past a stock cap.
+  const merged = new Map<string, any>();
   for (const raw of rawItems) {
+    const key = String(raw?.kind) + ':' + String(raw?.id) + ':' + String(raw?.tier ?? '');
+    const prev = merged.get(key);
+    if (prev) prev.qty = Number(prev.qty) + Number(raw?.qty);
+    else merged.set(key, { ...raw });
+  }
+
+  for (const raw of merged.values()) {
     const kind = raw?.kind;
     const id = typeof raw?.id === 'string' ? raw.id : '';
     let qty = Math.floor(Number(raw?.qty));
@@ -274,7 +284,7 @@ async function handleCreateOrder(body: any): Promise<Response> {
       lines.push({ kind, id, name: row.common, qty, unit_cents: unit });
     } else if (kind === 'kit') {
       const tier = typeof raw?.tier === 'string' ? raw.tier : '';
-      if (!(tier in KIT_TIERS)) return json({ error: 'bad_tier' }, 400);
+      if (!Object.prototype.hasOwnProperty.call(KIT_TIERS, tier)) return json({ error: 'bad_tier' }, 400);
       if (qty > 5) qty = 5; // kits are forced 1..5
       const { data: row } = await sb.from('plant_kits')
         .select('id, name, active, stock_qty').eq('id', id).maybeSingle();
@@ -422,8 +432,10 @@ async function handleStaffMarkPaid(req: Request, body: any): Promise<Response> {
   if (order.status === 'new' || order.status === 'link_created') {
     await sb.from('orders').update({ status: 'paid' }).eq('id', order.id);
     await decrementOrderStock(sb, order.items);
+    return json({ ok: true, status: 'paid' }, 200);
   }
-  return json({ ok: true, status: 'paid' }, 200);
+  // No transition (already paid, cancelled, completed...): report the truth.
+  return json({ ok: false, status: order.status }, 409);
 }
 
 Deno.serve(async (req) => {
