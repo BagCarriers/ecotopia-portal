@@ -8,6 +8,8 @@
 /store               /shop.html                301
 /contact             /intake.html              301
 /services            /services.html            301
-/blog-2-1            /                         301
-/blog-2-1/*          /                         301
+/blog-2-1            /blog.html                301
+/blog-2-1/*          /blog.html                301
+# Old Squarespace nursery list PDF link, sent straight to the migrated PDF
+/s/Ecotopian-EarthCare-Native-Plant-Nursery-2025.pdf  /assets/pdf/nursery-plants-list-2025.pdf  301
 /s/*                 /plants.html              301

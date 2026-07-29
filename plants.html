@@ -214,8 +214,38 @@
   padding: 20px 0; text-align: center;
 }
 .eco-lead-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Guides and ID booklets (static PDF library) */
+.guide-grid {
+  display: grid; gap: 22px; margin-top: 34px;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+.guide-card {
+  background: var(--cream-soft); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 24px 24px 26px; box-shadow: var(--shadow);
+  display: flex; flex-direction: column;
+}
+.guide-kicker {
+  font-family: var(--font-util); font-weight: 700; font-size: 0.74rem;
+  text-transform: uppercase; letter-spacing: 0.1em; color: var(--amber-dark);
+  margin: 0 0 10px;
+}
+.guide-card h3 {
+  font-family: var(--font-util); font-weight: 700; font-size: 1.2rem;
+  color: var(--green-dark); margin: 0 0 8px;
+}
+.guide-desc { margin: 0 0 18px; font-size: 1rem; line-height: 1.55; color: var(--ink-soft); }
+.guide-link {
+  margin-top: auto; align-self: flex-start;
+  font-family: var(--font-util); font-weight: 600; font-size: 0.96rem;
+  color: var(--green-dark); text-decoration: none;
+  padding: 9px 18px; border: 1.5px solid var(--green); border-radius: 999px;
+  background: #fff; transition: background 0.14s ease, color 0.14s ease;
+}
+.guide-link:hover { background: var(--green); color: #fff; }
+
 @media (prefers-reduced-motion: reduce) {
-  .filter-chip, .plant-add, .kit-req, .tray-fab { transition: none !important; }
+  .filter-chip, .plant-add, .kit-req, .tray-fab, .guide-link { transition: none !important; }
 }
 @media (max-width: 520px) {
   .tray-fab { right: 14px; bottom: 14px; padding: 12px 18px; }
@@ -258,6 +288,43 @@
       <div class="plant-grid" id="plantGrid"></div>
     </div>
   </section>
+  <div class="willow on-cream" data-opacity="0.4"></div>
+
+  <!-- Guides and ID booklets: static PDF library migrated from the old
+       Squarespace site (served from /assets/pdf/). Page content, not data. -->
+  <section class="section" aria-labelledby="guides-h">
+    <div class="wrap">
+      <p class="eyebrow">Learn and identify</p>
+      <h2 id="guides-h">Guides and ID booklets</h2>
+      <p class="lead">Field guides and reference booklets from our nursery. Open any of them to read online or download.</p>
+      <div class="guide-grid">
+        <article class="guide-card reveal">
+          <p class="guide-kicker">PDF · 5 pages</p>
+          <h3>Nursery Plants List</h3>
+          <p class="guide-desc">What we grow and sell, 2025 season.</p>
+          <a class="guide-link" href="/assets/pdf/nursery-plants-list-2025.pdf" target="_blank" rel="noopener">View PDF</a>
+        </article>
+        <article class="guide-card reveal">
+          <p class="guide-kicker">PDF · 58 pages</p>
+          <h3>Native Wildflowers ID</h3>
+          <p class="guide-desc">A 58 page field guide to the wildflowers we plant.</p>
+          <a class="guide-link" href="/https://wibnryfinfwbwwgsyojr.supabase.co/storage/v1/object/public/docs/pdf/native-wildflowers-id.pdf" target="_blank" rel="noopener">View PDF</a>
+        </article>
+        <article class="guide-card reveal">
+          <p class="guide-kicker">PDF · 48 pages</p>
+          <h3>Native Trees and Shrubs ID</h3>
+          <p class="guide-desc">A 48 page companion for woody natives.</p>
+          <a class="guide-link" href="/https://wibnryfinfwbwwgsyojr.supabase.co/storage/v1/object/public/docs/pdf/native-trees-shrubs-id.pdf" target="_blank" rel="noopener">View PDF</a>
+        </article>
+        <article class="guide-card reveal">
+          <p class="guide-kicker">PDF · 13 pages</p>
+          <h3>Habitat Kits Guide</h3>
+          <p class="guide-desc">The habitat kit lineup with layouts.</p>
+          <a class="guide-link" href="/assets/pdf/habitat-kits-guide.pdf" target="_blank" rel="noopener">View PDF</a>
+        </article>
+      </div>
+    </div>
+  </section>
   <!-- The card game moved to the standalone Shop (shop.html). See the cross-link
        in the intro above. -->
 </main>
@@ -283,6 +350,7 @@
         <li><a href="happenings.html">Events</a></li>
         <li><a href="community-gardens.html">Community Gardens</a></li>
         <li><a href="photos.html">Photos</a></li>
+        <li><a href="blog.html">Blog</a></li>
       </ul>
     </div>
     <div>
