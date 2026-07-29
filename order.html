@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Your Order - Ecotopian EarthCare</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/img/favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/assets/img/favicon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<!-- Public page: NO auth. It reads the order ONLY through the anon, token-gated
+     order_status action on the square-pay edge function. Every value is esc()'d. -->
+<script src="assets/config.js"></script>
+<style>
+  :root {
+    --green: #2D6A4F; --green-dark: #1B4332; --green-soft: #d1fae5; --green-ink: #065f46;
+    --amber: #B8730A; --amber-bg: #FDF0DA; --paper: #ffffff; --ink: #1C1C1C;
+    --ink-soft: #5A5A5A; --line: rgba(45,106,79,0.2); --rust: #9C4A32;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Poppins', system-ui, sans-serif; background: #e9efe7; color: var(--ink);
+    padding: 24px 16px; min-height: 100vh; display: flex; flex-direction: column; }
+  .wrap { max-width: 620px; margin: 0 auto; width: 100%; }
+
+  .brandbar { text-align: center; margin-bottom: 18px; }
+  .brandbar .mark { font-weight: 800; font-size: 1.3rem; color: var(--green-dark); letter-spacing: 0.01em; }
+  .brandbar .mark a { color: inherit; text-decoration: none; }
+
+  .card { background: var(--paper); border-radius: 14px; box-shadow: 0 10px 40px rgba(0,0,0,0.12);
+    padding: 26px 28px; }
+  .eyebrow { font-size: 0.74rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em;
+    color: var(--amber); margin-bottom: 6px; }
+  h1 { font-size: 1.5rem; font-weight: 800; color: var(--green-dark); margin-bottom: 4px; }
+  .sub { font-size: 0.9rem; color: var(--ink-soft); margin-bottom: 20px; }
+
+  /* Timeline */
+  .timeline { display: flex; gap: 6px; margin: 0 0 22px; }
+  .step { flex: 1; text-align: center; }
+  .step .dot { width: 26px; height: 26px; border-radius: 50%; margin: 0 auto 6px;
+    display: flex; align-items: center; justify-content: center; font-size: 0.9rem; font-weight: 700;
+    background: #e4e9e2; color: var(--ink-soft); border: 2px solid #e4e9e2; }
+  .step.done .dot { background: var(--green); color: #fff; border-color: var(--green); }
+  .step.current .dot { background: #fff; color: var(--green); border-color: var(--green); }
+  .step .lbl { font-size: 0.72rem; font-weight: 600; color: var(--ink-soft); line-height: 1.3; }
+  .step.done .lbl, .step.current .lbl { color: var(--green-dark); }
+
+  .status-line { font-size: 0.95rem; font-weight: 600; color: var(--green-ink); background: var(--green-soft);
+    border: 1px solid #a7d7bf; border-radius: 10px; padding: 12px 16px; margin-bottom: 18px; }
+  .status-line.pickup { color: var(--amber); background: var(--amber-bg); border-color: #f0d9a8; }
+  .status-line.cancel { color: var(--rust); background: #fbeae8; border-color: #f0cfc8; }
+
+  table.items { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+  table.items td { padding: 10px 4px; border-bottom: 1px solid var(--line); font-size: 0.95rem; vertical-align: top; }
+  table.items td.q { color: var(--ink-soft); white-space: nowrap; width: 44px; }
+  table.items td.amt { text-align: right; font-weight: 600; white-space: nowrap; }
+  .tier { color: var(--ink-soft); font-size: 0.85rem; }
+  .totrow { display: flex; justify-content: space-between; align-items: baseline; padding: 12px 4px 0; }
+  .totrow .l { font-weight: 700; color: var(--green-dark); }
+  .totrow .v { font-weight: 800; font-size: 1.2rem; color: var(--green-dark); }
+
+  .payblock { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); }
+  .btn-pay { display: block; text-align: center; text-decoration: none; background: var(--green); color: #fff;
+    font-weight: 700; font-size: 1.05rem; padding: 14px 22px; border-radius: 10px; }
+  .btn-pay:hover { background: #245c43; }
+  .pay-secure { font-size: 0.82rem; color: var(--ink-soft); margin-top: 8px; text-align: center; }
+  .pay-note { font-size: 0.92rem; color: var(--ink-soft); line-height: 1.55; }
+
+  .unavailable { text-align: center; padding: 40px 24px; }
+  .unavailable h1 { margin-bottom: 10px; }
+  .unavailable p { color: var(--ink-soft); font-size: 1rem; line-height: 1.6; margin-bottom: 6px; }
+  .unavailable a { color: var(--green-dark); font-weight: 700; text-decoration: none; }
+  .contact-note { text-align: center; font-size: 0.85rem; color: var(--ink-soft); margin: 20px auto 0; }
+  .contact-note a { color: var(--green-dark); font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="wrap" id="root"></div>
+
+<script>
+(function () {
+  'use strict';
+  function esc(v) {
+    if (v == null) return '';
+    return String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+  var CONTACT_PHONE = '814-631-5338';
+  var ORDER_FN = window.ECO_CONFIG.SUPABASE_URL + '/functions/v1/square-pay';
+  var ANON_KEY = window.ECO_CONFIG.SUPABASE_ANON_KEY;
+  var params = new URLSearchParams(location.search);
+  var token = params.get('t') || '';
+
+  function money(cents) {
+    return '$' + ((Number(cents) || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+  var TIER_LABEL = { '50': '50 sq ft', '100': '100 sq ft', '150': '150 sq ft', '200': '200 sq ft' };
+
+  function renderUnavailable() {
+    document.getElementById('root').innerHTML =
+      '<div class="brandbar"><span class="mark"><a href="index.html">Ecotopian EarthCare</a></span></div>' +
+      '<div class="card unavailable">' +
+        '<h1>This order link is not available</h1>' +
+        '<p>The link may be mistyped or the order is no longer on file. Reach out and we will help.</p>' +
+        '<p>Call or text <a href="tel:+1' + CONTACT_PHONE.replace(/-/g, '') + '">' + CONTACT_PHONE + '</a></p>' +
+      '</div>';
+  }
+
+  // Timeline: Received -> Paid/Pay at pickup -> Ready -> Completed.
+  function timelineHtml(o) {
+    var status = o.status;
+    var online = o.pay_mode === 'online';
+    var paid = status === 'paid' || status === 'ready' || status === 'completed';
+    var ready = status === 'ready' || status === 'completed';
+    var done = status === 'completed';
+    var steps = [
+      { lbl: 'Received', done: true, current: status === 'new' || status === 'link_created' },
+      { lbl: online ? 'Paid' : 'Pay at pickup', done: online ? paid : false, current: online ? (!paid) : true },
+      { lbl: 'Ready', done: ready, current: paid && !ready },
+      { lbl: 'Completed', done: done, current: ready && !done }
+    ];
+    return '<div class="timeline">' + steps.map(function (s, i) {
+      var cls = s.done ? 'done' : (s.current ? 'current' : '');
+      return '<div class="step ' + cls + '"><div class="dot">' + (s.done ? '&#10003;' : String(i + 1)) + '</div>' +
+        '<div class="lbl">' + esc(s.lbl) + '</div></div>';
+    }).join('') + '</div>';
+  }
+
+  function itemsHtml(items) {
+    if (!Array.isArray(items) || !items.length) return '';
+    var rows = items.map(function (it) {
+      var name = esc(it.name || '');
+      var tier = it.tier && TIER_LABEL[it.tier] ? ' <span class="tier">(' + esc(TIER_LABEL[it.tier]) + ')</span>' : '';
+      var qty = Number(it.qty) || 0;
+      var line = (Number(it.unit_cents) || 0) * qty;
+      return '<tr><td class="q">' + esc(String(qty)) + '&times;</td><td>' + name + tier + '</td>' +
+        '<td class="amt">' + money(line) + '</td></tr>';
+    }).join('');
+    return '<table class="items"><tbody>' + rows + '</tbody></table>';
+  }
+
+  function payBlockHtml(o) {
+    var status = o.status;
+    if (status === 'cancelled') {
+      return '<div class="status-line cancel">This order was cancelled. Questions? Call ' + esc(CONTACT_PHONE) + '.</div>';
+    }
+    // A live payment link that has not been paid yet.
+    if (status === 'link_created' && o.pay_url && /^https:\/\//i.test(o.pay_url)) {
+      return '<div class="payblock">' +
+        '<a class="btn-pay" href="' + esc(o.pay_url) + '" target="_blank" rel="noopener">Pay your order online</a>' +
+        '<div class="pay-secure">Secure card payment via Square</div></div>';
+    }
+    if (status === 'paid' || status === 'ready' || status === 'completed') {
+      var msg = status === 'completed' ? 'This order is complete. Thank you!'
+        : status === 'ready' ? 'Your order is ready. Payment received.'
+        : 'Payment received. We are getting your order ready.';
+      return '<div class="status-line">' + esc(msg) + '</div>';
+    }
+    // new / link_created without a usable link -> pay at pickup.
+    return '<div class="status-line pickup">We will confirm availability and have your order ready. Pay at pickup.</div>';
+  }
+
+  function render(o) {
+    var created = o.created_at ? new Date(o.created_at) : null;
+    var dateStr = created && !isNaN(created.getTime())
+      ? created.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : '';
+    document.getElementById('root').innerHTML =
+      '<div class="brandbar"><span class="mark"><a href="index.html">Ecotopian EarthCare</a></span></div>' +
+      '<div class="card">' +
+        '<p class="eyebrow">Your order</p>' +
+        '<h1>Order received</h1>' +
+        (dateStr ? '<p class="sub">Placed ' + esc(dateStr) + '</p>' : '') +
+        timelineHtml(o) +
+        payBlockHtml(o) +
+        itemsHtml(o.items) +
+        '<div class="totrow"><span class="l">Total</span><span class="v">' + money(o.subtotal_cents) + '</span></div>' +
+      '</div>' +
+      '<p class="contact-note">Questions? Call or text <a href="tel:+1' + CONTACT_PHONE.replace(/-/g, '') +
+        '">' + CONTACT_PHONE + '</a> &middot; Refresh this page to see the latest status.</p>';
+  }
+
+  async function init() {
+    if (!token) { renderUnavailable(); return; }
+    try {
+      var r = await fetch(ORDER_FN, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: ANON_KEY, Authorization: 'Bearer ' + ANON_KEY },
+        body: JSON.stringify({ action: 'order_status', token: token })
+      });
+      if (!r.ok) { renderUnavailable(); return; }
+      var o = await r.json();
+      if (!o || !o.status) { renderUnavailable(); return; }
+      render(o);
+    } catch (e) {
+      renderUnavailable();
+    }
+  }
+  init();
+})();
+</script>
+
+<!-- Bag Carriers thin powered-by footer (locked attribution component) -->
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Libre+Baskerville:ital@1&display=swap" rel="stylesheet">
+<style>
+.bc-thinfoot { margin-top: auto; }
+.bc-thinfoot {
+  --bc-ink:#0a0c10; --bc-bone:#f0ece4; --bc-sienna:#7a4520; --bc-muted:#8a8172;
+  flex: 0 0 auto;
+  background:var(--bc-ink);
+  font-family:'Bebas Neue',sans-serif;
+  padding:12px 20px;
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  border-top:2px solid var(--bc-sienna);
+  text-align:center;
+  margin:30px -16px -24px;
+}
+.bc-thinfoot__label {
+  font-family:'Libre Baskerville',serif; font-style:italic;
+  font-size:11px; letter-spacing:.02em; color:var(--bc-muted);
+}
+.bc-thinfoot__mark {
+  font-family:'Bebas Neue',sans-serif; letter-spacing:.08em;
+  font-size:15px; line-height:1; color:var(--bc-bone);
+  text-decoration:none;
+}
+.bc-thinfoot__mark:hover { opacity:.85; }
+.bc-thinfoot__mark .bc-systems { color:var(--bc-sienna); }
+.bc-thinfoot__mark .bc-dot { color:var(--bc-sienna); }
+</style>
+<footer class="bc-thinfoot">
+  <span class="bc-thinfoot__label">Powered by</span>
+  <a class="bc-thinfoot__mark" href="https://bagcarriers.com/systems" target="_blank" rel="noopener">
+    BAG CARRIERS <span class="bc-systems">SYSTEMS</span><span class="bc-dot">.</span>
+  </a>
+</footer>
+</body>
+</html>

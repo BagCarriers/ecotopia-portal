@@ -151,6 +151,14 @@
         <div class="form-group"><label>Status (free text)</label>
           <input type="text" id="mi_status" placeholder="Pre-order"></div>
       </div>
+      <div class="form-row">
+        <div class="form-group"><label>Price (USD, for online payment)</label>
+          <input type="number" id="mi_pricecents" min="0" step="0.01" placeholder="e.g. 40.00">
+          <div class="field-note">The payable price. Set it to make this item orderable (Reserve for pickup or Pay online); leave blank for a request-only item that uses the ask form. The free-text price at left is display only.</div></div>
+        <div class="form-group"><label>Stock (blank = untracked)</label>
+          <input type="number" id="mi_stock" min="0" step="1" placeholder="Leave blank for untracked">
+          <div class="field-note">Blank means always available (untracked). A number tracks the count; 0 shows "Sold out". Paid orders draw it down automatically.</div></div>
+      </div>
       <div class="form-group"><label>Buy link (optional)</label>
         <input type="url" id="mi_link" placeholder="https://store.example.com/item">
         <div class="field-note">If set (must start with https://), the card shows a "Buy" button that
@@ -200,6 +208,21 @@ function merchPhotoSrc(photoPath) {
 }
 function isStatic(path) { return !!path && String(path).slice(0, 7) === 'static:'; }
 
+// Stock input: blank -> null (untracked); otherwise a non-negative integer count.
+function parseStock(raw) {
+  const s = String(raw == null ? '' : raw).trim();
+  if (s === '') return { value: null };
+  if (!/^\d+$/.test(s)) return { error: 'Stock must be a whole number 0 or more, or blank for untracked.' };
+  return { value: parseInt(s, 10) };
+}
+// Payable price (dollars input) -> integer cents; blank -> null (request-only item).
+function parsePriceCents(raw) {
+  const s = String(raw == null ? '' : raw).trim();
+  if (s === '') return { value: null };
+  if (!/^\d+(\.\d{1,2})?$/.test(s)) return { error: 'Price must be a dollar amount like 40 or 39.99, or blank for a request-only item.' };
+  return { value: Math.round(parseFloat(s) * 100) };
+}
+
 async function uploadMerchPhoto(file) {
   const blob = await DataStore.resizeImage(file, 1600);
   const path = `shop/${crypto.randomUUID()}.jpg`;
@@ -230,6 +253,10 @@ function render() {
       : '<span class="status-pill status-off">Hidden</span>';
     const status = m.statusText ? `<span class="chip-soft">${esc(m.statusText)}</span>` : '';
     const price = m.priceText ? esc(m.priceText) : 'No price set';
+    const payable = m.priceCents != null
+      ? ` · payable $${(m.priceCents / 100).toFixed(2)}`
+      : (m.linkUrl ? '' : ' · request-only');
+    const stockHint = m.stockQty != null ? ` · stock ${esc(String(m.stockQty))}` : '';
     const link = m.linkUrl ? ' · external buy link' : '';
     return `
       <div class="row ${m.active ? '' : 'inactive'}">
@@ -241,7 +268,7 @@ function render() {
         <div class="row-main">
           <div class="row-title">${esc(m.name)} ${pill}</div>
           <div class="row-sub">${price}${status}</div>
-          <div class="row-sub2">${esc(m.blurb || '')}${link}</div>
+          <div class="row-sub2">${esc(m.blurb || '')}${payable}${stockHint}${link}</div>
         </div>
         <div class="row-actions">
           <button class="btn-sm" onclick="openModal('${esc(m.id)}')">Edit</button>
@@ -334,6 +361,8 @@ function openModal(id) {
   document.getElementById('mi_blurb').value = m ? (m.blurb || '') : '';
   document.getElementById('mi_price').value = m ? (m.priceText || '') : '';
   document.getElementById('mi_status').value = m ? (m.statusText || '') : '';
+  document.getElementById('mi_pricecents').value = (m && m.priceCents != null) ? (m.priceCents / 100) : '';
+  document.getElementById('mi_stock').value = (m && m.stockQty != null) ? m.stockQty : '';
   document.getElementById('mi_link').value = m ? (m.linkUrl || '') : '';
   document.getElementById('mi_photo').value = '';
   renderPhoto(photoCurrentPath ? merchPhotoSrc(photoCurrentPath) : '', isStatic(photoCurrentPath));
@@ -357,11 +386,17 @@ document.getElementById('itemForm').addEventListener('submit', async function (e
     errEl.textContent = 'The buy link must start with https:// (or leave it blank).';
     return;
   }
+  const priceCents = parsePriceCents(document.getElementById('mi_pricecents').value);
+  if (priceCents.error) { errEl.textContent = priceCents.error; return; }
+  const stock = parseStock(document.getElementById('mi_stock').value);
+  if (stock.error) { errEl.textContent = stock.error; return; }
   const changes = {
     name,
     blurb: document.getElementById('mi_blurb').value.trim() || null,
     priceText: document.getElementById('mi_price').value.trim() || null,
     statusText: document.getElementById('mi_status').value.trim() || null,
+    priceCents: priceCents.value,
+    stockQty: stock.value,
     linkUrl: link || null,
   };
   // Resolve photo change: new upload replaces; "remove" clears; else keep.

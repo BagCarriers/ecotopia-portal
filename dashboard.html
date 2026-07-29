@@ -195,12 +195,12 @@ try {
   document.getElementById('dateSubtitle').textContent =
     now.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
 
-  const [gardens, jobs, invoices, unpaidInvoicesList, jordanTasksList, openTasksList, recentCheckins, upcomingEventsList, observations, plantingSuggestions, questionsList] =
+  const [gardens, jobs, invoices, unpaidInvoicesList, jordanTasksList, openTasksList, recentCheckins, upcomingEventsList, observations, plantingSuggestions, questionsList, ordersList] =
     await Promise.all([
       DataStore.getGardens(), DataStore.getJobs(), DataStore.getInvoices(),
       DataStore.getUnpaidInvoices(), DataStore.getJordanTasks(), DataStore.getOpenTasks(),
       DataStore.getRecentCheckins(5), DataStore.getUpcomingEvents(), DataStore.getObservations(),
-      DataStore.getPlantingSuggestions(), DataStore.getQuestions(),
+      DataStore.getPlantingSuggestions(), DataStore.getQuestions(), DataStore.getOrders(),
     ]);
 
   // Stats
@@ -341,6 +341,14 @@ if (newQuestions.length > 0) {
     badge: 'blue', label: 'New Question',
     text: `${newQuestions.length} new question${newQuestions.length > 1 ? 's' : ''}`,
     link: 'question-inbox.html', linkText: 'Answer →'
+  });
+}
+const newOrders = ordersList.filter(o => o.status === 'new' || o.status === 'link_created');
+if (newOrders.length > 0) {
+  attentionItems.push({
+    badge: 'blue', label: 'New Order',
+    text: `${newOrders.length} new order${newOrders.length > 1 ? 's' : ''}`,
+    link: 'orders.html', linkText: 'View →'
   });
 }
 

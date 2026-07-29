@@ -192,6 +192,10 @@
         <input type="text" id="sp_tags" placeholder="spring, summer, bird">
         <div class="field-note">Comma-separated. Allowed: spring, summer, fall, shade, medicinal, edible, bird.</div>
       </div>
+      <div class="form-group"><label>Stock (blank = untracked)</label>
+        <input type="number" id="sp_stock" min="0" step="1" placeholder="Leave blank for untracked">
+        <div class="field-note">Blank means always available (untracked). A number tracks the count; 0 shows "Sold out this season" on the public page. Paid orders draw it down automatically.</div>
+      </div>
       <div class="form-group"><label>Photo</label>
         <input type="file" id="sp_photo" accept="image/*" onchange="onSpeciesPhotoChosen(this)">
         <div class="photo-preview" id="sp_photo_preview" style="display:none">
@@ -221,6 +225,10 @@
         <div class="kit-plant-rows" id="kt_plant_rows"></div>
         <button type="button" class="btn-sm kit-add-plant" onclick="addKitPlantRow()">+ Add plant</button>
         <div class="field-note">Name is required per row; the note is an optional soil or "optional shrub/tree/vine" qualifier.</div>
+      </div>
+      <div class="form-group"><label>Stock (blank = untracked)</label>
+        <input type="number" id="kt_stock" min="0" step="1" placeholder="Leave blank for untracked">
+        <div class="field-note">Blank means always available (untracked). A number tracks the count; 0 shows "Sold out" on the public page. Paid orders draw it down automatically.</div>
       </div>
       <div class="form-group"><label>Photo</label>
         <input type="file" id="kt_photo" accept="image/*" onchange="onKitPhotoChosen(this)">
@@ -282,6 +290,14 @@ function parseTags(raw) {
   parts.forEach(t => { if (uniq.indexOf(t) === -1) uniq.push(t); });
   const bad = uniq.filter(t => TAG_ALLOW.indexOf(t) === -1);
   return { tags: uniq, bad };
+}
+
+// Stock input: blank -> null (untracked); otherwise a non-negative integer count.
+function parseStock(raw) {
+  const s = String(raw == null ? '' : raw).trim();
+  if (s === '') return { value: null };
+  if (!/^\d+$/.test(s)) return { error: 'Stock must be a whole number 0 or more, or blank for untracked.' };
+  return { value: parseInt(s, 10) };
 }
 
 // ── Tabs ─────────────────────────────────────────────────────────────────────
@@ -410,6 +426,7 @@ function openSpeciesModal(id) {
   document.getElementById('sp_attracts').value = p ? (p.attracts || '') : '';
   document.getElementById('sp_fact').value = p ? (p.fact || '') : '';
   document.getElementById('sp_tags').value = p && p.tags ? p.tags.join(', ') : '';
+  document.getElementById('sp_stock').value = (p && p.stockQty != null) ? p.stockQty : '';
   document.getElementById('sp_photo').value = '';
   renderSpeciesPhoto(spPhotoCurrentPath ? catalogPhotoSrc(spPhotoCurrentPath) : '');
   document.getElementById('speciesModal').classList.add('open');
@@ -431,6 +448,8 @@ document.getElementById('speciesForm').addEventListener('submit', async function
     errEl.textContent = 'Unknown tag(s): ' + bad.join(', ') + '. Allowed: ' + TAG_ALLOW.join(', ') + '.';
     return;
   }
+  const spStock = parseStock(document.getElementById('sp_stock').value);
+  if (spStock.error) { errEl.textContent = spStock.error; return; }
   const changes = {
     common,
     botanical: document.getElementById('sp_botanical').value.trim() || null,
@@ -439,6 +458,7 @@ document.getElementById('speciesForm').addEventListener('submit', async function
     attracts: document.getElementById('sp_attracts').value.trim() || null,
     fact: document.getElementById('sp_fact').value.trim() || null,
     tags,
+    stockQty: spStock.value,
   };
   // Resolve photo change: new upload replaces; "remove" clears; else keep.
   let newPath = null;
@@ -618,6 +638,7 @@ function openKitModal(id) {
   const plants = (k && k.plants) ? k.plants : [];
   if (plants.length) plants.forEach(p => addKitPlantRow(p.name, p.note));
   else addKitPlantRow('', '');
+  document.getElementById('kt_stock').value = (k && k.stockQty != null) ? k.stockQty : '';
   document.getElementById('kt_photo').value = '';
   renderKitPhoto(ktPhotoCurrentPath ? catalogPhotoSrc(ktPhotoCurrentPath) : '');
   document.getElementById('kitModal').classList.add('open');
@@ -634,10 +655,13 @@ document.getElementById('kitForm').addEventListener('submit', async function (e)
   errEl.textContent = '';
   const name = document.getElementById('kt_name').value.trim();
   if (!name) { errEl.textContent = 'A kit name is required.'; return; }
+  const ktStock = parseStock(document.getElementById('kt_stock').value);
+  if (ktStock.error) { errEl.textContent = ktStock.error; return; }
   const changes = {
     name,
     blurb: document.getElementById('kt_blurb').value.trim() || null,
     plants: collectKitPlants(),
+    stockQty: ktStock.value,
   };
   let newPath = null;
   if (ktPhotoFile) {

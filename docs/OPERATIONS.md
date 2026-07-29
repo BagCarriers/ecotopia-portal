@@ -720,6 +720,99 @@ Data helpers (`assets/data.js`): `getMerchItems` (staff read, inactive included,
 `sort` then name), `addMerchItem` / `updateMerchItem` / `deleteMerchItem(id, photoPath)`,
 plus `merchPhotoUrl` for gallery-bucket paths.
 
+## Inventory and orders
+
+Migration `0025_inventory_orders.sql` makes **Supabase the single source of truth** for
+catalog, prices, inventory, and orders. **Square is a pure payment vessel**: it only ever
+sees a computed total via an ad-hoc `quick_pay` Payment Link, and **nothing is mirrored
+into Square** (no catalog items, no inventory, no customers). Applied live via the
+Management API, so register it with `supabase migration repair --status applied 0025`
+before any `supabase db push`.
+
+Schema changes:
+
+- `plant_species.stock_qty`, `plant_kits.stock_qty`, `merch_items.stock_qty` (all nullable
+  integer). **Stock semantics: `null` = untracked (always available); an integer = a tracked
+  count; `0` = sold out** (the public page shows a "Sold out" chip and disables the button).
+- `merch_items.price_cents` (nullable integer): the **payable** price. `price_text` stays
+  display-only. A merch item with `price_cents = null` is **request-only** (it uses the old
+  ask/pre-order form and cannot be ordered online); setting `price_cents` makes it orderable.
+- `public.orders` (Supabase-owned). Columns: `order_token` (unique, 64 hex; the public
+  status/pay page key), `customer_name`, `phone`, `email`, `items` (jsonb array of
+  `{kind:'species'|'kit'|'merch', id, name, qty, unit_cents, tier?}`), `subtotal_cents`,
+  `status`, `pay_mode` (`pickup`/`online`), `square_order_id`, `square_pay_url`, `note`.
+  **No anon RLS policy** at all: a single `o_staff_all` policy for authenticated portal
+  users; anon reaches orders only through the security-definer edge function. Carries the
+  shared `set_updated_at` trigger.
+- `decrement_stock(p_kind, p_id, p_qty)` (security definer): draws down a tracked row's
+  stock, floored at 0, leaving untracked (`null`) rows alone. **Execute is revoked from
+  `public`/`anon`/`authenticated` and granted only to `service_role`** - it is called ONLY
+  by the `square-pay` edge function.
+
+**Order lifecycle:** `new` -> `link_created` (online, a Square link was minted) -> `paid`
+-> `ready` -> `completed`, or `cancelled`. Stock is drawn down exactly once, on the first
+transition into `paid` (idempotent: re-marking paid never double-decrements).
+
+**Pricing authority (single source):** `PLANT_PRICE_CENTS` (500) and `KIT_TIERS`
+(`50`->7200, `100`->14400, `150`->20000, `200`->25000 cents) live in the `square-pay`
+edge function. Client-sent prices are always ignored; the server re-prices every line from
+the live catalog. `merch` lines are priced from `price_cents` (request-only items rejected).
+
+The `square-pay` edge function gained three public/staff actions plus a webhook branch (one
+endpoint, told apart by the `x-square-hmacsha256-signature` header then `body.action`):
+
+- **`create_order`** (PUBLIC, anon) - `{action, customer:{name, phone?, email?}, items:
+  [{kind,id,qty,tier?}], pay_mode, note?}`. Validates server-side: name required; 1-40
+  lines; qty 1-20 (kits forced 1-5, tier required and in `KIT_TIERS`); each row loaded from
+  the live catalog and must be `active`; merch must have `price_cents` (else `400
+  not_payable`). Any tracked item with `stock_qty < qty` -> `409 {error:'insufficient_stock',
+  item}`. Recomputes `subtotal_cents` server-side and inserts the order (`order_token` = 64
+  hex). `pay_mode:'online'` + Square configured mints a `quick_pay` Payment Link (`Order
+  <first 8 of id> - Ecotopian EarthCare`, amount `subtotal_cents`, idempotency `<id>:order`),
+  saves `square_order_id`/`square_pay_url`, sets status `link_created`, returns `{token,
+  pay_url}`. `online` but Square dark (or unreachable) -> `{token, configured:false}` (order
+  stays `new`, treated as pickup). `pickup` -> `{token}`.
+- **`order_status`** (PUBLIC, anon) - `{action, token}` (>= 32 chars). Returns `{status,
+  items, subtotal_cents, pay_mode, pay_url, created_at}` for the public `order.html` page;
+  `404` otherwise.
+- **`staff_mark_paid`** (STAFF) - `{action, order_id}` with an `Authorization: Bearer
+  <staff JWT>`. The JWT is validated by resolving it against GoTrue `/user` directly (apikey
+  = service role) and confirming an active `portal_users` row. It exists because staff RLS
+  can update `orders` but **cannot** call the service-role-only `decrement_stock`; this
+  action sets `paid` AND draws down tracked stock in one call, for cash/check pickups.
+- **Webhook routing** - on a `COMPLETED` `payment.updated`, the function first looks up a
+  `quotes` row by `square_order_id` (deposit flow, unchanged); if none matches it looks up an
+  `orders` row and, when the order is still `new`/`link_created`, sets it `paid` and
+  decrements tracked stock (idempotent; unknown order id is a `200` no-op). **This is the
+  same webhook URL Square already calls for deposit payments - order payments arrive here too.**
+
+Where things live:
+
+- Public `plants.html`: the plant tray and the kit modal now create orders (replacing the
+  old `intake_submissions` + `jobs` writes). Each carries a pay-mode choice ("Reserve and pay
+  at pickup" [default] / "Pay online now"); online falls back to a saved-for-pickup note when
+  Square is dark. Sold-out species/kits (`stock_qty === 0`) show a chip and a disabled button.
+- Public `shop.html`: payable merch (`price_cents` set) uses an "Order this" modal that
+  creates an order; request-only merch keeps the ask/pre-order form; sold-out items are
+  disabled. Branch flag: `isPayable = priceCents != null`.
+- Public `order.html?t=<token>` (marketing-branded, `noindex`, NO auth): reads
+  `order_status`, renders items, total, a Received -> Paid/Pay-at-pickup -> Ready -> Completed
+  timeline, a Square Pay button when a link exists and the order is unpaid, else a
+  pay-at-pickup note. Poll-free (refresh to update). Every value is `esc()`'d.
+- Portal `orders.html` (the "Orders" nav link after Jobs): newest-first list with status
+  filters, status pills, items + total, customer contact, note, and actions - **Mark paid**
+  (via `staff_mark_paid`, decrements stock), **Mark ready**, **Mark completed**, **Cancel**
+  (plain staff status updates via `DataStore.updateOrder`), and **Copy order link**.
+  `dashboard.html` "Needs attention" surfaces "N new order(s)" (`new`/`link_created`).
+- Staff editors: `manage-plants.html` species + kit modals gain a "Stock (blank = untracked)"
+  input; `manage-shop.html` gains "Stock" and "Price (USD, for online payment)" (stored as
+  `price_cents`, blank = request-only). Data helpers in `assets/data.js`: `getOrders`
+  (newest-first) and `updateOrder(id, ch)`; stock/price ride the existing camelCase mapping.
+
+The whole online-payment path runs **dark** until Square credentials exist (same five
+secrets as the deposit flow, see "Square deposit payments"); until then online orders save
+for pickup with no code change.
+
 ## Deploy
 
 The site is a static bundle deployed to Netlify:

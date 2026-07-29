@@ -69,6 +69,14 @@
   font-family: var(--font-util); color: var(--ink-soft); font-size: 1rem;
   padding: 24px 0; text-align: center;
 }
+.shop-card .shop-cta:disabled { opacity: 0.55; cursor: not-allowed; background: #fff;
+  color: var(--ink-soft); border: 1.5px solid var(--line); }
+.sold-chip { display: inline-block; font-family: var(--font-util); font-weight: 700;
+  font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: #b3261e;
+  background: #fbeae8; border-radius: 999px; padding: 4px 12px; margin: 0 0 12px; }
+.pay-choice { display: flex; align-items: center; gap: 8px; font-family: var(--font-util);
+  font-size: 0.98rem; color: var(--ink); padding: 6px 0; cursor: pointer; }
+.pay-choice input { margin: 0; }
 @media (prefers-reduced-motion: reduce) { .shop-card .shop-cta { transition: none !important; } }
 </style>
 </head>
@@ -134,10 +142,13 @@
 
 <script>
 /* ==========================================================================
-   Shop page runtime. Reads active merch_items over anon (RLS scopes it), and
-   the "Pre-order / Ask about this" modal fire-and-forgets anon inserts to
-   intake_submissions (service_type 'merch') + jobs (status 'inquiry'), exactly
-   mirroring the plants.html flows. No online payment.
+   Shop page runtime. Reads active merch_items over anon (RLS scopes it).
+   Payable items (price_cents set) create a first-class ORDER through the
+   square-pay edge function (create_order, kind 'merch'; the server re-prices from
+   the live catalog and checks stock). Request-only items (no price_cents) keep the
+   old "Pre-order / Ask about this" flow (anon inserts to intake_submissions +
+   jobs). Sold-out items (stock_qty === 0) are shown disabled. Nothing is mirrored
+   into Square.
    ========================================================================== */
 (function () {
   'use strict';
@@ -146,6 +157,44 @@
 
   var MERCH = [];
   var MERCH_BY_ID = {};
+
+  // ── Order creation (server-side validation + pricing lives in the edge fn) ──
+  var ORDER_FN = window.ECO_CONFIG.SUPABASE_URL + '/functions/v1/square-pay';
+  var ANON_KEY = window.ECO_CONFIG.SUPABASE_ANON_KEY;
+  async function createOrder(payload) {
+    var body = null, ok = false, status = 0;
+    try {
+      var r = await fetch(ORDER_FN, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: ANON_KEY, Authorization: 'Bearer ' + ANON_KEY },
+        body: JSON.stringify(payload)
+      });
+      ok = r.ok; status = r.status;
+      try { body = await r.json(); } catch (e) { body = null; }
+    } catch (e) { body = null; }
+    return { ok: ok, status: status, body: body || {} };
+  }
+  function orderErrorMessage(res) {
+    var b = res.body || {};
+    if (res.status === 409 && b.error === 'insufficient_stock') {
+      return 'Sorry, ' + (b.item || 'this item') + ' just sold out or is low on stock. Please try a smaller quantity.';
+    }
+    return 'Something went wrong sending your order. Please try again, or email us at admin@ecotopianearthcare.com or call 814-631-5338.';
+  }
+  function isPayable(item) { return item.priceCents != null; }
+  function isSoldOut(item) { return item.stockQty === 0; }
+  function payModeHtml(name) {
+    return (
+      '<div class="eco-lead-field eco-lead-full"><label>How would you like to pay?</label>' +
+        '<label class="pay-choice"><input type="radio" name="' + esc(name) + '" value="pickup" checked> Reserve and pay at pickup</label>' +
+        '<label class="pay-choice"><input type="radio" name="' + esc(name) + '" value="online"> Pay online now</label>' +
+      '</div>'
+    );
+  }
+  function readPayMode(name) {
+    var el = document.querySelector('input[name="' + name + '"]:checked');
+    return el && el.value === 'online' ? 'online' : 'pickup';
+  }
 
   // Resolve a stored photo_path to a renderable src, or null. 'static:<path>' is a
   // repo asset under assets/img/ (each path segment charset-guarded and '..'
@@ -217,20 +266,35 @@
           (m.statusText ? '<span class="shop-status">' + esc(m.statusText) + '</span>' : '') +
           '</div>';
       }
-      var cta = validLink(m.linkUrl)
-        ? '<a class="shop-cta" href="' + esc(m.linkUrl.trim()) + '" target="_blank" rel="noopener">Buy</a>'
-        : '<button type="button" class="shop-cta" data-id="' + esc(m.id) + '">Pre-order / Ask about this</button>';
+      var soldOut = isSoldOut(m);
+      var soldChip = soldOut ? '<span class="sold-chip">Sold out</span>' : '';
+      var cta;
+      if (validLink(m.linkUrl)) {
+        cta = '<a class="shop-cta" href="' + esc(m.linkUrl.trim()) + '" target="_blank" rel="noopener">Buy</a>';
+      } else if (soldOut) {
+        cta = '<button type="button" class="shop-cta" disabled>Sold out</button>';
+      } else if (isPayable(m)) {
+        // Payable item: create a first-class order (reserve for pickup or pay online).
+        cta = '<button type="button" class="shop-cta" data-order="' + esc(m.id) + '">Order this</button>';
+      } else {
+        // Request-only item (no price): keep the ask / pre-order form.
+        cta = '<button type="button" class="shop-cta" data-id="' + esc(m.id) + '">Pre-order / Ask about this</button>';
+      }
       return '<article class="shop-card reveal">' +
         photo +
         '<h3>' + esc(m.name) + '</h3>' +
         (m.blurb ? '<p class="shop-blurb">' + esc(m.blurb) + '</p>' : '') +
         thumbs +
         meta +
+        soldChip +
         cta +
         '</article>';
     }).join('');
     grid.querySelectorAll('.shop-cta[data-id]').forEach(function (btn) {
       btn.addEventListener('click', function () { openInquiry(btn.getAttribute('data-id')); });
+    });
+    grid.querySelectorAll('.shop-cta[data-order]').forEach(function (btn) {
+      btn.addEventListener('click', function () { openOrder(btn.getAttribute('data-order')); });
     });
     EcoSite.decorate();
   }
@@ -354,6 +418,107 @@
     } catch (err) {
       errEl.textContent = 'Something went wrong sending your request. Please try again, or email us at admin@ecotopianearthcare.com or call 814-631-5338.';
     }
+  }
+
+  // ── Order modal (payable items) ───────────────────────────────────────────
+  // Name required; email OR phone required; quantity 1-10; pay mode; optional note.
+  // Submits create_order (kind 'merch'); the server re-prices from the catalog.
+  function openOrder(id) {
+    var item = MERCH_BY_ID[id];
+    if (!item || !isPayable(item) || isSoldOut(item)) return; // allowlist + guards
+    ensureModal();
+    var body = document.getElementById('shopModalBody');
+    var qtyOpts = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(function (n) {
+      return '<option value="' + n + '">' + n + '</option>';
+    }).join('');
+    body.innerHTML =
+      '<p class="eco-lead-eyebrow">Order</p>' +
+      '<h2 id="shopModalTitle">' + esc(item.name) + '</h2>' +
+      (item.priceText ? '<p class="eco-lead-tinynote">' + esc(item.priceText) + '</p>' : '') +
+      '<form id="orderForm" novalidate>' +
+        '<div class="eco-lead-grid">' +
+          '<div class="eco-lead-field eco-lead-full"><label for="or-name">Name <span class="req">*</span></label>' +
+            '<input type="text" id="or-name" placeholder="Full name"></div>' +
+          '<div class="eco-lead-field"><label for="or-email">Email</label>' +
+            '<input type="email" id="or-email" placeholder="email@example.com"></div>' +
+          '<div class="eco-lead-field"><label for="or-phone">Phone</label>' +
+            '<input type="tel" id="or-phone" placeholder="(814) 555-0000"></div>' +
+          '<div class="eco-lead-field"><label for="or-qty">Quantity</label>' +
+            '<select id="or-qty">' + qtyOpts + '</select></div>' +
+          '<div class="eco-lead-field eco-lead-full"><label for="or-note">Anything to add?</label>' +
+            '<textarea id="or-note" placeholder="Optional. A delivery preference, anything else."></textarea></div>' +
+        '</div>' +
+        '<div class="eco-lead-grid">' + payModeHtml('or-pay') + '</div>' +
+        '<p class="eco-lead-tinynote">Add an email or a phone number so we can reach you. Online payment lights up once our card processor is set up; until then your order is saved for pickup.</p>' +
+        '<p class="eco-lead-error" id="shopModalError"></p>' +
+        '<button type="submit" class="eco-lead-primary">Place order</button>' +
+      '</form>';
+    document.getElementById('orderForm').addEventListener('submit', function (e) {
+      e.preventDefault();
+      submitOrder(item);
+    });
+    showModal();
+  }
+
+  async function submitOrder(item) {
+    var errEl = document.getElementById('shopModalError');
+    errEl.textContent = '';
+    var name = (document.getElementById('or-name').value || '').trim();
+    var email = (document.getElementById('or-email').value || '').trim();
+    var phone = (document.getElementById('or-phone').value || '').trim();
+    var note = (document.getElementById('or-note').value || '').trim();
+    var qty = parseInt(document.getElementById('or-qty').value, 10);
+    var payMode = readPayMode('or-pay');
+    if (!(qty >= 1 && qty <= 10)) qty = 1;
+    if (!name) { errEl.textContent = 'Please add your name.'; return; }
+    if (!email && !phone) {
+      errEl.textContent = 'Please add an email or a phone number so we can reach you.';
+      return;
+    }
+    var btn = document.querySelector('#orderForm .eco-lead-primary');
+    if (btn) btn.disabled = true;
+    var res = await createOrder({
+      action: 'create_order',
+      customer: { name: name, phone: phone, email: email },
+      items: [{ kind: 'merch', id: item.id, qty: qty }],
+      pay_mode: payMode,
+      note: note || null
+    });
+    if (btn) btn.disabled = false;
+    if (!res.ok || !res.body.token) { errEl.textContent = orderErrorMessage(res); return; }
+    showOrderConfirm(res, payMode);
+  }
+
+  function showOrderConfirm(res, payModeRequested) {
+    var b = res.body || {};
+    var token = b.token || '';
+    var orderLink = 'order.html?t=' + encodeURIComponent(token);
+    var payBlock = '';
+    var sub;
+    if (payModeRequested === 'online') {
+      if (b.pay_url && /^https:\/\//i.test(b.pay_url)) {
+        payBlock = '<a class="eco-lead-primary" style="display:block;text-align:center;text-decoration:none;margin:0 0 12px" href="' +
+          esc(b.pay_url) + '" target="_blank" rel="noopener">Pay online now</a>';
+        sub = 'Your order is reserved. Pay securely online below, or pay at pickup.';
+      } else {
+        sub = 'Online payment is not set up yet, so your order is saved for pickup instead. We will reach out to arrange it.';
+      }
+    } else {
+      sub = 'We will reach out to arrange your order. Nothing is charged now.';
+    }
+    var body = document.getElementById('shopModalBody');
+    body.innerHTML =
+      '<div class="eco-lead-success">' +
+        '<div class="eco-lead-check" aria-hidden="true">✓</div>' +
+        '<h2 id="shopModalTitle">Thanks, we got your order.</h2>' +
+        '<p>' + esc(sub) + '</p>' +
+        payBlock +
+        (token ? '<p style="margin:8px 0 14px"><a href="' + esc(orderLink) + '">View your order and its status</a></p>' : '') +
+        '<button type="button" class="eco-lead-primary" id="shopModalDone">Close</button>' +
+      '</div>';
+    var done = document.getElementById('shopModalDone');
+    done.addEventListener('click', closeModal);
+    done.focus();
   }
 
   function showSuccess(title, sub) {

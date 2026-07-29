@@ -6,6 +6,7 @@ const Nav = (() => {
   const links = [
     { href: 'dashboard.html',  label: 'Dashboard',   icon: '⌂'  },
     { href: 'jobs.html',       label: 'Jobs',        icon: '🔨' },
+    { href: 'orders.html',     label: 'Orders',      icon: '📦' },
     { href: 'gardens.html',    label: 'Gardens',     icon: '🌿' },
     { href: 'clients.html',    label: 'Clients',     icon: '👤' },
     { href: 'volunteers.html', label: 'Volunteers',  icon: '🤝' },

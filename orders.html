@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Orders - Ecotopia</title>
+<meta name="robots" content="noindex">
+  <link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/img/favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/assets/img/favicon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/mapping.js"></script>
+<script src="assets/auth.js"></script>
+<script>if (!AuthManager.hasCachedSession()) location.replace('login.html');</script>
+<script src="assets/data.js"></script>
+<script src="assets/nav.js"></script>
+<style>
+  :root {
+    --forest: #1B4332; --forest-mid: #2D6A4F; --forest-light: #52B788;
+    --sage: #D8F3DC; --sage-dim: #B7E4C7; --earth: #8B5E3C;
+    --earth-light: #C68642; --gold: #F4A261; --cream: #F9F6F0;
+    --cream-dim: #E8E0D5; --text: #1C1C1C; --text-dim: #5A5A5A;
+    --border: rgba(45,106,79,0.2); --amber: #B8730A; --amber-bg: #FDF0DA;
+    --blue: #1d4ed8; --blue-bg: #dbeafe;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--text); }
+  .page { padding: 28px 32px; max-width: 940px; }
+  .page-header { margin-bottom: 6px; }
+  h1 { font-family: 'Fraunces', serif; font-size: 1.9rem; color: var(--forest); }
+  .page-intro { font-size: 0.9rem; color: var(--text-dim); margin-bottom: 22px;
+    max-width: 700px; line-height: 1.6; }
+
+  .btn-sm { font-size: 0.78rem; padding: 6px 12px; background: transparent;
+    border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
+    color: var(--text-dim); font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+  .btn-sm:hover { color: var(--forest); border-color: var(--forest-light); background: var(--sage); }
+  .btn-sm:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-sm.btn-primary { background: var(--forest); color: #fff; border-color: var(--forest); }
+  .btn-sm.btn-primary:hover { background: var(--forest-mid); color: #fff; }
+  .btn-sm.btn-danger { color: #b3261e; }
+  .btn-sm.btn-danger:hover { color: #fff; background: #b3261e; border-color: #b3261e; }
+
+  .filters { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; }
+  .filter { padding: 7px 15px; border-radius: 20px; border: 1.5px solid var(--border);
+    background: #fff; color: var(--text-dim); font-size: 0.82rem; font-weight: 600;
+    cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+  .filter:hover { border-color: var(--forest-light); }
+  .filter.active { background: var(--forest); color: #fff; border-color: var(--forest); }
+
+  .o-list { display: flex; flex-direction: column; gap: 12px; }
+  .o-card { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
+  .o-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
+  .o-cust { font-weight: 600; color: var(--forest); font-size: 1rem; }
+  .o-when { font-size: 0.78rem; color: var(--text-dim); margin-left: auto; white-space: nowrap; }
+  .status-pill { display: inline-block; padding: 2px 10px; border-radius: 20px;
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+  .status-new { background: var(--blue-bg); color: var(--blue); }
+  .status-link_created { background: var(--amber-bg); color: var(--amber); }
+  .status-paid { background: var(--sage); color: var(--forest); }
+  .status-ready { background: #fef3c7; color: #b45309; }
+  .status-completed { background: var(--cream-dim); color: var(--text-dim); }
+  .status-cancelled { background: #fbeae8; color: #b3261e; }
+  .pay-mode { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
+    color: var(--text-dim); background: var(--cream-dim); padding: 2px 9px; border-radius: 20px; }
+
+  .o-items { font-size: 0.9rem; color: var(--text); line-height: 1.6; margin-bottom: 6px; }
+  .o-items .tier { color: var(--text-dim); font-size: 0.84rem; }
+  .o-total { font-weight: 700; color: var(--forest); margin-bottom: 4px; }
+  .o-contact { font-size: 0.84rem; color: var(--text-dim); margin-bottom: 4px; }
+  .o-contact a { color: var(--forest-mid); text-decoration: none; }
+  .o-note { font-size: 0.84rem; color: var(--text-dim); background: var(--cream); border-radius: 8px;
+    padding: 8px 10px; margin: 6px 0; white-space: pre-wrap; }
+  .o-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
+  .o-err { color: #b3261e; font-size: 0.8rem; margin-top: 6px; }
+  .o-err:empty { display: none; }
+
+  .empty { padding: 30px 16px; color: var(--text-dim); font-size: 0.9rem; text-align: center; }
+  #pageError { color: #b3261e; font-size: 0.85rem; margin-bottom: 14px; }
+  #pageError:empty { display: none; }
+
+  @media (max-width: 700px) {
+    .page { padding: 20px 16px; }
+    .o-when { margin-left: 0; width: 100%; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="page-header"><h1>Orders</h1></div>
+  <p class="page-intro">Plant and shop orders placed from the public site. Prices and totals are
+    computed and held here in the portal (the single source of truth); Square only ever sees a
+    total when someone pays online. Mark an order paid when you take cash or a check at pickup
+    (this also draws down tracked stock), then Ready and Completed as you fulfil it.</p>
+
+  <div id="pageError"></div>
+  <div class="filters" id="filters"></div>
+  <div class="o-list" id="orderList"><div class="empty">Loading…</div></div>
+</div>
+
+<script>
+const esc = DataStore.esc;
+const ORDER_FN = window.ECO_CONFIG.SUPABASE_URL + '/functions/v1/square-pay';
+const ORDER_BASE = 'https://ecotopia.bagcarriers.dev';
+const TIER_LABEL = { '50': '50 sq ft', '100': '100 sq ft', '150': '150 sq ft', '200': '200 sq ft' };
+const STATUS_LABEL = {
+  new: 'New', link_created: 'Link sent', paid: 'Paid', ready: 'Ready',
+  completed: 'Completed', cancelled: 'Cancelled'
+};
+
+let orders = [];
+let filter = 'open';
+
+function money(cents) {
+  return '$' + ((Number(cents) || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function fmtWhen(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) + ', ' +
+    d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+function itemsSummary(items) {
+  if (!Array.isArray(items) || !items.length) return '';
+  return items.map(o => {
+    const tier = o.tier && TIER_LABEL[o.tier] ? ' <span class="tier">(' + esc(TIER_LABEL[o.tier]) + ')</span>' : '';
+    return esc(String(o.qty || 0)) + '&times; ' + esc(o.name || '') + tier +
+      ' <span class="tier">' + money((Number(o.unit_cents) || 0) * (Number(o.qty) || 0)) + '</span>';
+  }).join('<br>');
+}
+
+const FILTERS = [
+  { key: 'open', label: 'Open' },
+  { key: 'all', label: 'All' },
+  { key: 'new', label: 'New' },
+  { key: 'paid', label: 'Paid' },
+  { key: 'ready', label: 'Ready' },
+  { key: 'completed', label: 'Completed' },
+  { key: 'cancelled', label: 'Cancelled' },
+];
+function renderFilters() {
+  document.getElementById('filters').innerHTML = FILTERS.map(f =>
+    `<button class="filter ${f.key === filter ? 'active' : ''}" data-f="${esc(f.key)}">${esc(f.label)}</button>`
+  ).join('');
+  document.querySelectorAll('#filters .filter').forEach(b => {
+    b.addEventListener('click', () => { filter = b.getAttribute('data-f'); renderFilters(); render(); });
+  });
+}
+
+function matchesFilter(o) {
+  if (filter === 'all') return true;
+  if (filter === 'open') return o.status !== 'completed' && o.status !== 'cancelled';
+  if (filter === 'new') return o.status === 'new' || o.status === 'link_created';
+  return o.status === filter;
+}
+
+function actionsFor(o) {
+  const btns = [];
+  if (o.status === 'new' || o.status === 'link_created') {
+    btns.push(`<button class="btn-sm btn-primary" data-act="paid" data-id="${esc(o.id)}">Mark paid</button>`);
+  }
+  if (o.status === 'paid') {
+    btns.push(`<button class="btn-sm btn-primary" data-act="ready" data-id="${esc(o.id)}">Mark ready</button>`);
+  }
+  if (o.status === 'ready') {
+    btns.push(`<button class="btn-sm btn-primary" data-act="completed" data-id="${esc(o.id)}">Mark completed</button>`);
+  }
+  if (o.status !== 'completed' && o.status !== 'cancelled') {
+    btns.push(`<button class="btn-sm btn-danger" data-act="cancel" data-id="${esc(o.id)}">Cancel</button>`);
+  }
+  btns.push(`<button class="btn-sm" data-act="copy" data-id="${esc(o.id)}">Copy order link</button>`);
+  return btns.join('');
+}
+
+function render() {
+  const el = document.getElementById('orderList');
+  const rows = orders.filter(matchesFilter);
+  if (!rows.length) { el.innerHTML = '<div class="empty">No orders in this view.</div>'; return; }
+  el.innerHTML = rows.map(o => {
+    const contactBits = [];
+    if (o.phone) contactBits.push(`<a href="tel:${esc(o.phone)}">${esc(o.phone)}</a>`);
+    if (o.email) contactBits.push(`<a href="mailto:${esc(o.email)}">${esc(o.email)}</a>`);
+    const payMode = o.payMode === 'online' ? 'Online' : 'Pickup';
+    return `
+      <div class="o-card" data-id="${esc(o.id)}">
+        <div class="o-top">
+          <span class="o-cust">${esc(o.customerName)}</span>
+          <span class="status-pill status-${esc(o.status)}">${esc(STATUS_LABEL[o.status] || o.status)}</span>
+          <span class="pay-mode">${esc(payMode)}</span>
+          <span class="o-when">${esc(fmtWhen(o.createdAt))}</span>
+        </div>
+        <div class="o-items">${itemsSummary(o.items)}</div>
+        <div class="o-total">Total: ${money(o.subtotalCents)}</div>
+        ${contactBits.length ? `<div class="o-contact">${contactBits.join(' &middot; ')}</div>` : ''}
+        ${o.note ? `<div class="o-note">${esc(o.note)}</div>` : ''}
+        <div class="o-actions">${actionsFor(o)}</div>
+        <div class="o-err" id="err-${esc(o.id)}"></div>
+      </div>`;
+  }).join('');
+  el.querySelectorAll('[data-act]').forEach(btn => {
+    btn.addEventListener('click', () => handleAction(btn.getAttribute('data-act'), btn.getAttribute('data-id'), btn));
+  });
+}
+
+function orderById(id) { return orders.find(o => o.id === id); }
+function setErr(id, msg) { const e = document.getElementById('err-' + id); if (e) e.textContent = msg || ''; }
+
+async function handleAction(act, id, btn) {
+  const o = orderById(id);
+  if (!o) return;
+  setErr(id, '');
+  if (act === 'copy') {
+    const link = ORDER_BASE + '/order.html?t=' + encodeURIComponent(o.orderToken);
+    try { await navigator.clipboard.writeText(link); btn.textContent = 'Copied!'; setTimeout(() => { btn.textContent = 'Copy order link'; }, 1500); }
+    catch (e) { setErr(id, 'Could not copy. Link: ' + link); }
+    return;
+  }
+  if (act === 'paid') {
+    if (!confirm(`Mark ${o.customerName}'s order paid? This also draws down tracked stock.`)) return;
+    btn.disabled = true;
+    try {
+      const { data } = await window.ecoSupabase.auth.getSession();
+      const jwt = data && data.session ? data.session.access_token : null;
+      if (!jwt) throw new Error('Your session expired. Please sign in again.');
+      const r = await fetch(ORDER_FN, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + jwt },
+        body: JSON.stringify({ action: 'staff_mark_paid', order_id: id })
+      });
+      if (!r.ok) throw new Error('Could not mark paid (' + r.status + ').');
+      await load();
+    } catch (err) {
+      btn.disabled = false;
+      setErr(id, err.message || 'Could not mark paid.');
+    }
+    return;
+  }
+  // ready / completed / cancel: plain staff status updates (RLS-guarded).
+  const nextStatus = act === 'cancel' ? 'cancelled' : act;
+  if (act === 'cancel' && !confirm(`Cancel ${o.customerName}'s order?`)) return;
+  btn.disabled = true;
+  try {
+    await DataStore.updateOrder(id, { status: nextStatus });
+    await load();
+  } catch (err) {
+    btn.disabled = false;
+    setErr(id, 'Could not update. ' + err.message);
+  }
+}
+
+async function load() {
+  orders = await DataStore.getOrders();
+  render();
+}
+
+(async function init() {
+  try {
+    await AuthManager.requireAuth();
+    Nav.render();
+    renderFilters();
+    await load();
+  } catch (err) {
+    document.getElementById('orderList').innerHTML =
+      '<div class="empty">Could not load orders (' + esc(err.message) +
+      '). <a href="javascript:location.reload()">Retry</a></div>';
+  }
+})();
+</script>
+
+<!-- Bag Carriers thin powered-by footer (locked attribution component) -->
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Libre+Baskerville:ital@1&display=swap" rel="stylesheet">
+<style>
+body { min-height: 100vh; display: flex; flex-direction: column; }
+.bc-thinfoot { margin-top: auto; }
+.bc-thinfoot {
+  --bc-ink:#0a0c10; --bc-bone:#f0ece4; --bc-sienna:#7a4520; --bc-muted:#8a8172;
+  flex: 0 0 auto;
+  background:var(--bc-ink);
+  font-family:'Bebas Neue',sans-serif;
+  padding:12px 20px;
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  border-top:2px solid var(--bc-sienna);
+  text-align:center;
+}
+.bc-thinfoot__label {
+  font-family:'Libre Baskerville',serif; font-style:italic;
+  font-size:11px; letter-spacing:.02em; color:var(--bc-muted);
+}
+.bc-thinfoot__mark {
+  font-family:'Bebas Neue',sans-serif; letter-spacing:.08em;
+  font-size:15px; line-height:1; color:var(--bc-bone);
+  text-decoration:none;
+}
+.bc-thinfoot__mark:hover { opacity:.85; }
+.bc-thinfoot__mark .bc-systems { color:var(--bc-sienna); }
+.bc-thinfoot__mark .bc-dot { color:var(--bc-sienna); }
+</style>
+<footer class="bc-thinfoot">
+  <span class="bc-thinfoot__label">Powered by</span>
+  <a class="bc-thinfoot__mark" href="https://bagcarriers.com/systems" target="_blank" rel="noopener">
+    BAG CARRIERS <span class="bc-systems">SYSTEMS</span><span class="bc-dot">.</span>
+  </a>
+</footer>
+</body>
+</html>

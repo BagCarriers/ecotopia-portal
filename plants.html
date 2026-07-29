@@ -214,6 +214,24 @@
   padding: 20px 0; text-align: center;
 }
 .eco-lead-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+.pay-choice {
+  display: flex; align-items: center; gap: 8px; font-family: var(--font-util);
+  font-size: 0.98rem; color: var(--ink); padding: 6px 0; cursor: pointer;
+}
+.pay-choice input { margin: 0; }
+
+/* Sold-out chip + disabled add/request buttons */
+.sold-chip {
+  display: inline-block; font-family: var(--font-util); font-weight: 700;
+  font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em;
+  color: #b3261e; background: #fbeae8; border-radius: 999px; padding: 4px 12px;
+  margin: 0 0 12px;
+}
+.plant-add:disabled, .kit-req:disabled {
+  opacity: 0.55; cursor: not-allowed; background: #fff; color: var(--ink-soft);
+  border-color: var(--line);
+}
+.kit-req:disabled:hover { background: #fff; }
 
 /* Guides and ID booklets (static PDF library) */
 .guide-grid {
@@ -373,13 +391,51 @@
 /* ==========================================================================
    Native Plants page runtime. Page-specific data + request-to-reserve flows.
    Loads AFTER site.js (uses EcoSite.esc / renderNav / decorate / ecoSupabase).
-   Model: anon, fire-and-forget inserts to intake_submissions + jobs (inquiry),
-   mirroring the service lead-gen flow in site.js. No online payment.
+   Model: the plant tray and the kit modal create first-class ORDERS through the
+   square-pay edge function (create_order). The server re-validates and re-prices
+   every line from the live catalog (Supabase is the single source of truth), checks
+   tracked stock, and inserts an order. Pay mode 'pickup' reserves for pickup;
+   'online' mints a Square Payment Link for the total when Square is configured, and
+   falls back to pickup when it is dark. Nothing is mirrored into Square.
    ========================================================================== */
 (function () {
   'use strict';
   var esc = EcoSite.esc;
   var sb = function () { return window.ecoSupabase; };
+
+  // ── Order creation (server-side validation + pricing lives in the edge fn) ──
+  var ORDER_FN = window.ECO_CONFIG.SUPABASE_URL + '/functions/v1/square-pay';
+  var ANON_KEY = window.ECO_CONFIG.SUPABASE_ANON_KEY;
+  async function createOrder(payload) {
+    var body = null, ok = false, status = 0;
+    try {
+      var r = await fetch(ORDER_FN, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', apikey: ANON_KEY, Authorization: 'Bearer ' + ANON_KEY },
+        body: JSON.stringify(payload)
+      });
+      ok = r.ok; status = r.status;
+      try { body = await r.json(); } catch (e) { body = null; }
+    } catch (e) { body = null; }
+    return { ok: ok, status: status, body: body || {} };
+  }
+  // Friendly message for a failed create_order (item names are DB strings; the caller
+  // esc()'s them at render).
+  function orderErrorMessage(res) {
+    var b = res.body || {};
+    if (res.status === 409 && b.error === 'insufficient_stock') {
+      return 'Sorry, ' + (b.item || 'one of these plants') + ' just sold out or is low on stock. Please adjust your request and try again.';
+    }
+    return 'Something went wrong sending your request. Please try again, or email us at admin@ecotopianearthcare.com or call 814-631-5338.';
+  }
+  // Fold the extra contact fields (no dedicated order columns) into the order note.
+  function orderNote(c, msg) {
+    var parts = [];
+    if (msg) parts.push(msg);
+    if (c.address) parts.push('Pickup/delivery address: ' + c.address);
+    if (c.pref) parts.push('Preferred contact: ' + c.pref);
+    return parts.join('\n');
+  }
 
   // Universal habitat-kit pricing. plugs = flower plugs included.
   var KIT_TIERS = [
@@ -465,6 +521,7 @@
         return '<li' + cls + '>' + esc(p.name) + note + '</li>';
       }).join('');
       var src = plantPhotoSrc(k.photoPath);
+      var soldOut = k.stockQty === 0;
       return '<article class="kit-card reveal">' +
         (src ? '<img class="kit-photo" src="' + esc(src) + '" alt="' + esc(k.name) + '" loading="lazy" width="640" height="480">' : '') +
         '<h3>' + esc(k.name) + '</h3>' +
@@ -475,7 +532,9 @@
         '<tbody>' + priceRows() + '</tbody></table>' +
         '<p class="kit-larger">Like to plant a larger space? ' +
         '<a href="services.html">Inquire about our Ecological Landscaping service</a> and our team can plant the flowers for you.</p>' +
-        '<button type="button" class="kit-req" data-kit="' + esc(k.id) + '">Request this kit</button>' +
+        (soldOut ? '<span class="sold-chip">Sold out</span>' : '') +
+        '<button type="button" class="kit-req" data-kit="' + esc(k.id) + '"' + (soldOut ? ' disabled' : '') + '>' +
+          (soldOut ? 'Sold out' : 'Request this kit') + '</button>' +
         '</article>';
     }).join('');
     grid.querySelectorAll('.kit-req').forEach(function (btn) {
@@ -508,6 +567,7 @@
     var grid = document.getElementById('plantGrid');
     grid.innerHTML = PLANTS.map(function (p) {
       var src = plantPhotoSrc(p.photoPath);
+      var soldOut = p.stockQty === 0;
       return '<article class="plant-card" data-id="' + esc(p.id) + '">' +
         (src ? '<img class="plant-photo" src="' + esc(src) + '" alt="' + esc(p.common) + '" loading="lazy" width="640" height="480">' : '') +
         '<h3>' + esc(p.common) + '</h3>' +
@@ -519,10 +579,13 @@
         '<p class="plant-attracts">' + esc(p.attracts) + '</p>' +
         (p.fact ? '<p class="plant-fact">' + esc(p.fact) + '</p>' : '') +
         '<p class="plant-price">$' + esc(String(PLANT_PRICE)) + ' each</p>' +
-        '<button type="button" class="plant-add" data-id="' + esc(p.id) + '">+ Add to request</button>' +
+        (soldOut ? '<span class="sold-chip">Sold out this season</span>' : '') +
+        '<button type="button" class="plant-add" data-id="' + esc(p.id) + '"' + (soldOut ? ' disabled' : '') + '>' +
+          (soldOut ? 'Sold out' : '+ Add to request') + '</button>' +
         '</article>';
     }).join('');
     grid.querySelectorAll('.plant-add').forEach(function (btn) {
+      if (btn.disabled) return;
       btn.addEventListener('click', function () { togglePlant(btn.getAttribute('data-id'), btn); });
     });
     applyFilter();
@@ -546,6 +609,7 @@
   // ── Tray state ───────────────────────────────────────────────────────────
   function togglePlant(id, btn) {
     if (!PLANT_BY_ID[id]) return; // allowlist: only known species ids
+    if (PLANT_BY_ID[id].stockQty === 0) return; // sold out: never addable
     if (tray[id]) { delete tray[id]; btn.classList.remove('added'); btn.textContent = '+ Add to request'; }
     else { tray[id] = 1; btn.classList.add('added'); btn.textContent = '✓ Added'; }
     updateTrayCount();
@@ -636,6 +700,58 @@
       (c.address ? '\nAddress: ' + c.address : '') + '\nPreferred contact: ' + c.pref + '.';
   }
 
+  // Pay-mode chooser (Reserve for pickup [default] vs Pay online now). Shown in both
+  // the kit modal and the tray. 'name' scopes the radio group so the two never collide.
+  function payModeHtml(name) {
+    return (
+      '<div class="eco-lead-field eco-lead-full"><label>How would you like to pay?</label>' +
+        '<label class="pay-choice"><input type="radio" name="' + esc(name) + '" value="pickup" checked> ' +
+          'Reserve and pay at pickup</label>' +
+        '<label class="pay-choice"><input type="radio" name="' + esc(name) + '" value="online"> ' +
+          'Pay online now</label>' +
+      '</div>'
+    );
+  }
+  function readPayMode(name) {
+    var el = document.querySelector('input[name="' + name + '"]:checked');
+    return el && el.value === 'online' ? 'online' : 'pickup';
+  }
+
+  // Order confirmation screen (replaces the generic success for order flows). Always
+  // links to the public order status page; when the caller asked to pay online it also
+  // shows the Square Pay button (or a "saved for pickup" note when Square is dark).
+  function showOrderConfirm(res, payModeRequested) {
+    var b = res.body || {};
+    var token = b.token || '';
+    var orderLink = 'order.html?t=' + encodeURIComponent(token);
+    var payBlock = '';
+    var sub;
+    if (payModeRequested === 'online') {
+      if (b.pay_url && /^https:\/\//i.test(b.pay_url)) {
+        payBlock = '<a class="eco-lead-primary" style="display:block;text-align:center;text-decoration:none;margin:0 0 12px" href="' +
+          esc(b.pay_url) + '" target="_blank" rel="noopener">Pay online now</a>';
+        sub = 'Your order is reserved. Pay securely online below, or pay at pickup.';
+      } else {
+        sub = 'Online payment is not set up yet, so your reservation is saved for pickup instead. We will confirm availability and arrange pickup.';
+      }
+    } else {
+      sub = 'We will confirm availability and arrange pickup. Nothing is charged now.';
+    }
+    var body = document.getElementById('plantModalBody');
+    body.innerHTML =
+      '<div class="eco-lead-success">' +
+        '<div class="eco-lead-check" aria-hidden="true">✓</div>' +
+        '<h2 id="plantModalTitle">Thanks, we got your order.</h2>' +
+        '<p>' + esc(sub) + '</p>' +
+        payBlock +
+        (token ? '<p style="margin:8px 0 14px"><a href="' + esc(orderLink) + '">View your order and its status</a></p>' : '') +
+        '<button type="button" class="eco-lead-primary" id="plantModalDone">Close</button>' +
+      '</div>';
+    var done = document.getElementById('plantModalDone');
+    done.addEventListener('click', closeModal);
+    done.focus();
+  }
+
   // ── Kit request modal ────────────────────────────────────────────────────
   function openKit(id) {
     var kit = KIT_BY_ID[id];
@@ -659,9 +775,10 @@
         '<div class="eco-lead-grid"><div class="eco-lead-field eco-lead-full">' +
           '<label for="pl-kit-msg">Anything to add?</label>' +
           '<textarea id="pl-kit-msg" placeholder="Optional. Soil conditions, an optional add-on, a delivery preference..."></textarea></div></div>' +
-        '<p class="eco-lead-tinynote">Kits are reserved and paid when you arrange pickup or delivery. Nothing is charged online.</p>' +
+        '<div class="eco-lead-grid">' + payModeHtml('pl-kit-pay') + '</div>' +
+        '<p class="eco-lead-tinynote">Reserve for pickup, or pay online now. Online payment lights up once our card processor is set up; until then your reservation is saved for pickup.</p>' +
         '<p class="eco-lead-error" id="plantModalError"></p>' +
-        '<button type="submit" class="eco-lead-primary">Send kit request</button>' +
+        '<button type="submit" class="eco-lead-primary">Place kit order</button>' +
       '</form>';
     document.getElementById('kitForm').addEventListener('submit', function (e) {
       e.preventDefault();
@@ -676,37 +793,25 @@
     var sizeKey = document.getElementById('pl-kit-size').value;
     var tier = TIER_BY_KEY[sizeKey];
     var msg = (document.getElementById('pl-kit-msg').value || '').trim();
+    var payMode = readPayMode('pl-kit-pay');
     var c = readContact();
     if (!tier) { errEl.textContent = 'Please choose a kit size.'; return; }
     if (!c.name || !c.phone) {
       errEl.textContent = 'Please add your name and a phone number so we can reach you.';
       return;
     }
-    var descr = 'Habitat kit: ' + kit.name + '\nSize: ' + tier.label +
-      (msg ? '\nMessage: ' + msg : '');
-    var notes = 'Submitted via plants page.\n\n' + descr + '\n\n' + contactBlock(c) +
-      '\nReserved and paid at pickup or delivery. Nothing charged online.';
-    try {
-      var ins1 = await sb().from('intake_submissions').insert({
-        name: c.name, phone: c.phone, email: c.email, address: c.address,
-        service_type: 'habitat_kit', size: tier.label, description: descr,
-        contact_preference: c.pref, submitted_at: new Date().toISOString()
-      });
-      if (ins1.error) throw new Error(ins1.error.message);
-      var ins2 = await sb().from('jobs').insert({
-        status: 'inquiry',
-        title: kit.name + ' Kit Request',
-        client_name: c.name,
-        address: c.address,
-        type: 'habitat_kit',
-        notes: notes,
-        activity_log: [{ ts: new Date().toISOString(), note: 'Received via plants page.' }]
-      });
-      if (ins2.error) throw new Error(ins2.error.message);
-      showSuccess('Thanks, we got your kit request.', 'We will confirm availability and arrange pickup or delivery. Nothing is charged online.');
-    } catch (err) {
-      errEl.textContent = 'Something went wrong sending your request. Please try again, or email us at admin@ecotopianearthcare.com or call 814-631-5338.';
-    }
+    var btn = document.querySelector('#kitForm .eco-lead-primary');
+    if (btn) btn.disabled = true;
+    var res = await createOrder({
+      action: 'create_order',
+      customer: { name: c.name, phone: c.phone, email: c.email },
+      items: [{ kind: 'kit', id: kit.id, tier: tier.key, qty: 1 }],
+      pay_mode: payMode,
+      note: orderNote(c, 'Habitat kit: ' + kit.name + ' (' + tier.label + ')' + (msg ? '\n' + msg : ''))
+    });
+    if (btn) btn.disabled = false;
+    if (!res.ok || !res.body.token) { errEl.textContent = orderErrorMessage(res); return; }
+    showOrderConfirm(res, payMode);
   }
 
   // ── Plant request tray modal ─────────────────────────────────────────────
@@ -754,15 +859,16 @@
       '<h2 id="plantModalTitle">Plant request</h2>' +
       '<ul class="tray-items">' + items + '</ul>' +
       '<p class="tray-total">' + esc(String(trayCount())) + ' plants · $' + esc(String(total)) + '</p>' +
-      '<p class="tray-note">We will confirm availability and arrange pickup. Nothing is charged online.</p>' +
+      '<p class="tray-note">Reserve for pickup, or pay online now. We confirm availability either way.</p>' +
       '<form id="trayForm" novalidate>' +
         '<p class="eco-lead-sub">How can we reach you?</p>' +
         '<div class="eco-lead-grid">' + contactHtml() + '</div>' +
         '<div class="eco-lead-grid"><div class="eco-lead-field eco-lead-full">' +
           '<label for="pl-c-msg">Anything to add?</label>' +
           '<textarea id="pl-c-msg" placeholder="Optional"></textarea></div></div>' +
+        '<div class="eco-lead-grid">' + payModeHtml('pl-tray-pay') + '</div>' +
         '<p class="eco-lead-error" id="plantModalError"></p>' +
-        '<button type="submit" class="eco-lead-primary" id="traySubmit">Send plant request</button>' +
+        '<button type="submit" class="eco-lead-primary" id="traySubmit">Place order</button>' +
       '</form>';
     // Steppers + remove (event-delegated, validated against known species ids).
     body.querySelectorAll('.ti-inc').forEach(function (b) {
@@ -804,46 +910,28 @@
     if (!ids.length) { errEl.textContent = 'Add at least one plant to your request.'; return; }
     var c = readContact();
     var msg = (document.getElementById('pl-c-msg').value || '').trim();
+    var payMode = readPayMode('pl-tray-pay');
     if (!c.name || !c.phone) {
       errEl.textContent = 'Please add your name and a phone number so we can reach you.';
       return;
     }
-    var lines = ids.map(function (id) {
-      var p = PLANT_BY_ID[id];
-      var qty = tray[id];
-      return p.common + ' x ' + qty + ' ($' + (qty * PLANT_PRICE) + ')';
+    var items = ids.map(function (id) { return { kind: 'species', id: id, qty: tray[id] }; });
+    var btn = document.getElementById('traySubmit');
+    if (btn) btn.disabled = true;
+    var res = await createOrder({
+      action: 'create_order',
+      customer: { name: c.name, phone: c.phone, email: c.email },
+      items: items,
+      pay_mode: payMode,
+      note: orderNote(c, msg)
     });
-    var total = trayCount() * PLANT_PRICE;
-    var descr = 'Plant order:\n' + lines.join('\n') +
-      '\nTotal: $' + total + ' (' + trayCount() + ' plants at $' + PLANT_PRICE + ' each)' +
-      (msg ? '\n\nMessage: ' + msg : '');
-    var notes = 'Submitted via plants page.\n\n' + descr + '\n\n' + contactBlock(c) +
-      '\nWe will confirm availability and arrange pickup. Nothing is charged online.';
-    try {
-      var ins1 = await sb().from('intake_submissions').insert({
-        name: c.name, phone: c.phone, email: c.email, address: c.address,
-        service_type: 'plant_order', size: trayCount() + ' plants', description: descr,
-        contact_preference: c.pref, submitted_at: new Date().toISOString()
-      });
-      if (ins1.error) throw new Error(ins1.error.message);
-      var ins2 = await sb().from('jobs').insert({
-        status: 'inquiry',
-        title: 'Plant Order Request',
-        client_name: c.name,
-        address: c.address,
-        type: 'plant_order',
-        notes: notes,
-        activity_log: [{ ts: new Date().toISOString(), note: 'Received via plants page.' }]
-      });
-      if (ins2.error) throw new Error(ins2.error.message);
-      // Clear the tray on success.
-      ids.forEach(function (id) { setPlantButton(id, false); });
-      tray = {};
-      updateTrayCount();
-      showSuccess('Thanks, we got your plant request.', 'We will confirm availability and arrange pickup. Nothing is charged online.');
-    } catch (err) {
-      errEl.textContent = 'Something went wrong sending your request. Please try again, or email us at admin@ecotopianearthcare.com or call 814-631-5338.';
-    }
+    if (btn) btn.disabled = false;
+    if (!res.ok || !res.body.token) { errEl.textContent = orderErrorMessage(res); return; }
+    // Clear the tray on success.
+    ids.forEach(function (id) { setPlantButton(id, false); });
+    tray = {};
+    updateTrayCount();
+    showOrderConfirm(res, payMode);
   }
 
   function showSuccess(title, sub) {

@@ -321,6 +321,17 @@ const DataStore = (() => {
     merchPhotoUrl: (photoPath) =>
       sb.storage.from('gallery').getPublicUrl(photoPath).data.publicUrl, // sync
 
+    // Orders (Supabase-owned; Square only ever sees a computed total). The public
+    // plants/shop pages create orders through the square-pay edge function (server-side
+    // validation + pricing); these staff methods read and progress them. Staff RLS
+    // (authenticated + is_portal_user) allows full CRUD. "Mark paid" is NOT a plain
+    // update: it must also decrement tracked stock (service-role only), so it goes
+    // through the square-pay `staff_mark_paid` action, not this DataStore.
+    getOrders: async () =>
+      fromDbAll(unwrap(await sb.from('orders').select('*')
+        .order('created_at', { ascending: false }))),
+    updateOrder: (id, ch) => update('orders', id, ch),
+
     // Sync utilities (unchanged from the demo version)
     esc(v) {
       if (v == null) return '';
