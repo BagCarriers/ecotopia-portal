@@ -198,7 +198,7 @@ Create `assets/pricing.js`:
     };
   }
 
-  root.EcoPricing = { CARD_UPLIFT, ADMIN_FEE_RATE, round2, cardCents, cardDollars, quoteTotals };
+  root.EcoPricing = { CARD_UPLIFT, ADMIN_FEE_RATE, cardCents, cardDollars, quoteTotals };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
 ```
 
