@@ -37,6 +37,15 @@ const KIT_TIERS: Record<string, number> = {
   '200': 25000,
 };
 
+// Card uplift: displayed prices carry the card cost, cash and check pay base.
+// MIRRORED in assets/pricing.js. These two are the only authorities. Keep in sync.
+const CARD_UPLIFT = 0.04;
+
+// Integer cents to integer cents, half-up.
+function cardCents(baseCents: number): number {
+  return Math.round((Number(baseCents) || 0) * (1 + CARD_UPLIFT));
+}
+
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, content-type, apikey, x-square-hmacsha256-signature',
@@ -315,6 +324,8 @@ async function handleCreateOrder(body: any): Promise<Response> {
   }
 
   const token = newOrderToken();
+  // subtotal_cents stays BASE. charge_cents is what we actually take.
+  const chargeCents = payMode === 'online' ? cardCents(subtotal) : subtotal;
   const { data: inserted, error: insErr } = await sb.from('orders').insert({
     order_token: token,
     customer_name: name,
@@ -322,6 +333,7 @@ async function handleCreateOrder(body: any): Promise<Response> {
     email: email || null,
     items: lines,
     subtotal_cents: subtotal,
+    charge_cents: chargeCents,
     status: 'new',
     pay_mode: payMode,
     note: note || null,
@@ -329,7 +341,7 @@ async function handleCreateOrder(body: any): Promise<Response> {
   if (insErr || !inserted) return json({ error: 'Could not save the order.' }, 500);
 
   // Pickup, or a zero-total order: nothing to charge, done.
-  if (payMode !== 'online' || subtotal <= 0) return json({ token }, 200);
+  if (payMode !== 'online' || chargeCents <= 0) return json({ token }, 200);
 
   // Online: mint a Square Payment Link for the total, or fall back to pickup if dark.
   const accessToken = Deno.env.get('SQUARE_ACCESS_TOKEN');
@@ -350,7 +362,7 @@ async function handleCreateOrder(body: any): Promise<Response> {
         idempotency_key: inserted.id + ':order',
         quick_pay: {
           name: linkName,
-          price_money: { amount: subtotal, currency: 'USD' },
+          price_money: { amount: chargeCents, currency: 'USD' },
           location_id: locationId,
         },
       }),
@@ -379,13 +391,14 @@ async function handleOrderStatus(body: any): Promise<Response> {
   if (token.length < 32) return json({ error: 'Not found' }, 404);
   const sb = admin();
   const { data: order } = await sb.from('orders')
-    .select('status, items, subtotal_cents, pay_mode, square_pay_url, created_at')
+    .select('status, items, subtotal_cents, charge_cents, pay_mode, square_pay_url, created_at')
     .eq('order_token', token).maybeSingle();
   if (!order) return json({ error: 'Not found' }, 404);
   return json({
     status: order.status,
     items: order.items,
     subtotal_cents: order.subtotal_cents,
+    charge_cents: order.charge_cents,
     pay_mode: order.pay_mode,
     pay_url: order.square_pay_url || null,
     created_at: order.created_at,
