@@ -13,6 +13,7 @@
 <script src="assets/config.js"></script>
 <script src="assets/supabase-client.js"></script>
 <script src="assets/mapping.js"></script>
+<script src="assets/pricing.js"></script>
 <script src="assets/auth.js"></script>
 <script>if (!AuthManager.hasCachedSession()) location.replace('login.html');</script>
 <script src="assets/data.js"></script>
@@ -74,6 +75,8 @@
   .pill-paid { background: #d1fae5; color: #065f46; }
   .dep-pill { margin-left: 6px; }
   .accept-note { font-size: 0.72rem; color: var(--forest-mid); margin-top: 5px; }
+  /* The second price under the card price in the Total column. */
+  .cash-note { font-size: 0.72rem; color: var(--text-dim); font-weight: 400; margin-top: 3px; }
 
   /* Share-link modal */
   .share-row { display: flex; gap: 8px; margin: 10px 0 4px; }
@@ -219,9 +222,11 @@
 
       <div class="summary" id="summary">
         <div class="srow"><span>Subtotal</span><span id="s_subtotal">$0.00</span></div>
-        <div class="srow muted"><span>Processing and administration (5%)</span><span id="s_admin">$0.00</span></div>
-        <div class="srow total"><span>Total</span><span id="s_total">$0.00</span></div>
-        <div class="srow balance" id="s_balance_row"><span>Balance due</span><span id="s_balance">$0.00</span></div>
+        <div class="srow muted"><span>Administration (5%)</span><span id="s_admin">$0.00</span></div>
+        <div class="srow"><span>Total (card)</span><span id="s_card">$0.00</span></div>
+        <div class="srow"><span>Pay by check or cash</span><span id="s_cash">$0.00</span></div>
+        <div class="srow balance" id="s_card_balance_row"><span>Balance due (card)</span><span id="s_card_balance">$0.00</span></div>
+        <div class="srow balance" id="s_cash_balance_row"><span>Balance due by check or cash</span><span id="s_cash_balance">$0.00</span></div>
       </div>
 
       <input type="hidden" id="q_id">
@@ -253,8 +258,8 @@
 
 <script>
 const esc = DataStore.esc;
-// The administration fee rate lives here and nowhere else.
-const ADMIN_FEE_RATE = 0.05;
+// The admin fee rate and the card uplift both live in assets/pricing.js now.
+const ADMIN_FEE_RATE = EcoPricing.ADMIN_FEE_RATE;
 // Public quote-view base (matches the live domain in supabase/functions + docs).
 const PUBLIC_BASE = window.location.origin;
 // Share token = two dash-stripped UUIDs concatenated (64 hex chars, well over the
@@ -278,13 +283,9 @@ function yearOf(dateStr) {
   return Number.isFinite(y) ? y : currentYear();
 }
 
-// Compute subtotal / admin fee / total from raw line items.
+// Compute base subtotal / admin fee / cash and card totals from raw line items.
 function computeTotals(lineItems, deposit) {
-  const subtotal = round2((lineItems || []).reduce((s, li) => s + (Number(li.amount) || 0), 0));
-  const adminFee = round2(subtotal * ADMIN_FEE_RATE);
-  const total = round2(subtotal + adminFee);
-  const balance = round2(total - (Number(deposit) || 0));
-  return { subtotal, adminFee, total, balance };
+  return EcoPricing.quoteTotals(lineItems, deposit);
 }
 
 async function refresh() {
@@ -314,12 +315,15 @@ function renderTable() {
     const depPill = deposit > 0
       ? `<span class="status-pill dep-pill pill-${esc(depStatus)}">Deposit: ${esc(depStatus)}</span>`
       : '';
+    // The card figure is derived from the stored line items; q.total is the stored cash
+    // total and stays the authoritative one, so it is the one we print beside it.
+    const cardTotal = computeTotals(q.lineItems, deposit).cardTotal;
     return `
     <tr>
       <td class="q-num">${label}</td>
       <td><strong>${esc(q.clientName)}</strong></td>
       <td>${q.quoteDate ? DataStore.formatDate(q.quoteDate + 'T00:00:00') : '-'}</td>
-      <td><strong>${money(q.total)}</strong></td>
+      <td><strong>${money(cardTotal)}</strong><div class="cash-note">${money(q.total)} by check or cash</div></td>
       <td>
         <span class="status-pill pill-${esc(q.status)}">${esc(q.status.charAt(0).toUpperCase() + q.status.slice(1))}</span>
         ${depPill}
@@ -393,9 +397,14 @@ function recalc() {
   const t = computeTotals(items, deposit);
   document.getElementById('s_subtotal').textContent = money(t.subtotal);
   document.getElementById('s_admin').textContent = money(t.adminFee);
-  document.getElementById('s_total').textContent = money(t.total);
-  document.getElementById('s_balance').textContent = money(t.balance);
-  document.getElementById('s_balance_row').style.display = deposit > 0 ? 'flex' : 'none';
+  document.getElementById('s_card').textContent = money(t.cardTotal);
+  document.getElementById('s_cash').textContent = money(t.cashTotal);
+  document.getElementById('s_card_balance').textContent = money(t.cardBalance);
+  document.getElementById('s_cash_balance').textContent = money(t.cashBalance);
+  // A deposit changes both balances or neither, so the two rows show and hide together.
+  const balDisplay = deposit > 0 ? 'flex' : 'none';
+  document.getElementById('s_card_balance_row').style.display = balDisplay;
+  document.getElementById('s_cash_balance_row').style.display = balDisplay;
 }
 
 function openBuilder(id) {
@@ -455,6 +464,8 @@ document.getElementById('builderForm').addEventListener('submit', async function
   }
   const deposit = round2(parseFloat(document.getElementById('q_deposit').value) || 0);
   const dateStr = document.getElementById('q_date').value || new Date().toISOString().slice(0, 10);
+  // quotes.total stays the CASH total (base subtotal plus the admin fee), exactly the
+  // meaning it has always had. Card figures are display only; none of them are stored.
   const totals = computeTotals(items, deposit);
   const jobId = document.getElementById('q_job').value || null;
   const address = document.getElementById('q_address').value.trim() || null;
@@ -468,7 +479,7 @@ document.getElementById('builderForm').addEventListener('submit', async function
       await DataStore.updateQuote(id, {
         clientName: client, clientAddress: address, jobId,
         quoteDate: dateStr, lineItems: items, deposit,
-        subtotal: totals.subtotal, adminFee: totals.adminFee, total: totals.total,
+        subtotal: totals.subtotal, adminFee: totals.adminFee, total: totals.cashTotal,
       });
     } else {
       const year = yearOf(dateStr);
@@ -477,7 +488,7 @@ document.getElementById('builderForm').addEventListener('submit', async function
         quoteYear: year, quoteNumber: number,
         clientName: client, clientAddress: address, jobId,
         quoteDate: dateStr, lineItems: items, deposit,
-        subtotal: totals.subtotal, adminFee: totals.adminFee, total: totals.total,
+        subtotal: totals.subtotal, adminFee: totals.adminFee, total: totals.cashTotal,
         status: 'draft',
       });
     }
