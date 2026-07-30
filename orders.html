@@ -198,8 +198,12 @@ function render() {
     const collected = o.amountCollectedCents == null ? ''
       : money(o.amountCollectedCents) + ' ' + esc(o.tender || '');
     // The webhook prefixes this flag onto the note when Square took an amount we did
-    // not expect. The customer's own text still follows it, untouched, below.
-    const mismatch = typeof o.note === 'string' && o.note.indexOf('AMOUNT MISMATCH') === 0;
+    // not expect. The customer's own text still follows it, untouched, below. The note
+    // starts as free text off the public order form, and the webhook only ever writes
+    // that prefix on the transition into 'paid', so an unpaid row cannot raise the chip
+    // by typing it: this is a staff trust signal, not something the customer can forge.
+    const mismatch = o.status === 'paid' &&
+      typeof o.note === 'string' && o.note.indexOf('AMOUNT MISMATCH') === 0;
     return `
       <div class="o-card" data-id="${esc(o.id)}">
         <div class="o-top">

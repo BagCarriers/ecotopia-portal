@@ -179,6 +179,11 @@
   // return to the base price.
   function totalHtml(o) {
     if (onSquare(o)) {
+      // charge_cents is nullable and nothing backfills it. money() would turn a null
+      // into "$0.00" while the Square link charges the real amount, so show no total
+      // at all. Not the pickup pair either: this customer is being sent to Square, and
+      // quoting them a cash price would be worse than quoting them nothing.
+      if (o.charge_cents == null) return '';
       return '<div class="totrow"><span class="l">Total</span><span class="v">' + money(o.charge_cents) + '</span></div>';
     }
     return '<div class="totrow"><span class="l">Due at pickup</span><span class="v">' +
