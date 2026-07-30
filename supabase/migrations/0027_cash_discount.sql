@@ -14,10 +14,6 @@ alter table public.orders
   add constraint orders_tender_chk
   check (tender is null or tender in ('cash', 'check', 'card'));
 
--- Any order created before this deploy was priced at base with no uplift.
--- (Verified zero rows on 2026-07-30; this is a safety net, not a real backfill.)
-update public.orders set charge_cents = subtotal_cents where charge_cents is null;
-
 alter table public.quotes
   add column if not exists deposit_tender text;
 
