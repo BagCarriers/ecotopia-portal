@@ -27,8 +27,9 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 // public paths are anon; staff_mark_paid validates its own JWT; the webhook path is
 // authed by its own signature), pinned in supabase/config.toml.
 //
-// Pricing authority (single source): PLANT_PRICE_CENTS and KIT_TIERS live HERE. The
-// plants page shows matching display prices, but only these server constants are charged.
+// Pricing authority (single source): PLANT_PRICE_CENTS, KIT_TIERS, and CARD_UPLIFT live
+// HERE. The plants page shows matching display prices, but only these server constants
+// are charged.
 const PLANT_PRICE_CENTS = 500;
 const KIT_TIERS: Record<string, number> = {
   '50': 7200,
@@ -124,6 +125,7 @@ async function handleWebhook(req: Request, rawBody: string, signature: string): 
   const type = event?.type;
   const status = payment?.status;
   const orderId = payment?.order_id;
+  const paidCents = Number(payment?.amount_money?.amount);
   // Only a completed payment on a known order matters; everything else is a fast no-op.
   if (type !== 'payment.updated' || status !== 'COMPLETED' || !orderId) {
     return json({ ok: true }, 200);
@@ -134,19 +136,36 @@ async function handleWebhook(req: Request, rawBody: string, signature: string): 
     .eq('square_order_id', orderId).maybeSingle();
   if (quote) {
     if (quote.deposit_status !== 'paid') {
-      await sb.from('quotes').update({ deposit_status: 'paid' }).eq('id', quote.id);
+      await sb.from('quotes').update({
+        deposit_status: 'paid',
+        deposit_tender: 'card',
+      }).eq('id', quote.id);
     }
     return json({ ok: true }, 200);
   }
 
   // No quote matched: this may be one of our shop/plant orders instead.
   const { data: order } = await sb.from('orders')
-    .select('id, status, items').eq('square_order_id', orderId).maybeSingle();
+    .select('id, status, items, charge_cents').eq('square_order_id', orderId).maybeSingle();
   if (!order) return json({ ok: true }, 200); // unknown order -> no-op
   // Idempotent: only 'new'/'link_created' transitions to 'paid' + decrements stock.
   // 'paid' or any later status is a no-op, so stock is never decremented twice.
   if (order.status === 'new' || order.status === 'link_created') {
-    await sb.from('orders').update({ status: 'paid' }).eq('id', order.id);
+    // Record what Square actually took. A mismatch against charge_cents still marks the
+    // order paid (refusing would strand real money) but is noted for staff review, so a
+    // divergence between charged and recorded can never pass silently.
+    const collected = Number.isFinite(paidCents) ? paidCents : null;
+    const mismatch = collected != null && order.charge_cents != null
+      && collected !== order.charge_cents;
+    const patch: Record<string, unknown> = {
+      status: 'paid',
+      tender: 'card',
+      amount_collected_cents: collected,
+    };
+    if (mismatch) {
+      patch.note = `AMOUNT MISMATCH: expected ${order.charge_cents}, Square collected ${collected}. Review before fulfilling.`;
+    }
+    await sb.from('orders').update(patch).eq('id', order.id);
     await decrementOrderStock(sb, order.items);
   }
   return json({ ok: true }, 200);
@@ -438,14 +457,25 @@ async function handleStaffMarkPaid(req: Request, body: any): Promise<Response> {
 
   const orderId = typeof body?.order_id === 'string' ? body.order_id : '';
   if (!orderId) return json({ error: 'missing_order_id' }, 400);
+  const tender = body?.tender;
+  if (tender !== 'cash' && tender !== 'check' && tender !== 'card') {
+    return json({ error: 'bad_tender' }, 400);
+  }
   const { data: order } = await sb.from('orders')
-    .select('id, status, items').eq('id', orderId).maybeSingle();
+    .select('id, status, items, subtotal_cents').eq('id', orderId).maybeSingle();
   if (!order) return json({ error: 'Not found' }, 404);
   // Idempotent: only decrement stock on the first transition into 'paid'.
   if (order.status === 'new' || order.status === 'link_created') {
-    await sb.from('orders').update({ status: 'paid' }).eq('id', order.id);
+    // Card at the table costs us the fee, so it pays the card price. Cash and check
+    // pay base. subtotal_cents is always base, so this is the whole rule.
+    const collected = tender === 'card' ? cardCents(order.subtotal_cents) : order.subtotal_cents;
+    await sb.from('orders').update({
+      status: 'paid',
+      tender,
+      amount_collected_cents: collected,
+    }).eq('id', order.id);
     await decrementOrderStock(sb, order.items);
-    return json({ ok: true, status: 'paid' }, 200);
+    return json({ ok: true, status: 'paid', collected_cents: collected }, 200);
   }
   // No transition (already paid, cancelled, completed...): report the truth.
   return json({ ok: false, status: order.status }, 409);

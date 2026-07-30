@@ -1,10 +1,23 @@
 const test = require('node:test');
 const assert = require('node:assert');
+const fs = require('node:fs');
+const path = require('node:path');
 require('../assets/pricing.js');
 const { CARD_UPLIFT, cardCents, cardDollars, quoteTotals } = globalThis.EcoPricing;
 
 test('CARD_UPLIFT is 4 percent', () => {
   assert.strictEqual(CARD_UPLIFT, 0.04);
+});
+
+test('the edge function mirrors CARD_UPLIFT exactly', () => {
+  // The browser shows the uplifted price and the edge function charges it. If the two
+  // copies ever drift, customers are quoted one number and charged another, which is the
+  // exact failure this feature exists to prevent. Fail loudly instead.
+  const edgePath = path.join(__dirname, '..', 'supabase', 'functions', 'square-pay', 'index.ts');
+  const src = fs.readFileSync(edgePath, 'utf8');
+  const m = src.match(/^const CARD_UPLIFT = ([0-9.]+);$/m);
+  assert.ok(m, 'square-pay/index.ts must declare `const CARD_UPLIFT = <number>;`');
+  assert.strictEqual(Number(m[1]), CARD_UPLIFT);
 });
 
 test('cardCents grosses every current shop price exactly', () => {
