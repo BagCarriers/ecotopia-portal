@@ -146,24 +146,30 @@ async function handleWebhook(req: Request, rawBody: string, signature: string): 
 
   // No quote matched: this may be one of our shop/plant orders instead.
   const { data: order } = await sb.from('orders')
-    .select('id, status, items, charge_cents').eq('square_order_id', orderId).maybeSingle();
+    .select('id, status, items, charge_cents, note').eq('square_order_id', orderId).maybeSingle();
   if (!order) return json({ ok: true }, 200); // unknown order -> no-op
   // Idempotent: only 'new'/'link_created' transitions to 'paid' + decrements stock.
   // 'paid' or any later status is a no-op, so stock is never decremented twice.
   if (order.status === 'new' || order.status === 'link_created') {
     // Record what Square actually took. A mismatch against charge_cents still marks the
     // order paid (refusing would strand real money) but is noted for staff review, so a
-    // divergence between charged and recorded can never pass silently.
+    // divergence between charged and recorded can never pass silently. An event carrying
+    // no usable amount is a divergence too: we cannot confirm what was taken.
     const collected = Number.isFinite(paidCents) ? paidCents : null;
-    const mismatch = collected != null && order.charge_cents != null
-      && collected !== order.charge_cents;
     const patch: Record<string, unknown> = {
       status: 'paid',
       tender: 'card',
       amount_collected_cents: collected,
     };
-    if (mismatch) {
-      patch.note = `AMOUNT MISMATCH: expected ${order.charge_cents}, Square collected ${collected}. Review before fulfilling.`;
+    // charge_cents is nullable and nothing backfills it; with nothing to compare against
+    // there is no divergence to claim, so an old row is never falsely flagged.
+    if (order.charge_cents != null && collected !== order.charge_cents) {
+      const took = collected == null ? 'Square reported no amount' : `Square collected ${collected}`;
+      // The flag LEADS the note so the Orders page can key its warning off the prefix, and
+      // the customer's own note follows it. A mismatch is exactly when staff need the
+      // address and contact preference they wrote, so it must never be overwritten.
+      patch.note = `AMOUNT MISMATCH: expected ${order.charge_cents}, ${took}. Review before fulfilling.`
+        + (order.note ? `\n\n${order.note}` : '');
     }
     await sb.from('orders').update(patch).eq('id', order.id);
     await decrementOrderStock(sb, order.items);
