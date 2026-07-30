@@ -66,6 +66,9 @@
   .status-cancelled { background: #fbeae8; color: #b3261e; }
   .pay-mode { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
     color: var(--text-dim); background: var(--cream-dim); padding: 2px 9px; border-radius: 20px; }
+  .warn-chip { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em;
+    color: var(--amber); background: var(--amber-bg); border: 1px solid #f0d9a8;
+    padding: 2px 9px; border-radius: 20px; }
 
   .o-items { font-size: 0.9rem; color: var(--text); line-height: 1.6; margin-bottom: 6px; }
   .o-items .tier { color: var(--text-dim); font-size: 0.84rem; }
@@ -161,7 +164,12 @@ function matchesFilter(o) {
 function actionsFor(o) {
   const btns = [];
   if (o.status === 'new' || o.status === 'link_created') {
-    btns.push(`<button class="btn-sm btn-primary" data-act="paid" data-id="${esc(o.id)}">Mark paid</button>`);
+    // How it was tendered decides what we collect: cash and check pay the base price,
+    // card pays the card price. data-tender is a fixed allowlist written here, never a
+    // DB value, so it is safe in the attribute.
+    btns.push(`<button class="btn-sm btn-primary" data-act="paid" data-tender="cash" data-id="${esc(o.id)}">Paid cash</button>`);
+    btns.push(`<button class="btn-sm btn-primary" data-act="paid" data-tender="check" data-id="${esc(o.id)}">Paid check</button>`);
+    btns.push(`<button class="btn-sm" data-act="paid" data-tender="card" data-id="${esc(o.id)}">Paid card</button>`);
   }
   if (o.status === 'paid') {
     btns.push(`<button class="btn-sm btn-primary" data-act="ready" data-id="${esc(o.id)}">Mark ready</button>`);
@@ -185,16 +193,24 @@ function render() {
     if (o.phone) contactBits.push(`<a href="tel:${esc(o.phone)}">${esc(o.phone)}</a>`);
     if (o.email) contactBits.push(`<a href="mailto:${esc(o.email)}">${esc(o.email)}</a>`);
     const payMode = o.payMode === 'online' ? 'Online' : 'Pickup';
+    // A settled order shows what actually came in and how, so the drawer can be
+    // reconciled against this list. Unpaid rows keep showing the base total.
+    const collected = o.amountCollectedCents == null ? ''
+      : money(o.amountCollectedCents) + ' ' + esc(o.tender || '');
+    // The webhook prefixes this flag onto the note when Square took an amount we did
+    // not expect. The customer's own text still follows it, untouched, below.
+    const mismatch = typeof o.note === 'string' && o.note.indexOf('AMOUNT MISMATCH') === 0;
     return `
       <div class="o-card" data-id="${esc(o.id)}">
         <div class="o-top">
           <span class="o-cust">${esc(o.customerName)}</span>
           <span class="status-pill status-${esc(o.status)}">${esc(STATUS_LABEL[o.status] || o.status)}</span>
           <span class="pay-mode">${esc(payMode)}</span>
+          ${mismatch ? '<span class="warn-chip">Amount mismatch</span>' : ''}
           <span class="o-when">${esc(fmtWhen(o.createdAt))}</span>
         </div>
         <div class="o-items">${itemsSummary(o.items)}</div>
-        <div class="o-total">Total: ${money(o.subtotalCents)}</div>
+        <div class="o-total">${collected ? 'Collected: ' + collected : 'Total: ' + money(o.subtotalCents)}</div>
         ${contactBits.length ? `<div class="o-contact">${contactBits.join(' &middot; ')}</div>` : ''}
         ${o.note ? `<div class="o-note">${esc(o.note)}</div>` : ''}
         <div class="o-actions">${actionsFor(o)}</div>
@@ -202,14 +218,17 @@ function render() {
       </div>`;
   }).join('');
   el.querySelectorAll('[data-act]').forEach(btn => {
-    btn.addEventListener('click', () => handleAction(btn.getAttribute('data-act'), btn.getAttribute('data-id'), btn));
+    btn.addEventListener('click', () => handleAction(btn.getAttribute('data-act'), btn.getAttribute('data-id'), btn,
+      btn.getAttribute('data-tender')));
   });
 }
 
 function orderById(id) { return orders.find(o => o.id === id); }
 function setErr(id, msg) { const e = document.getElementById('err-' + id); if (e) e.textContent = msg || ''; }
 
-async function handleAction(act, id, btn) {
+const TENDERS = ['cash', 'check', 'card'];
+
+async function handleAction(act, id, btn, tender) {
   const o = orderById(id);
   if (!o) return;
   setErr(id, '');
@@ -220,7 +239,10 @@ async function handleAction(act, id, btn) {
     return;
   }
   if (act === 'paid') {
-    if (!confirm(`Mark ${o.customerName}'s order paid? This also draws down tracked stock.`)) return;
+    // The server rejects anything else with bad_tender; refuse it here too rather than
+    // fire a request that cannot succeed.
+    if (TENDERS.indexOf(tender) === -1) { setErr(id, 'Choose cash, check, or card.'); return; }
+    if (!confirm(`Mark ${o.customerName}'s order paid by ${tender}? This also draws down tracked stock.`)) return;
     btn.disabled = true;
     try {
       const { data } = await window.ecoSupabase.auth.getSession();
@@ -229,7 +251,7 @@ async function handleAction(act, id, btn) {
       const r = await fetch(ORDER_FN, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + jwt },
-        body: JSON.stringify({ action: 'staff_mark_paid', order_id: id })
+        body: JSON.stringify({ action: 'staff_mark_paid', order_id: id, tender: tender })
       });
       if (!r.ok) throw new Error('Could not mark paid (' + r.status + ').');
       await load();

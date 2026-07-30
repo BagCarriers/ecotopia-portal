@@ -12,6 +12,7 @@
 <!-- Public page: NO auth. It reads the order ONLY through the anon, token-gated
      order_status action on the square-pay edge function. Every value is esc()'d. -->
 <script src="assets/config.js"></script>
+<script src="assets/pricing.js"></script>
 <style>
   :root {
     --green: #2D6A4F; --green-dark: #1B4332; --green-soft: #d1fae5; --green-ink: #065f46;
@@ -160,7 +161,30 @@
       return '<div class="status-line">' + esc(msg) + '</div>' + reviewAsk;
     }
     // new / link_created without a usable link -> pay at pickup.
-    return '<div class="status-line pickup">We will confirm availability and have your order ready. Pay at pickup.</div>';
+    return '<div class="status-line pickup">We will confirm availability and have your order ready. ' +
+      'Pay at pickup by cash, check, or card.</div>';
+  }
+
+  // True only when the order really is (or is about to be) settled at Square. An
+  // 'online' order minted no link when Square was dark or unreachable: the row still
+  // carries the card charge_cents, but the customer was sent down the pickup path and
+  // pays the base price, so it has to be shown both prices like any other pickup.
+  function onSquare(o) {
+    if (o.pay_mode !== 'online') return false;
+    return !!(o.pay_url && /^https:\/\//i.test(o.pay_url));
+  }
+
+  // Online: one total, the card price Square charges. Pickup: both prices, never a
+  // percentage, because grossing up by the card cost and taking it back off does not
+  // return to the base price.
+  function totalHtml(o) {
+    if (onSquare(o)) {
+      return '<div class="totrow"><span class="l">Total</span><span class="v">' + money(o.charge_cents) + '</span></div>';
+    }
+    return '<div class="totrow"><span class="l">Due at pickup</span><span class="v">' +
+      money(o.subtotal_cents) + ' cash or check</span></div>' +
+      '<div class="totrow"><span class="l">If paying by card</span><span class="v">' +
+      money(EcoPricing.cardCents(o.subtotal_cents)) + '</span></div>';
   }
 
   function render(o) {
@@ -176,7 +200,7 @@
         timelineHtml(o) +
         payBlockHtml(o) +
         itemsHtml(o.items) +
-        '<div class="totrow"><span class="l">Total</span><span class="v">' + money(o.subtotal_cents) + '</span></div>' +
+        totalHtml(o) +
       '</div>' +
       '<p class="contact-note">Questions? Call or text <a href="tel:+1' + CONTACT_PHONE.replace(/-/g, '') +
         '">' + CONTACT_PHONE + '</a> &middot; Refresh this page to see the latest status.</p>';
