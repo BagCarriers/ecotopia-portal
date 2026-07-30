@@ -246,9 +246,10 @@ alter table public.orders
   add constraint orders_tender_chk
   check (tender is null or tender in ('cash', 'check', 'card'));
 
--- Any order created before this deploy was priced at base with no uplift.
--- (Verified zero rows on 2026-07-30; this is a safety net, not a real backfill.)
-update public.orders set charge_cents = subtotal_cents where charge_cents is null;
+-- NO backfill of charge_cents. orders had zero rows at deploy time (verified twice on
+-- 2026-07-30), so there is nothing to backfill, and a `where charge_cents is null` guard
+-- would not stay correct: on any re-run it would stamp the BASE amount onto a live order
+-- whose charge_cents was never written, silently undercharging it by the uplift.
 
 alter table public.quotes
   add column if not exists deposit_tender text;
@@ -266,21 +267,17 @@ alter table public.quotes
 
 - [ ] **Step 2: Apply it live via the Management API**
 
+Use `curl`, not python's `urllib`: Cloudflare blocks urllib's default user-agent on this endpoint with HTTP 403 / `error code: 1010`. Build the JSON body with python (so SQL containing single quotes is escaped correctly) but send it with curl:
+
 ```bash
 TOKEN=$(security find-generic-password -s "Supabase CLI" -w)
-python3 - <<'PY'
-import json, subprocess, urllib.request
-tok = subprocess.check_output(['security','find-generic-password','-s','Supabase CLI','-w']).decode().strip()
-sql = open('supabase/migrations/0027_cash_discount.sql').read()
-req = urllib.request.Request(
-  'https://api.supabase.com/v1/projects/wibnryfinfwbwwgsyojr/database/query',
-  data=json.dumps({'query': sql}).encode(),
-  headers={'Authorization': f'Bearer {tok}', 'Content-Type': 'application/json'})
-print(urllib.request.urlopen(req).read().decode())
-PY
+python3 -c "import json;print(json.dumps({'query':open('supabase/migrations/0027_cash_discount.sql').read()}))" > /tmp/mig27.json
+curl -s -X POST "https://api.supabase.com/v1/projects/wibnryfinfwbwwgsyojr/database/query" \
+ -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+ --data @/tmp/mig27.json
 ```
 
-Expected: `[]` (DDL returns no rows).
+Expected: `[]`. The API returns only the LAST statement's result set, and the last statement is an `add constraint`, so an empty array is the correct success signal.
 
 - [ ] **Step 3: Verify the columns landed**
 
