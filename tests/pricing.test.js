@@ -20,6 +20,18 @@ test('the edge function mirrors CARD_UPLIFT exactly', () => {
   assert.strictEqual(Number(m[1]), CARD_UPLIFT);
 });
 
+test('the plants.html lead paragraph states the pair PLANT_PRICE implies', () => {
+  // That sentence is static marketing prose and cannot read PLANT_PRICE, so nothing but
+  // this test stops the two from drifting the next time the plant price changes.
+  const html = fs.readFileSync(path.join(__dirname, '..', 'plants.html'), 'utf8');
+  const base = html.match(/^\s*var PLANT_PRICE = ([0-9.]+);/m);
+  assert.ok(base, 'plants.html must declare `var PLANT_PRICE = <number>;`');
+  const lead = html.match(/wildflowers, \$([0-9.]+) card or \$([0-9.]+) by cash or check/);
+  assert.ok(lead, 'the wildflower lead must read "$<card> card or $<cash> by cash or check"');
+  assert.strictEqual(Number(lead[2]), Number(base[1]), 'lead cash price must be PLANT_PRICE');
+  assert.strictEqual(Number(lead[1]), cardDollars(Number(base[1])), 'lead card price must be cardDollars(PLANT_PRICE)');
+});
+
 test('cardCents grosses every current shop price exactly', () => {
   assert.strictEqual(cardCents(500), 520);      // $5 plant
   assert.strictEqual(cardCents(7200), 7488);    // 50 sq ft kit

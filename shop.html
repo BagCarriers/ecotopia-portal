@@ -278,11 +278,12 @@
             return '<img src="' + esc(t.src) + '" alt="' + esc(t.alt) + '" loading="lazy" width="681" height="900">';
           }).join('') + '</div>'
         : '';
-      // Payable items show the pair computed from price_cents. An item with no
-      // price_cents cannot be ordered at all (the edge function rejects it as
-      // not_payable), so it gets no card figure: it falls back to whatever price_text
-      // staff wrote, escaped as before.
-      var priceHtml = isPayable(m) ? twoPriceCents(m.priceCents)
+      // Only an item we actually take money for shows the pair. Two kinds do not, and
+      // both fall back to whatever price_text staff wrote, escaped as before:
+      // no price_cents means the edge function rejects it as not_payable, and a link_url
+      // sends the shopper to an outside store (the CTA below prefers that link over our
+      // own order flow) which honours neither of our figures.
+      var priceHtml = (isPayable(m) && !validLink(m.linkUrl)) ? twoPriceCents(m.priceCents)
         : (m.priceText ? esc(m.priceText) : '');
       var meta = '';
       if (priceHtml || m.statusText) {

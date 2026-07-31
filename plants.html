@@ -219,6 +219,12 @@
   font-family: var(--font-util); color: var(--ink-soft); font-size: 1rem;
   padding: 20px 0; text-align: center;
 }
+/* The kit modal's price line. It sits immediately above the tender choice and reads at
+   the weight of the tray total, since it is the same kind of statement. */
+.kit-price-line {
+  font-family: var(--font-util); font-weight: 700; font-size: 1.1rem;
+  color: var(--green-dark); margin: 14px 0 2px;
+}
 .eco-lead-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 .pay-choice {
   display: flex; align-items: center; gap: 8px; font-family: var(--font-util);
@@ -307,7 +313,8 @@
       <p class="eyebrow">Browse the nursery</p>
       <h2 id="species-h">Wildflower species</h2>
       <!-- The two figures here are the same pair the cards below render from
-           PLANT_PRICE. Change one and change the other. -->
+           PLANT_PRICE. Change one and change the other: tests/pricing.test.js scrapes
+           this sentence and fails if it stops matching PLANT_PRICE and its card price. -->
       <p class="lead">Fifty native perennial wildflowers, $5.20 card or $5.00 by cash or check at our plant sale. Build a request below and we will confirm what is ready to reserve.</p>
       <div class="filter-bar" id="filterBar" role="group" aria-label="Filter wildflowers"></div>
       <p class="filter-count" id="filterCount" aria-live="polite"></p>
@@ -469,6 +476,9 @@
     var card = EcoPricing.cardDollars(baseDollars);
     return '$' + card.toFixed(2) + ' card &middot; $' + Number(baseDollars).toFixed(2) + ' cash or check';
   }
+
+  // Shown in the kit modal until a size is picked, since the price depends on the size.
+  var KIT_PRICE_PROMPT = 'Choose a kit size to see the price.';
 
   // ── Live catalog state (loaded from the DB over anon) ────────────
   // KITS + species come from public.plant_kits / public.plant_species, which
@@ -796,16 +806,32 @@
         '<div class="eco-lead-grid"><div class="eco-lead-field eco-lead-full">' +
           '<label for="pl-kit-msg">Anything to add?</label>' +
           '<textarea id="pl-kit-msg" placeholder="Optional. Soil conditions, an optional add-on, a delivery preference..."></textarea></div></div>' +
+        '<p class="kit-price-line" id="pl-kit-price">' + KIT_PRICE_PROMPT + '</p>' +
         '<div class="eco-lead-grid">' + payModeHtml('pl-kit-pay') + '</div>' +
         '<p class="eco-lead-tinynote">Reserve for pickup, or pay online now. Online payment lights up once our card processor is set up; until then your reservation is saved for pickup.</p>' +
         '<p class="eco-lead-error" id="plantModalError"></p>' +
         '<button type="submit" class="eco-lead-primary">Place kit order</button>' +
       '</form>';
+    var sizeSel = document.getElementById('pl-kit-size');
+    sizeSel.addEventListener('change', function () { renderKitPrice(sizeSel.value); });
+    renderKitPrice(sizeSel.value);
     document.getElementById('kitForm').addEventListener('submit', function (e) {
       e.preventDefault();
       submitKit(kit);
     });
     showModal();
+  }
+
+  // The modal is a full-screen overlay: it covers the kit card and the price table the
+  // customer just read. This line puts the pair back on screen directly above the tender
+  // choice, which is the one moment both figures have to be visible for the customer to
+  // choose between them. It follows the size dropdown, because the price does.
+  function renderKitPrice(sizeKey) {
+    var el = document.getElementById('pl-kit-price');
+    if (!el) return;
+    var tier = TIER_BY_KEY[sizeKey]; // allowlist: an unknown key falls back to the prompt
+    // twoPrice returns HTML built from KIT_TIERS numbers only, never from a DB string.
+    el.innerHTML = tier ? twoPrice(tier.price) : KIT_PRICE_PROMPT;
   }
 
   async function submitKit(kit) {
