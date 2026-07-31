@@ -187,7 +187,11 @@ async function decrementOrderStock(sb: ReturnType<typeof admin>, items: any): Pr
     const qty = Number(it?.qty) || 0;
     if (!kind || !id || qty <= 0) continue;
     try {
-      await sb.rpc('decrement_stock', { p_kind: kind, p_id: id, p_qty: qty });
+      // Species stock is per size since 0028, so the size has to reach the RPC or
+      // neither species branch matches and the counter silently never moves. Lines
+      // written before sizes existed carry none; those were plugs.
+      const size = it?.size ?? (kind === 'species' ? 'plug' : null);
+      await sb.rpc('decrement_stock', { p_kind: kind, p_id: id, p_qty: qty, p_size: size });
     } catch (_e) { /* one line failing must not sink the rest */ }
   }
 }
@@ -324,15 +328,21 @@ async function handleCreateOrder(body: any): Promise<Response> {
     if (!(qty >= 1 && qty <= 20)) return json({ error: 'bad_quantity' }, 400);
 
     if (kind === 'species') {
+      // Migration 0028 replaced stock_qty with per-size counters. A payload with no
+      // size comes from a page built before sizes existed, so it means the plug, which
+      // is the size that was on sale then. Task 2 adds the full per-size gating; this
+      // keeps checkout working for an already-deployed page in the meantime.
+      const size = raw?.size === 'gallon' ? 'gallon' : 'plug';
       const { data: row } = await sb.from('plant_species')
-        .select('id, common, active, stock_qty').eq('id', id).maybeSingle();
+        .select('id, common, active, stock_plug, stock_gallon').eq('id', id).maybeSingle();
       if (!row || row.active === false) return json({ error: 'item_unavailable' }, 400);
-      if (row.stock_qty != null && row.stock_qty < qty) {
+      const stock = size === 'plug' ? row.stock_plug : row.stock_gallon;
+      if (stock != null && stock < qty) {
         return json({ error: 'insufficient_stock', item: row.common }, 409);
       }
       const unit = PLANT_PRICE_CENTS;
       subtotal += unit * qty;
-      lines.push({ kind, id, name: row.common, qty, unit_cents: unit });
+      lines.push({ kind, id, name: row.common, qty, unit_cents: unit, size });
     } else if (kind === 'kit') {
       const tier = typeof raw?.tier === 'string' ? raw.tier : '';
       if (!Object.prototype.hasOwnProperty.call(KIT_TIERS, tier)) return json({ error: 'bad_tier' }, 400);
