@@ -15,8 +15,10 @@ it is committed so it survives across machines and sessions.
 Migrations `0001`-`0027` (every migration in `supabase/migrations/`) were applied to the
 live database directly via the Supabase Management API
 (`POST https://api.supabase.com/v1/projects/wibnryfinfwbwwgsyojr/database/query`),
-NOT via `supabase db push`. Because of that, the `supabase_migrations.schema_migrations`
-table is empty and the CLI does not know these migrations ran.
+NOT via `supabase db push`. Because of that the CLI does not know any of them ran: the
+`supabase_migrations.schema_migrations` table does not exist on this project at all
+(checked 2026-07-31, `relation ... does not exist`, not merely empty). The first
+`migration repair` creates it.
 
 Before ever running `supabase db push` against this project, first register the
 already-applied migrations so the CLI does not try to re-run them:
@@ -299,8 +301,9 @@ token-gated `get_quote_by_token` RPC).
 - **`POST {action:'create_link', token:<share_token>}`** - PUBLIC (anon; the public
   quote-view page calls it on the accepting client's behalf with the anon `apikey` +
   `Authorization: Bearer <anon>` headers). Validates the token is >= 32 chars, then looks
-  up the quote via service role: it must be `status = 'accepted'` with `deposit > 0` and
-  not already `deposit_status = 'paid'`. If the quote already has a `square_pay_url` it is
+  up the quote via service role: its status must be `accepted` **or `invoiced`**
+  (`index.ts:207`), with `deposit > 0` and not already `deposit_status = 'paid'` (which is
+  a `409`). If the quote already has a `square_pay_url` it is
   returned as-is (idempotent re-click). Otherwise, if `SQUARE_ACCESS_TOKEN` or
   `SQUARE_LOCATION_ID` is unset it returns `{configured:false}` (dark mode). With both
   set, it creates a Square Payment Link (`quick_pay` for `Deposit - Quote N of YYYY -
@@ -309,8 +312,10 @@ token-gated `get_quote_by_token` RPC).
   `deposit_status` to `pending`, and returns `{configured:true, url}`.
   **The deposit carries the card uplift** (`index.ts:242`): `quotes.deposit` is the BASE
   figure staff entered, and this is the card path, so a $200 deposit is charged **$208**.
-  `quote-view.html` prints `cardDollars(deposit)` beside a "By check or cash" figure of the
-  base, so the two agree. See "Cash-discount pricing".
+  `quote-view.html` pairs both figures wherever it names a deposit, so the page and the
+  link agree: "Deposit due: $208.00" over "$200.00 if you pay by check or cash" in the
+  action panel (`:302-303`), and `DEPOSIT RECEIVED` over `By check or cash:` on the
+  document itself. See "Cash-discount pricing".
 - **Square webhook (`payment.updated`)** - Square POSTs the event JSON signed with an
   HMAC-SHA256 over (`SQUARE_WEBHOOK_URL` + raw body), base64, in the
   `x-square-hmacsha256-signature` header. The function verifies that signature
@@ -685,7 +690,7 @@ Table `public.merch_items` columns:
 | `name`        | required                                                         |
 | `blurb`       | optional description                                             |
 | `price_text`  | free text label, **display only**. NOT the price we charge, and a payable card does not render it at all: `shop.html:286` shows it only on request-only items and on items with an external buy link |
-| `price_cents` | integer, nullable (added by `0025`). **The storefront price.** Set = orderable, and the card shows the card and cash pair; null = request-only (`400 not_payable` if ordered) |
+| `price_cents` | integer, nullable (added by `0025`). **The storefront price.** Set = orderable through our own checkout, and the card shows the card and cash pair; null = request-only (`400 not_payable` if ordered). Same exception as `price_text` above: a valid `https://` `link_url` wins, and such a card shows `price_text` and sends the CTA outside instead |
 | `stock_qty`   | integer, nullable (added by `0025`). null = untracked, 0 = sold out |
 | `status_text` | free text ("Pre-order", "In stock", "Coming soon")                |
 | `photo_path`  | `static:<path>` repo asset, or a gallery-bucket object (see below) |
@@ -838,8 +843,9 @@ Where things live:
   filters, status pills, items + total, customer contact, note, and actions - **Paid cash**
   / **Paid check** / **Paid card** (three buttons, each calling `staff_mark_paid` with its
   own `tender`; they decrement stock), **Mark ready**, **Mark completed**, **Cancel**
-  (plain staff status updates via `DataStore.updateOrder`), and **Copy order link**. A
-  settled row shows "Collected: $X <tender>" in place of the total.
+  (plain staff status updates via `DataStore.updateOrder`), and **Copy order link**. A row
+  with a recorded `amount_collected_cents` shows "Collected: $X <tender>" in place of the
+  total; every other row shows the base total.
   `dashboard.html` "Needs attention" surfaces "N new order(s)" (`new`/`link_created`).
 - Staff editors: `manage-plants.html` species + kit modals gain a "Stock (blank = untracked)"
   input; `manage-shop.html` gains "Stock" and "Price (USD, for online payment)" (stored as
@@ -897,16 +903,30 @@ plus its token-gated RPCs).
   backfills it**. `null` means "not priced yet" and must **never** be coerced to
   `subtotal_cents`: pre-0027 rows have no charge, and rendering `money(null)` would show
   "$0.00" beside a Square link charging the real amount, so `order.html` shows no total at
-  all in that case. The staff list never renders `charge_cents`: an unsettled row on
+  all in that case. That blank applies only on the Square branch (`order.html:181-187`); a
+  pickup row prints the pair off `subtotal_cents` and never consults `charge_cents` at all.
+  The staff list never renders `charge_cents`: an unsettled row on
   `orders.html` always shows `money(subtotalCents)`, the BASE total, including a
-  `link_created` online order whose Square link is 4 percent higher. Once settled it shows
-  `amount_collected_cents` instead.
-- **`orders.tender`** is null until the order settles, then records how it was paid.
-- **`orders.amount_collected_cents`** is what actually came in.
+  `link_created` online order whose Square link is 4 percent higher. The row switches to
+  "Collected: ..." on `amountCollectedCents != null` (`orders.html:203`), NOT on status, so
+  a settled order whose payment event carried no usable amount (`index.ts:158` writes null)
+  keeps showing the base total.
+- **`orders.tender`** is null until the order settles (no default), then records how it was
+  paid.
+- **`orders.amount_collected_cents`** is the amount recorded as collected, and the two paths
+  mean slightly different things by it. On the card/webhook path it is **observed**: what
+  Square reported taking, or null when the event carried no usable amount. On the
+  `staff_mark_paid` path it is **derived** (`index.ts:481`): what the tender says the
+  customer owed, not what anyone counted. So it confirms a Square settlement, but on a
+  pickup it only records what we asked for.
 - **`quotes.total` is the CASH total** (base subtotal + the 5 percent administration fee,
-  which is itself computed on the base subtotal). Unchanged in meaning, so again no
-  backfill. The card figures are derived at display time by `quoteTotals`, never stored.
-- **`quotes.deposit_tender`** is set to `card` by the Square deposit webhook.
+  which is itself computed on the base subtotal). The builder writes it as
+  `total: totals.cashTotal` (`quotes.html:490` and `:499`). Unchanged in meaning, so again
+  no backfill. The card figures are derived at display time by `quoteTotals`, never stored.
+- **`quotes.deposit_tender`** is set to `card` by the Square deposit webhook, and by
+  nothing else. **Do not reconcile off it**: the manual "Mark deposit paid" action leaves it
+  null, so null means "not recorded", never "not a card". Full caveat under "Square deposit
+  payments" above.
 
 ### Tender at pickup
 
@@ -943,18 +963,23 @@ compare against.
 the order is `paid`, `ready` or `completed`. It stays visible past `paid` because staff
 advance a flagged order through `ready` and `completed`, and those are precisely the
 moments someone is about to hand over goods that may not have been paid for. Customers
-cannot set any of those three statuses.
+cannot write any of those three statuses themselves (no anon policy on `orders`, and the
+public `create_order` action only ever writes `new` or `link_created`), though paying does
+settle the order through the webhook, which is the hole the next paragraph is about.
 
 **The chip is NOT forgery-proof. Treat it as "read the note", not as proof we were
 short-changed.** `orders.note` is customer free text off the public order form
 (`index.ts:284`, stored verbatim at `:368`), the webhook rewrites it only when there IS a
 mismatch, and `staff_mark_paid` never touches it. So a customer who types
 `AMOUNT MISMATCH: ...` into their own note and then pays the correct amount ends up at
-`status = 'paid'` with that text intact, and the chip fires on a clean order. What the
-status gate does buy is that they cannot raise it on their own unpaid row; it surfaces only
-once staff have marked the order paid. Closing the hole properly means flagging on
-`amountCollectedCents !== chargeCents` rather than trusting note text, which would also
-survive an operator editing the note. That is not built.
+`status = 'paid'` with that text intact, and the chip fires on a clean order. **No operator
+action is needed anywhere in that sequence**: on the online path the customer pays their own
+Square link and the webhook sets `paid` itself (`index.ts:159-174`), so the chip is already
+showing the first time staff open the page. It is customer-triggerable end to end. The
+status gate buys exactly one thing, and it is worth keeping: they cannot raise it on their
+own row while it is still unpaid, only once the order settles. Closing the hole properly
+means flagging on `amountCollectedCents !== chargeCents` rather than trusting note text,
+which would also survive an operator editing the note. That is not built.
 
 The gate deliberately excludes `cancelled`, so a flagged order that is cancelled loses its
 chip at exactly the moment someone is deciding whether to refund. The `AMOUNT MISMATCH`
