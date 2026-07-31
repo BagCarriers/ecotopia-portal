@@ -13,6 +13,7 @@
 <script src="assets/config.js"></script>
 <script src="assets/supabase-client.js"></script>
 <script src="assets/mapping.js"></script>
+<script src="assets/pricing.js"></script>
 <script src="assets/auth.js"></script>
 <script>if (!AuthManager.hasCachedSession()) location.replace('login.html');</script>
 <script src="assets/data.js"></script>
@@ -89,6 +90,9 @@
   .trow.admin .lbl { font-weight: 500; font-size: 0.92rem; letter-spacing: 0.01em; }
   .trow.admin .val { font-weight: 600; font-size: 0.92rem; }
   .trow.total .lbl, .trow.total .val { font-size: 1.55rem; font-weight: 800; }
+  /* The alternative price. It sits under the total and must read as the second option,
+     not as a competing headline, so it stays a size down from it. */
+  .trow.cash .lbl, .trow.cash .val { font-size: 1.05rem; font-weight: 700; color: var(--olive); }
   .trow.balance { border-top: 2px solid var(--navy); margin-top: 6px; padding-top: 10px; }
   .trow.balance .lbl, .trow.balance .val { font-size: 1.3rem; font-weight: 800; color: var(--rust); }
 
@@ -150,23 +154,29 @@ function notFound() {
 }
 
 function renderQuote(q) {
-  const items = Array.isArray(q.lineItems) ? q.lineItems : [];
+  // line_items is raw jsonb: filter empty entries so the rows below and the totals are
+  // built from exactly the same list, and so one bad entry cannot blank the document.
+  const items = (Array.isArray(q.lineItems) ? q.lineItems : []).filter(Boolean);
+  // The printed column carries the card price, so it has to add up to the card total
+  // beneath it. quoteTotals sums individually grossed lines for that reason.
+  const t = EcoPricing.quoteTotals(items, q.deposit);
   const rows = items.map(li => `
     <tr>
       <td class="desc">${esc(li.description || '')}</td>
       <td>${esc(li.hours || '')}</td>
       <td class="mat">${esc(li.material || '')}</td>
-      <td class="amt">${li.amount != null && li.amount !== '' ? money(li.amount) : ''}</td>
+      <td class="amt">${li.amount != null && li.amount !== '' ? money(EcoPricing.cardDollars(li.amount)) : ''}</td>
     </tr>`).join('');
   // A couple of blank ruled rows to echo the reference table feel.
   const blanks = '<tr><td class="desc">&nbsp;</td><td></td><td></td><td></td></tr>';
 
-  const deposit = Number(q.deposit) || 0;
-  const balanceRow = deposit > 0
-    ? `<div class="trow balance"><span class="lbl">BALANCE DUE:</span><span class="val">${money(q.total - deposit)}</span></div>`
+  // Deposit and balance stay on the card tender, so the arithmetic on the sheet reads
+  // straight down: card total minus card deposit is the card balance.
+  const balanceRow = t.cashDeposit > 0
+    ? `<div class="trow balance"><span class="lbl">BALANCE DUE:</span><span class="val">${money(t.cardBalance)}</span></div>`
     : '';
-  const depositRow = deposit > 0
-    ? `<div class="trow deposit"><span class="lbl">DEPOSIT RECEIVED:</span><span class="val">${money(deposit)}</span></div>`
+  const depositRow = t.cashDeposit > 0
+    ? `<div class="trow deposit"><span class="lbl">DEPOSIT RECEIVED:</span><span class="val">${money(t.cardDeposit)}</span></div>`
     : '';
 
   document.getElementById('root').innerHTML = `
@@ -198,8 +208,9 @@ function renderQuote(q) {
 
       <div class="totals">
         ${depositRow}
-        <div class="trow admin"><span class="lbl">Processing and administration:</span><span class="val">${money(q.adminFee)}</span></div>
-        <div class="trow total"><span class="lbl">TOTAL ESTIMATE:</span><span class="val">${money(q.total)}</span></div>
+        <div class="trow admin"><span class="lbl">Administration:</span><span class="val">${money(t.adminFee)}</span></div>
+        <div class="trow total"><span class="lbl">TOTAL ESTIMATE:</span><span class="val">${money(t.cardTotal)}</span></div>
+        <div class="trow cash"><span class="lbl">Pay by check or cash:</span><span class="val">${money(t.cashTotal)}</span></div>
         ${balanceRow}
       </div>
 

@@ -77,4 +77,20 @@ test('quoteTotals tolerates empty and null input', () => {
   const t = quoteTotals(null, 0);
   assert.strictEqual(t.subtotal, 0);
   assert.strictEqual(t.cardTotal, 0);
+  const e = quoteTotals([], 0);
+  assert.strictEqual(e.subtotal, 0);
+  assert.strictEqual(e.cardSubtotal, 0);
+  assert.strictEqual(e.cashTotal, 0);
+  assert.strictEqual(e.cardTotal, 0);
+});
+
+test('quoteTotals prices around a null line item instead of throwing', () => {
+  // line_items is raw jsonb and nothing constrains its entries. A single null used to
+  // throw here, which blanked the staff quotes table and would blank a client's quote.
+  const t = quoteTotals([{ amount: 100 }, null, { amount: 675 }], 0);
+  assert.strictEqual(t.subtotal, 775);        // 100 + 675, the null contributes nothing
+  assert.strictEqual(t.adminFee, 38.75);
+  assert.strictEqual(t.cardSubtotal, 806);    // 104 + 702
+  assert.strictEqual(t.cashTotal, 813.75);
+  assert.strictEqual(t.cardTotal, 844.75);
 });

@@ -15,6 +15,7 @@
 <script src="assets/config.js"></script>
 <script src="assets/supabase-client.js"></script>
 <script src="assets/mapping.js"></script>
+<script src="assets/pricing.js"></script>
 <script src="assets/data.js"></script>
 <style>
   :root {
@@ -75,6 +76,9 @@
   .trow.admin .lbl { font-weight: 500; font-size: 0.92rem; letter-spacing: 0.01em; }
   .trow.admin .val { font-weight: 600; font-size: 0.92rem; }
   .trow.total .lbl, .trow.total .val { font-size: 1.55rem; font-weight: 800; }
+  /* The alternative price. It sits under the total and must read as the second option,
+     not as a competing headline, so it stays a size down from it. */
+  .trow.cash .lbl, .trow.cash .val { font-size: 1.05rem; font-weight: 700; color: var(--olive); }
   .trow.balance { border-top: 2px solid var(--navy); margin-top: 6px; padding-top: 10px; }
   .trow.balance .lbl, .trow.balance .val { font-size: 1.3rem; font-weight: 800; color: var(--rust); }
 
@@ -119,6 +123,7 @@
 
   .deposit-panel { margin-top: 18px; border-top: 1px solid rgba(30,58,95,0.12); padding-top: 18px; }
   .deposit-due { font-size: 1.15rem; font-weight: 800; color: var(--rust); margin-bottom: 4px; }
+  .deposit-cash { font-size: 1rem; font-weight: 700; color: var(--olive); margin-bottom: 8px; }
   .deposit-balance { font-size: 0.9rem; color: var(--text-dim); margin-bottom: 12px; }
   .pay-instructions { background: var(--ink-dim); border-radius: 10px; padding: 16px 18px; font-size: 0.95rem;
     color: var(--navy); line-height: 1.6; font-weight: 500; }
@@ -202,21 +207,27 @@ function renderUnavailable() {
 
 // The branded document (client-facing view of the quote).
 function documentHtml(q) {
-  const items = Array.isArray(q.lineItems) ? q.lineItems : [];
+  // line_items is raw jsonb: filter empty entries so the rows below and the totals are
+  // built from exactly the same list, and so one bad entry cannot blank the document.
+  const items = (Array.isArray(q.lineItems) ? q.lineItems : []).filter(Boolean);
+  // The printed column carries the card price, so it has to add up to the card total
+  // beneath it. quoteTotals sums individually grossed lines for that reason.
+  const t = EcoPricing.quoteTotals(items, q.deposit);
   const rows = items.map(li => `
     <tr>
       <td class="desc">${esc(li.description || '')}</td>
       <td>${esc(li.hours || '')}</td>
       <td class="mat">${esc(li.material || '')}</td>
-      <td class="amt">${li.amount != null && li.amount !== '' ? money(li.amount) : ''}</td>
+      <td class="amt">${li.amount != null && li.amount !== '' ? money(EcoPricing.cardDollars(li.amount)) : ''}</td>
     </tr>`).join('');
   const blanks = '<tr><td class="desc">&nbsp;</td><td></td><td></td><td></td></tr>';
-  const deposit = Number(q.deposit) || 0;
-  const depositRow = deposit > 0
-    ? `<div class="trow deposit"><span class="lbl">DEPOSIT RECEIVED:</span><span class="val">${money(deposit)}</span></div>`
+  // Deposit and balance stay on the card tender, so the arithmetic on the sheet reads
+  // straight down: card total minus card deposit is the card balance.
+  const depositRow = t.cashDeposit > 0
+    ? `<div class="trow deposit"><span class="lbl">DEPOSIT RECEIVED:</span><span class="val">${money(t.cardDeposit)}</span></div>`
     : '';
-  const balanceRow = deposit > 0
-    ? `<div class="trow balance"><span class="lbl">BALANCE DUE:</span><span class="val">${money((Number(q.total) || 0) - deposit)}</span></div>`
+  const balanceRow = t.cashDeposit > 0
+    ? `<div class="trow balance"><span class="lbl">BALANCE DUE:</span><span class="val">${money(t.cardBalance)}</span></div>`
     : '';
 
   return `
@@ -247,8 +258,9 @@ function documentHtml(q) {
       <div class="rule"></div>
       <div class="totals">
         ${depositRow}
-        <div class="trow admin"><span class="lbl">Processing and administration:</span><span class="val">${money(q.adminFee)}</span></div>
-        <div class="trow total"><span class="lbl">TOTAL ESTIMATE:</span><span class="val">${money(q.total)}</span></div>
+        <div class="trow admin"><span class="lbl">Administration:</span><span class="val">${money(t.adminFee)}</span></div>
+        <div class="trow total"><span class="lbl">TOTAL ESTIMATE:</span><span class="val">${money(t.cardTotal)}</span></div>
+        <div class="trow cash"><span class="lbl">Pay by check or cash:</span><span class="val">${money(t.cashTotal)}</span></div>
         ${balanceRow}
       </div>
       <div class="signoff">
@@ -267,17 +279,22 @@ function documentHtml(q) {
 // loadPayOptions() fills in asynchronously (online Square button, or the manual
 // check instructions when Square is not configured / unreachable).
 function depositPanelHtml(q) {
-  const deposit = Number(q.deposit) || 0;
-  if (deposit <= 0) return '';
+  const items = (Array.isArray(q.lineItems) ? q.lineItems : []).filter(Boolean);
+  const t = EcoPricing.quoteTotals(items, q.deposit);
+  if (t.cashDeposit <= 0) return '';
   const depStatus = q.depositStatus || 'unpaid';
   if (depStatus === 'paid') {
-    return `<div class="deposit-panel"><div class="deposit-paid">Deposit of ${money(deposit)} received. Thank you!</div></div>`;
+    // No figure here: a deposit can arrive on either tender and the page is not told
+    // which, so naming one amount would be wrong half the time.
+    return `<div class="deposit-panel"><div class="deposit-paid">Deposit received. Thank you!</div></div>`;
   }
-  const balance = (Number(q.total) || 0) - deposit;
+  // Card first, because the Pay button below charges exactly cardDeposit: square-pay
+  // applies the same uplift server-side, and these two numbers must agree.
   return `
     <div class="deposit-panel">
-      <div class="deposit-due">Deposit due: ${money(deposit)}</div>
-      <div class="deposit-balance">Remaining balance after deposit: ${money(balance)}</div>
+      <div class="deposit-due">Deposit due: ${money(t.cardDeposit)}</div>
+      <div class="deposit-cash">${money(t.cashDeposit)} if you pay by check or cash</div>
+      <div class="deposit-balance">Remaining balance after deposit: ${money(t.cardBalance)}, or ${money(t.cashBalance)} by check or cash</div>
       <div id="payArea" class="pay-area">
         <div class="pay-instructions">${esc(MANUAL_INSTRUCTIONS)}</div>
       </div>

@@ -235,7 +235,11 @@ async function handleCreateLink(body: any): Promise<Response> {
         idempotency_key: quote.id + ':deposit',
         quick_pay: {
           name,
-          price_money: { amount: toCents(quote.deposit), currency: 'USD' },
+          // The deposit carries the same uplift as everything else: quotes.deposit is
+          // the BASE figure staff entered, and this is the card path. The client never
+          // sends an amount, so this line is the only place the deposit charge is decided;
+          // quote-view.html displays cardDollars(deposit) to match it exactly.
+          price_money: { amount: cardCents(toCents(quote.deposit)), currency: 'USD' },
           location_id: locationId,
         },
       }),

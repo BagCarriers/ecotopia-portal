@@ -25,9 +25,12 @@
     return round2((Number(baseDollars) || 0) * (1 + CARD_UPLIFT));
   }
 
-  // lineItems carry BASE dollar amounts, exactly as staff enter them.
+  // lineItems carry BASE dollar amounts, exactly as staff enter them. line_items is raw
+  // jsonb, so a null or otherwise empty entry can reach us; drop those here rather than at
+  // each call site, because one bad entry throwing would blank a whole staff table or a
+  // client's whole quote.
   function quoteTotals(lineItems, deposit) {
-    const items = lineItems || [];
+    const items = (Array.isArray(lineItems) ? lineItems : []).filter(Boolean);
     const subtotal = round2(items.reduce((s, li) => s + (Number(li.amount) || 0), 0));
     const adminFee = round2(subtotal * ADMIN_FEE_RATE);
     // Sum of individually grossed lines, NOT cardDollars(subtotal): the client sees the
