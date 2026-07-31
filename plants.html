@@ -11,7 +11,7 @@
 <meta property="og:site_name" content="Ecotopian EarthCare">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Native Plants - Ecotopian EarthCare">
-<meta property="og:description" content="Fifty native perennial wildflowers and eleven habitat kits, nursery-grown for Central Pennsylvania. Reserve plants for pickup, nothing charged online.">
+<meta property="og:description" content="Fifty native perennial wildflowers and eleven habitat kits, nursery-grown for Central Pennsylvania. Reserve plants for pickup, or pay online.">
   <meta property="og:image" content="https://ecotopianearthcare.com/assets/img/og-pawpaw.jpg">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
@@ -291,7 +291,7 @@
     <div class="wrap">
       <p class="eyebrow">Native plant nursery</p>
       <h1>Native Plants and Habitat Kits</h1>
-      <p class="lead">Nursery-grown native perennials for Central Pennsylvania, chosen for the pollinators, birds, and people who share this land. Reserve the plants you want here; we confirm availability and arrange pickup or delivery. Nothing is charged online.</p>
+      <p class="lead">Nursery-grown native perennials for Central Pennsylvania, chosen for the pollinators, birds, and people who share this land. Reserve the plants you want here; we confirm availability and arrange pickup or delivery. Pay when you pick up, or pay online now; cash or check costs a little less.</p>
       <p class="plants-crosslink">Prefer we plant it for you? <a href="services.html">See our services.</a></p>
       <p class="plants-crosslink">Looking for the card game? It moved to our new <a href="shop.html">Shop</a>.</p>
     </div>
@@ -765,9 +765,9 @@
       if (b.pay_url && /^https:\/\//i.test(b.pay_url)) {
         payBlock = '<a class="eco-lead-primary" style="display:block;text-align:center;text-decoration:none;margin:0 0 12px" href="' +
           esc(b.pay_url) + '" target="_blank" rel="noopener">Pay online now</a>';
-        sub = 'Your order is reserved. Pay securely online below, or pay at pickup.';
+        sub = 'Your order is reserved. Pay securely online below, or pay at pickup by cash or check for a little less.';
       } else {
-        sub = 'Online payment is not set up yet, so your reservation is saved for pickup instead. We will confirm availability and arrange pickup.';
+        sub = 'We could not open the online payment just now, so your reservation is saved for pickup instead. We will confirm availability and arrange pickup.';
       }
     } else {
       sub = 'We will confirm availability and arrange pickup. Nothing is charged now.';
@@ -812,7 +812,8 @@
           '<textarea id="pl-kit-msg" placeholder="Optional. Soil conditions, an optional add-on, a delivery preference..."></textarea></div></div>' +
         '<p class="kit-price-line" id="pl-kit-price" aria-live="polite">' + KIT_PRICE_PROMPT + '</p>' +
         '<div class="eco-lead-grid">' + payModeHtml('pl-kit-pay') + '</div>' +
-        '<p class="eco-lead-tinynote">Reserve for pickup, or pay online now. Online payment lights up once our card processor is set up; until then your reservation is saved for pickup.</p>' +
+        '<p class="eco-lead-tinynote">Reserve for pickup, or pay online now. Pick a size and the line above ' +
+          'shows what each way comes to; cash or check is the lower figure.</p>' +
         '<p class="eco-lead-error" id="plantModalError"></p>' +
         '<button type="submit" class="eco-lead-primary">Place kit order</button>' +
       '</form>';

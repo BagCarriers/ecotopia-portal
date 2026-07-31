@@ -7,7 +7,7 @@
   <link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png">
 <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/favicon-32.png">
 <link rel="icon" type="image/png" sizes="192x192" href="/assets/img/favicon-192.png">
-<meta name="description" content="Shop Ecotopian EarthCare: the Ecotopian EarthCare card game and other goods that support native-plant restoration in Central Pennsylvania. Nothing is charged online.">
+<meta name="description" content="Shop Ecotopian EarthCare: the Ecotopian EarthCare card game and other goods that support native-plant restoration in Central Pennsylvania. Reserve for pickup or pay online.">
 <meta property="og:site_name" content="Ecotopian EarthCare">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Shop - Ecotopian EarthCare">
@@ -96,8 +96,9 @@
       <p class="eyebrow">Shop</p>
       <h1>Shop Ecotopian EarthCare</h1>
       <p class="lead">Goods that carry our work into the world, from the Ecotopian EarthCare card game to
-        other native-plant projects in the making. Reserve or pre-order below. Nothing is charged online;
-        we reach out to arrange the rest.</p>
+        other native-plant projects in the making. Reserve or pre-order below. Where a price is shown you can
+        pay at pickup or pay online now, and cash or check costs a little less. For anything without a price,
+        nothing is charged online and we reach out to arrange the rest.</p>
     </div>
   </section>
   <div class="willow on-cream" data-opacity="0.4"></div>
@@ -477,7 +478,8 @@
             '<textarea id="or-note" placeholder="Optional. A delivery preference, anything else."></textarea></div>' +
         '</div>' +
         '<div class="eco-lead-grid">' + payModeHtml('or-pay') + '</div>' +
-        '<p class="eco-lead-tinynote">Add an email or a phone number so we can reach you. Online payment lights up once our card processor is set up; until then your order is saved for pickup.</p>' +
+        '<p class="eco-lead-tinynote">Add an email or a phone number so we can reach you. Pay at pickup or ' +
+          'pay online, whichever suits; the two prices above show what each way comes to.</p>' +
         '<p class="eco-lead-error" id="shopModalError"></p>' +
         '<button type="submit" class="eco-lead-primary">Place order</button>' +
       '</form>';
@@ -527,9 +529,9 @@
       if (b.pay_url && /^https:\/\//i.test(b.pay_url)) {
         payBlock = '<a class="eco-lead-primary" style="display:block;text-align:center;text-decoration:none;margin:0 0 12px" href="' +
           esc(b.pay_url) + '" target="_blank" rel="noopener">Pay online now</a>';
-        sub = 'Your order is reserved. Pay securely online below, or pay at pickup.';
+        sub = 'Your order is reserved. Pay securely online below, or pay at pickup by cash or check for a little less.';
       } else {
-        sub = 'Online payment is not set up yet, so your order is saved for pickup instead. We will reach out to arrange it.';
+        sub = 'We could not open the online payment just now, so your order is saved for pickup instead. We will reach out to arrange it.';
       }
     } else {
       sub = 'We will reach out to arrange your order. Nothing is charged now.';
