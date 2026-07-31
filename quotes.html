@@ -484,11 +484,31 @@ document.getElementById('builderForm').addEventListener('submit', async function
     const id = document.getElementById('q_id').value;
     if (id) {
       // Editing: recompute money fields, NEVER change the quote number/year.
-      await DataStore.updateQuote(id, {
+      const changes = {
         clientName: client, clientAddress: address, jobId,
         quoteDate: dateStr, lineItems: items, deposit,
         subtotal: totals.subtotal, adminFee: totals.adminFee, total: totals.cashTotal,
-      });
+      };
+      // A minted Square deposit link charges the amount it was minted for and nothing
+      // else, forever. Move the deposit figure and the client's quote would display one
+      // number over a Pay button that takes another, which is the single thing this
+      // pricing model exists to prevent. So drop the link: the next click on the client's
+      // quote mints a fresh one at the new figure. square-pay keys its idempotency on the
+      // charged amount precisely so that re-mint is a new link and not the old one handed
+      // back. deposit_status goes back to 'unpaid' because 'pending' means "a link is out
+      // there" and, after this, none is.
+      // NEVER on a deposit already paid: the money is in, that link is the record of it,
+      // and re-minting would be a second charge waiting to happen. Editing the figure on a
+      // paid deposit still leaves the quote disagreeing with what was collected; that is
+      // the deposit reconciliation gap tracked separately.
+      const prev = quotes.find(x => x.id === id);
+      const depositMoved = prev && round2(Number(prev.deposit) || 0) !== deposit;
+      if (depositMoved && prev.squarePayUrl && prev.depositStatus !== 'paid') {
+        changes.squareOrderId = null;
+        changes.squarePayUrl = null;
+        changes.depositStatus = 'unpaid';
+      }
+      await DataStore.updateQuote(id, changes);
     } else {
       const year = yearOf(dateStr);
       const number = await DataStore.nextQuoteNumber(year);

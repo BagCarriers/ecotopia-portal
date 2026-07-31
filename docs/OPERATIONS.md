@@ -308,8 +308,12 @@ token-gated `get_quote_by_token` RPC).
   `SQUARE_LOCATION_ID` is unset it returns `{configured:false}` (dark mode). With both
   set, it creates a Square Payment Link (`quick_pay` for `Deposit - Quote N of YYYY -
   Ecotopian EarthCare`, amount **`cardCents(round(deposit*100))`** cents, `idempotency_key
-  = <quote id>:deposit`), saves `square_order_id` + `square_pay_url`, flips
+  = <quote id>:deposit:<that amount>`), saves `square_order_id` + `square_pay_url`, flips
   `deposit_status` to `pending`, and returns `{configured:true, url}`.
+  **The idempotency key carries the amount, and it has to.** Square answers a repeated key
+  with the original link at the original amount, so a key naming only the quote would hand
+  back the old charge after staff changed the deposit, and the re-mint below would be a
+  no-op. See "Editing a deposit after the link is minted".
   **The deposit carries the card uplift** (`index.ts:242`): `quotes.deposit` is the BASE
   figure staff entered, and this is the card path, so a $200 deposit is charged **$208**.
   `quote-view.html` pairs both figures wherever it names a deposit, so the page and the
@@ -359,6 +363,38 @@ Staff page (`quotes.html`): the `Deposit: unpaid/pending/paid` pill and the manu
 deposit paid" action are unchanged. A Square payment flips the pill to `paid` on its own
 (webhook); "Mark deposit paid" stays as the manual override for checks / cash / any
 deposit paid outside Square.
+
+### Editing a deposit after the link is minted
+
+A Square Payment Link charges the amount it was minted for and nothing else, forever.
+Nothing in Square updates when `quotes.deposit` changes. So **any writer of
+`quotes.deposit` must clear `square_pay_url` and `square_order_id` with it**, or the
+client's quote will show one figure over a Pay button that takes another.
+
+The quote builder is the only writer today and does exactly that (`quotes.html`, the
+editing branch of the builder submit handler): when the deposit figure moves on a quote
+that has a minted link and a deposit **not** already paid, it nulls both columns and puts
+`deposit_status` back to `unpaid`. The next load of the client's quote page mints a fresh
+link at the new figure. Because the idempotency key names the amount, that really is a new
+link; with the old key Square would have returned the original one and the clear would have
+changed nothing. Verified against the sandbox on 2026-07-31: clearing the columns without
+changing the deposit returned the identical url and `square_order_id` (retry protection
+intact), and lowering $5,000 to $2,000 returned a new url whose checkout page charges
+`208000` cents, matching the `$2,080.00` the page displays.
+
+Two things this does not do:
+
+- **A deposit already paid is never re-minted.** The money is in and that link is the
+  record of it. Editing the figure afterwards leaves the quote disagreeing with what was
+  collected, which is the deposit reconciliation gap tracked separately (nothing records
+  the observed deposit amount).
+- **The old link is not deactivated.** It stays live and payable at the old amount. We
+  never send that url anywhere ourselves (the client gets `quote-view.html?t=...`, which
+  reads the current link), so the exposure is a client who kept an old checkout page or
+  bookmark. Closing it means storing Square's `payment_link.id` and calling
+  `DELETE /v2/online-checkout/payment-links/{id}` on re-mint, which needs a new column.
+  Note that a payment on the old link would also **not** flip `deposit_status`: the webhook
+  matches on `square_order_id`, which now holds the new order.
 
 ### Secrets checklist (set the night Jordan creates his Square account)
 

@@ -212,6 +212,10 @@ async function handleCreateLink(body: any): Promise<Response> {
   }
 
   // Idempotent re-click: a link already exists (deposit_status is 'pending') -> return it.
+  // The cached url is also what keeps square_order_id stable, and the webhook matches the
+  // deposit payment on square_order_id, so re-minting on every load would be unsafe.
+  // Staff editing the deposit clear both columns (quotes.html), which is what makes the
+  // amount below authoritative again.
   if (quote.square_pay_url) {
     return json({ configured: true, url: quote.square_pay_url }, 200);
   }
@@ -222,6 +226,11 @@ async function handleCreateLink(body: any): Promise<Response> {
   if (!accessToken || !locationId) return json({ configured: false }, 200);
 
   const name = `Deposit - Quote ${quote.quote_number} of ${quote.quote_year} - Ecotopian EarthCare`;
+  // The deposit carries the same uplift as everything else: quotes.deposit is the BASE
+  // figure staff entered, and this is the card path. The client never sends an amount, so
+  // this is the only place the deposit charge is decided; quote-view.html displays
+  // cardDollars(deposit) to match it exactly.
+  const depositCharge = cardCents(toCents(quote.deposit));
   let res: Response;
   try {
     res = await fetch(squareBase() + '/v2/online-checkout/payment-links', {
@@ -232,14 +241,18 @@ async function handleCreateLink(body: any): Promise<Response> {
         Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify({
-        idempotency_key: quote.id + ':deposit',
+        // Keyed on the quote AND the amount, never the quote alone. Square answers a
+        // repeated key with the ORIGINAL link at the ORIGINAL amount, so a key that
+        // ignored the amount would hand back the old charge after staff lowered the
+        // deposit, and clearing the cached url above would achieve nothing. Varying it by
+        // the amount keeps the retry protection the key exists for (a double click, or a
+        // re-mint at an unchanged figure, still returns one link) while making a changed
+        // figure mint a new one. An amount staff revert to is served its own old link,
+        // which charges that same amount, so that case is right too.
+        idempotency_key: quote.id + ':deposit:' + depositCharge,
         quick_pay: {
           name,
-          // The deposit carries the same uplift as everything else: quotes.deposit is
-          // the BASE figure staff entered, and this is the card path. The client never
-          // sends an amount, so this line is the only place the deposit charge is decided;
-          // quote-view.html displays cardDollars(deposit) to match it exactly.
-          price_money: { amount: cardCents(toCents(quote.deposit)), currency: 'USD' },
+          price_money: { amount: depositCharge, currency: 'USD' },
           location_id: locationId,
         },
       }),
