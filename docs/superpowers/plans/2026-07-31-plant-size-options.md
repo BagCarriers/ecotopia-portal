@@ -84,7 +84,7 @@ curl -s -X POST "https://api.supabase.com/v1/projects/wibnryfinfwbwwgsyojr/datab
  -d '{"query":"select count(*) total, count(stock_qty) tracked from plant_species;"}'
 ```
 
-Expected: `{"total":50,"tracked":0}`. **If `tracked` is not 0, STOP and report** — someone began tracking stock and the drop would destroy counts.
+Expected: `{"total":50,"tracked":0}`. **If `tracked` is not 0, STOP and report.** Someone began tracking stock, and the drop would destroy those counts.
 
 - [ ] **Step 2: Write the migration**
 
