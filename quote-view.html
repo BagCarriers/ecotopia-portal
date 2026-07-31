@@ -221,13 +221,17 @@ function documentHtml(q) {
       <td class="amt">${li.amount != null && li.amount !== '' ? money(EcoPricing.cardDollars(li.amount)) : ''}</td>
     </tr>`).join('');
   const blanks = '<tr><td class="desc">&nbsp;</td><td></td><td></td><td></td></tr>';
-  // Deposit and balance stay on the card tender, so the arithmetic on the sheet reads
-  // straight down: card total minus card deposit is the card balance.
+  // Deposit and balance each state BOTH figures, for the same reason the total does. A
+  // single card figure beside "DEPOSIT RECEIVED" would assert, on a document the client
+  // keeps, that we took the card amount from someone who handed us a check. Each row is
+  // therefore paired with its check-or-cash counterpart, exactly like the total above.
   const depositRow = t.cashDeposit > 0
-    ? `<div class="trow deposit"><span class="lbl">DEPOSIT RECEIVED:</span><span class="val">${money(t.cardDeposit)}</span></div>`
+    ? `<div class="trow deposit"><span class="lbl">DEPOSIT RECEIVED:</span><span class="val">${money(t.cardDeposit)}</span></div>
+       <div class="trow cash"><span class="lbl">By check or cash:</span><span class="val">${money(t.cashDeposit)}</span></div>`
     : '';
   const balanceRow = t.cashDeposit > 0
-    ? `<div class="trow balance"><span class="lbl">BALANCE DUE:</span><span class="val">${money(t.cardBalance)}</span></div>`
+    ? `<div class="trow balance"><span class="lbl">BALANCE DUE:</span><span class="val">${money(t.cardBalance)}</span></div>
+       <div class="trow cash"><span class="lbl">By check or cash:</span><span class="val">${money(t.cashBalance)}</span></div>`
     : '';
 
   return `
