@@ -314,7 +314,7 @@ token-gated `get_quote_by_token` RPC).
   with the original link at the original amount, so a key naming only the quote would hand
   back the old charge after staff changed the deposit, and the re-mint below would be a
   no-op. See "Editing a deposit after the link is minted".
-  **The deposit carries the card uplift** (`index.ts:242`): `quotes.deposit` is the BASE
+  **The deposit carries the card uplift** (`index.ts:255`): `quotes.deposit` is the BASE
   figure staff entered, and this is the card path, so a $200 deposit is charged **$208**.
   `quote-view.html` pairs both figures wherever it names a deposit, so the page and the
   link agree: "Deposit due: $208.00" over "$200.00 if you pay by check or cash" in the
@@ -834,7 +834,7 @@ endpoint, told apart by the `x-square-hmacsha256-signature` header then `body.ac
   hex) with `charge_cents` = `subtotal_cents` for `pickup` and **`cardCents(subtotal_cents)`
   for `online`**. `pay_mode:'online'` + Square configured mints a `quick_pay` Payment Link
   (`Order <first 8 of id> - Ecotopian EarthCare`, **amount `charge_cents`, NOT
-  `subtotal_cents`** (`index.ts:394`) so Square is asked for the card price, idempotency
+  `subtotal_cents`** (`index.ts:407`) so Square is asked for the card price, idempotency
   `<id>:order`), saves `square_order_id`/`square_pay_url`, sets status `link_created`,
   returns `{token, pay_url}`. `online` but Square dark (or unreachable) ->
   `{token, configured:false}` (order stays `new`, treated as pickup, and **it keeps the
@@ -944,7 +944,7 @@ plus its token-gated RPCs).
   `charge_cents` at all. The staff list never renders `charge_cents`: an unsettled row on
   `orders.html` always shows `money(subtotalCents)`, the BASE total, including a
   `link_created` online order whose Square link is 4 percent higher. The row switches to
-  "Collected: ..." on `amountCollectedCents != null` (`orders.html:203`), NOT on status, so
+  "Collected: ..." on `amountCollectedCents != null` (`orders.html:219`), NOT on status, so
   a settled order whose payment event carried no usable amount (`index.ts:158` writes null)
   keeps showing the base total.
 - **`orders.tender`** is null until the order settles (no default), then records how it was
@@ -952,12 +952,12 @@ plus its token-gated RPCs).
 - **`orders.amount_collected_cents`** is the amount recorded as collected, and the two paths
   mean slightly different things by it. On the card/webhook path it is **observed**: what
   Square reported taking, or null when the event carried no usable amount. On the
-  `staff_mark_paid` path it is **derived** (`index.ts:481`): what the tender says the
+  `staff_mark_paid` path it is **derived** (`index.ts:499`): what the tender says the
   customer owed, not what anyone counted. So it confirms a Square settlement, but on a
   pickup it only records what we asked for.
 - **`quotes.total` is the CASH total** (base subtotal + the 5 percent administration fee,
   which is itself computed on the base subtotal). The builder writes it as
-  `total: totals.cashTotal` (`quotes.html:490` and `:499`). Unchanged in meaning, so again
+  `total: totals.cashTotal` (`quotes.html:490` and `:519`). Unchanged in meaning, so again
   no backfill. The card figures are derived at display time by `quoteTotals`, never stored.
 - **`quotes.deposit_tender`** is set to `card` by the Square deposit webhook, and by
   nothing else. **Do not reconcile off it**: the manual "Mark deposit paid" action leaves it
@@ -1062,7 +1062,7 @@ lost there, only demoted.
 
 **It is no longer forgeable.** Before 2026-07-31 the chip keyed on the note starting with
 `AMOUNT MISMATCH`. `orders.note` is customer free text off the public order form
-(`index.ts:284`, stored verbatim at `:368`), so a customer could type that prefix into
+(`index.ts:297`, stored verbatim at `:381`), so a customer could type that prefix into
 their own order, pay their own Square link correctly, and have the webhook settle the row
 with the forged text intact: the chip was already up the first time staff opened the page,
 with no operator action anywhere in the sequence. The money columns are written only by the
