@@ -614,6 +614,16 @@ details.past-events[open] > summary::before { transform: rotate(90deg); }
   font-family: var(--font-util); font-size: 0.98rem;
   -webkit-appearance: none; appearance: none;
 }
+/* Radios and checkboxes are controls, not text fields. The rule above stretched them
+   to full width and appearance:none erased the dot, so they rendered as blank bars.
+   The attribute selector outranks it, so this holds wherever a lead field is used. */
+.eco-lead-field input[type="radio"],
+.eco-lead-field input[type="checkbox"] {
+  width: auto; flex: 0 0 auto;
+  padding: 0; border: 0; border-radius: 0;
+  -webkit-appearance: auto; appearance: auto;
+  accent-color: var(--green-dark);
+}
 .eco-lead-field select {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23555' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
   background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px;
