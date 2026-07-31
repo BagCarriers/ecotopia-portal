@@ -420,7 +420,10 @@ async function handleOrderStatus(body: any): Promise<Response> {
   if (token.length < 32) return json({ error: 'Not found' }, 404);
   const sb = admin();
   const { data: order } = await sb.from('orders')
-    .select('status, items, subtotal_cents, charge_cents, pay_mode, square_pay_url, created_at')
+    // tender and amount_collected_cents let the public page state what was collected on a
+    // settled order instead of a figure it no longer owes. Both are null until it settles.
+    // `note` stays unexposed: it can carry the staff-facing mismatch flag.
+    .select('status, items, subtotal_cents, charge_cents, pay_mode, square_pay_url, created_at, tender, amount_collected_cents')
     .eq('order_token', token).maybeSingle();
   if (!order) return json({ error: 'Not found' }, 404);
   return json({
@@ -431,6 +434,8 @@ async function handleOrderStatus(body: any): Promise<Response> {
     pay_mode: order.pay_mode,
     pay_url: order.square_pay_url || null,
     created_at: order.created_at,
+    tender: order.tender,
+    amount_collected_cents: order.amount_collected_cents,
   }, 200);
 }
 

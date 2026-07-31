@@ -96,6 +96,54 @@
     return '$' + ((Number(cents) || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
   var TIER_LABEL = { '50': '50 sq ft', '100': '100 sq ft', '150': '150 sq ft', '200': '200 sq ft' };
+  var SETTLED = ['paid', 'ready', 'completed'];
+  var TENDER_WORD = { cash: 'cash', check: 'check', card: 'card' };
+
+  function isSettled(o) { return SETTLED.indexOf(o.status) !== -1; }
+
+  // True only when the order really is (or is about to be) settled at Square. An
+  // 'online' order minted no link when Square was dark or unreachable: the row still
+  // carries the card charge_cents, but the customer was sent down the pickup path and
+  // pays the base price, so it has to be shown both prices like any other pickup.
+  function onSquare(o) {
+    if (o.pay_mode !== 'online') return false;
+    return !!(o.pay_url && /^https:\/\//i.test(o.pay_url));
+  }
+
+  // Whether the money printed for this order carries the card cost. An order bound for
+  // Square is charged the card price, and a settled order paid by card was collected at
+  // it. Everything else is BASE. The item column and the figure beneath it both read
+  // this, so they can never disagree about which price they are quoting.
+  function showsCardAmounts(o) {
+    return onSquare(o) || (isSettled(o) && o.tender === 'card');
+  }
+
+  // The single figure printed beneath the item column, or null when there is none: an
+  // unsettled pickup prints a pair instead (below), and there are states we can put no
+  // honest number on at all.
+  function chargedLine(o) {
+    if (o.status === 'cancelled') return null;
+    if (isSettled(o)) {
+      // Settled orders state what was collected, never what is due. A card payment event
+      // that carried no usable amount stores null (see docs/OPERATIONS.md), and there is
+      // nothing honest to print for it, so print nothing.
+      if (o.amount_collected_cents == null) return null;
+      var word = TENDER_WORD[o.tender] || '';
+      return {
+        label: word ? 'Paid by ' + word : 'Paid',
+        cents: Number(o.amount_collected_cents),
+      };
+    }
+    if (onSquare(o)) {
+      // charge_cents is nullable and nothing backfills it. money() would turn a null
+      // into "$0.00" while the Square link charges the real amount, so show no total
+      // at all. Not the pickup pair either: this customer is being sent to Square, and
+      // quoting them a cash price would be worse than quoting them nothing.
+      if (o.charge_cents == null) return null;
+      return { label: 'Total', cents: Number(o.charge_cents) };
+    }
+    return null;
+  }
 
   function renderUnavailable() {
     document.getElementById('root').innerHTML =
@@ -108,15 +156,18 @@
   }
 
   // Timeline: Received -> Paid/Pay at pickup -> Ready -> Completed.
+  // Step two reads onSquare(), not pay_mode: an 'online' order that minted no link is
+  // paid at pickup like any other, and labelling it "Paid" contradicted both the total
+  // and the status line beneath it. Its done/current state follows the status either
+  // way, so a settled order never shows an unfinished payment step.
   function timelineHtml(o) {
     var status = o.status;
-    var online = o.pay_mode === 'online';
-    var paid = status === 'paid' || status === 'ready' || status === 'completed';
+    var paid = isSettled(o);
     var ready = status === 'ready' || status === 'completed';
     var done = status === 'completed';
     var steps = [
       { lbl: 'Received', done: true, current: status === 'new' || status === 'link_created' },
-      { lbl: online ? 'Paid' : 'Pay at pickup', done: online ? paid : false, current: online ? (!paid) : true },
+      { lbl: onSquare(o) ? 'Paid' : 'Pay at pickup', done: paid, current: !paid },
       { lbl: 'Ready', done: ready, current: paid && !ready },
       { lbl: 'Completed', done: done, current: ready && !done }
     ];
@@ -127,15 +178,40 @@
     }).join('') + '</div>';
   }
 
-  function itemsHtml(items) {
+  // items[].unit_cents is BASE. The column is printed in whichever price the figure
+  // beneath it quotes, so the two always agree and no unexplained increment ever appears
+  // between them. On the card side the column is also tied to that figure exactly: the
+  // charge grosses the subtotal once, whereas grossing each line separately can land a
+  // cent or two away when a unit price is not a whole dollar, so the residual is settled
+  // on the last line rather than left hanging under the total.
+  function itemsHtml(o) {
+    var items = o.items;
     if (!Array.isArray(items) || !items.length) return '';
-    var rows = items.map(function (it) {
-      var name = esc(it.name || '');
-      var tier = it.tier && TIER_LABEL[it.tier] ? ' <span class="tier">(' + esc(TIER_LABEL[it.tier]) + ')</span>' : '';
+    var lines = items.map(function (it) {
       var qty = Number(it.qty) || 0;
-      var line = (Number(it.unit_cents) || 0) * qty;
-      return '<tr><td class="q">' + esc(String(qty)) + '&times;</td><td>' + name + tier + '</td>' +
-        '<td class="amt">' + money(line) + '</td></tr>';
+      return {
+        name: esc(it.name || ''),
+        tier: it.tier && TIER_LABEL[it.tier] ? ' <span class="tier">(' + esc(TIER_LABEL[it.tier]) + ')</span>' : '',
+        qty: qty,
+        base: (Number(it.unit_cents) || 0) * qty,
+      };
+    });
+    var amounts = lines.map(function (l) { return l.base; });
+    if (showsCardAmounts(o)) {
+      amounts = lines.map(function (l) { return EcoPricing.cardCents(l.base); });
+      var target = chargedLine(o);
+      // Reconcile only when these lines really are the whole order: the charged figure was
+      // computed from subtotal_cents, so if the lines do not sum to it there is nothing to
+      // tie out against and a forced residual would be a fiction.
+      var baseSum = lines.reduce(function (s, l) { return s + l.base; }, 0);
+      if (target && baseSum === Number(o.subtotal_cents)) {
+        var grossSum = amounts.reduce(function (s, a) { return s + a; }, 0);
+        amounts[amounts.length - 1] += target.cents - grossSum;
+      }
+    }
+    var rows = lines.map(function (l, i) {
+      return '<tr><td class="q">' + esc(String(l.qty)) + '&times;</td><td>' + l.name + l.tier + '</td>' +
+        '<td class="amt">' + money(amounts[i]) + '</td></tr>';
     }).join('');
     return '<table class="items"><tbody>' + rows + '</tbody></table>';
   }
@@ -165,27 +241,20 @@
       'Pay at pickup by cash, check, or card.</div>';
   }
 
-  // True only when the order really is (or is about to be) settled at Square. An
-  // 'online' order minted no link when Square was dark or unreachable: the row still
-  // carries the card charge_cents, but the customer was sent down the pickup path and
-  // pays the base price, so it has to be shown both prices like any other pickup.
-  function onSquare(o) {
-    if (o.pay_mode !== 'online') return false;
-    return !!(o.pay_url && /^https:\/\//i.test(o.pay_url));
-  }
-
-  // Online: one total, the card price Square charges. Pickup: both prices, never a
+  // A settled order states what was collected. An order going to Square states the one
+  // total it will be charged. Everything still owed at pickup states both prices, never a
   // percentage, because grossing up by the card cost and taking it back off does not
   // return to the base price.
   function totalHtml(o) {
-    if (onSquare(o)) {
-      // charge_cents is nullable and nothing backfills it. money() would turn a null
-      // into "$0.00" while the Square link charges the real amount, so show no total
-      // at all. Not the pickup pair either: this customer is being sent to Square, and
-      // quoting them a cash price would be worse than quoting them nothing.
-      if (o.charge_cents == null) return '';
-      return '<div class="totrow"><span class="l">Total</span><span class="v">' + money(o.charge_cents) + '</span></div>';
+    var line = chargedLine(o);
+    if (line) {
+      return '<div class="totrow"><span class="l">' + esc(line.label) + '</span><span class="v">' +
+        money(line.cents) + '</span></div>';
     }
+    // Nothing is owed on a cancelled or already settled order, and an order bound for
+    // Square is never quoted the cash pair, so in each of those cases print no figure
+    // rather than a wrong one.
+    if (o.status === 'cancelled' || isSettled(o) || onSquare(o)) return '';
     return '<div class="totrow"><span class="l">Due at pickup</span><span class="v">' +
       money(o.subtotal_cents) + ' cash or check</span></div>' +
       '<div class="totrow"><span class="l">If paying by card</span><span class="v">' +
@@ -204,7 +273,7 @@
         (dateStr ? '<p class="sub">Placed ' + esc(dateStr) + '</p>' : '') +
         timelineHtml(o) +
         payBlockHtml(o) +
-        itemsHtml(o.items) +
+        itemsHtml(o) +
         totalHtml(o) +
       '</div>' +
       '<p class="contact-note">Questions? Call or text <a href="tel:+1' + CONTACT_PHONE.replace(/-/g, '') +

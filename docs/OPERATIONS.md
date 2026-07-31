@@ -903,9 +903,9 @@ plus its token-gated RPCs).
   backfills it**. `null` means "not priced yet" and must **never** be coerced to
   `subtotal_cents`: pre-0027 rows have no charge, and rendering `money(null)` would show
   "$0.00" beside a Square link charging the real amount, so `order.html` shows no total at
-  all in that case. That blank applies only on the Square branch (`order.html:181-187`); a
-  pickup row prints the pair off `subtotal_cents` and never consults `charge_cents` at all.
-  The staff list never renders `charge_cents`: an unsettled row on
+  all in that case. That blank applies only on the Square branch of `chargedLine()`; an
+  unsettled pickup row prints the pair off `subtotal_cents` and never consults
+  `charge_cents` at all. The staff list never renders `charge_cents`: an unsettled row on
   `orders.html` always shows `money(subtotalCents)`, the BASE total, including a
   `link_created` online order whose Square link is 4 percent higher. The row switches to
   "Collected: ..." on `amountCollectedCents != null` (`orders.html:203`), NOT on status, so
@@ -999,27 +999,67 @@ pair:
   is `aria-live="polite"`).
 - `shop.html`: the pair on payable merch cards and in the order modal. Request-only items
   and items with an external buy link keep their free-text `price_text` label instead.
-- `order.html`: a pickup order shows "Due at pickup ... cash or check" and "If paying by
-  card ..."; an order actually going to Square shows the single card total it will be
-  charged.
+- `order.html`: an order still owing money at pickup shows "Due at pickup ... cash or check"
+  and "If paying by card ..."; an order actually going to Square shows the single card total
+  it will be charged; a settled order shows neither and states what was collected instead
+  (see "What order.html shows in each state").
 - `quote-view.html` / `quote-print.html`: line items are printed grossed, the "Administration"
   fee line sits above the card TOTAL, the cash total is stated beneath it, and the deposit
   and balance rows each carry their own "By check or cash" counterpart.
 
-### Known characteristic: orders gross the subtotal, quotes gross each line
+### What order.html shows in each state
+
+Three helpers decide the whole page, and they all read the same two facts, so the item
+column, the figure beneath it and the timeline can never quote different prices:
+
+- `onSquare(o)` - `pay_mode = 'online'` **and** a usable `square_pay_url`. An `online` order
+  that minted no link (Square dark or unreachable) is a pickup in every respect, so this is
+  what the timeline's second step, the item column and the total all key off, never
+  `pay_mode` on its own.
+- `showsCardAmounts(o)` - `onSquare(o)`, **or** a settled order whose `tender` is `card`.
+  When true, the item column is printed grossed; otherwise it is BASE.
+- `chargedLine(o)` - the one figure printed under the column, or null when there is none.
+
+| State | Item column | Figure beneath |
+| --- | --- | --- |
+| Unsettled, going to Square | grossed | `Total <charge_cents>` (nothing if `charge_cents` is null) |
+| Unsettled, paying at pickup | BASE | the pair: `Due at pickup ... cash or check` and `If paying by card ...` |
+| Settled, `tender` cash or check | BASE | `Paid by cash/check <amount_collected_cents>` |
+| Settled, `tender` card | grossed | `Paid by card <amount_collected_cents>` |
+| Settled, `amount_collected_cents` null | as above per tender | nothing |
+| Cancelled | as above per tender | nothing |
+
+A settled order never states a figure as due, and never states the two-price pair: the
+tender has already been chosen, so there is only one true number left. Where that number is
+unknown (a payment event that carried no usable amount, or a pre-0027 row with neither
+column) the page prints no figure rather than a wrong one; the "Payment received" status
+line still stands. `order_status` returns `tender` and `amount_collected_cents` for exactly
+this. It does **not** return `note`, which can carry the staff-facing mismatch flag.
+
+### Known characteristic: the charge grosses the subtotal, the column grosses each line
 
 `quoteTotals` deliberately sums **individually grossed lines** (`cardSubtotal`) rather than
 grossing the subtotal, because the client reads the grossed column on the printed quote and
 that column has to add up to the total beneath it.
 
-Orders do the opposite: `charge_cents = cardCents(subtotal_cents)`, one grossing of the
-whole subtotal, while the shop card shows a per-unit card figure. For a unit price that is
-not a whole dollar, `cardCents(unit) * qty` can differ from `cardCents(unit * qty)` by a
-cent or two. **Drift is exactly zero for every current price** ($5 plants, $72/$144/$200/$250
-kits, the $40 card game, all whole dollars), so nothing is wrong today. If a
-non-whole-dollar merch price is ever set, decide first which of the two figures the
-customer should see, because the per-unit display and the charged total can disagree by
-pennies.
+Orders charge the other way: `charge_cents = cardCents(subtotal_cents)`, one grossing of the
+whole subtotal. For a unit price that is not a whole dollar, `cardCents(unit * qty)` summed
+over the lines can differ from `cardCents(subtotal)` by a cent or two. **Drift is exactly
+zero for every current price** ($5 plants, $72/$144/$200/$250 kits, the $40 card game, all
+whole dollars), so nothing is wrong today.
+
+`order.html` prints a grossed column anyway, and settles the residual **on the last line**
+so the column always adds up to the figure beneath it. It does that only when the lines sum
+to `subtotal_cents`, which is the precondition for the charge having been computed from
+them; if they do not, the lines are printed grossed and left un-reconciled rather than
+having a fictional residual forced onto one of them. **What is charged never moves**: the
+residual is a presentation adjustment inside a total that is still `charge_cents` (or, on a
+settled order, `amount_collected_cents`) exactly as stored.
+
+The shop card still shows a per-unit card figure, which is `cardCents(unit)`. If a
+non-whole-dollar merch price is ever set, that per-unit figure times the quantity can be a
+cent away from the line printed on `order.html`. Decide first which of the two the customer
+should see.
 
 ### Before production credentials
 
