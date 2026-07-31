@@ -123,10 +123,13 @@
     <h1>Shop</h1>
   </div>
   <p class="page-intro">Edit the items shown on the public
-    <a href="shop.html" target="_blank" rel="noopener">Shop</a> page. Price and status are free text
-    ("US $40", "From $15"; "Pre-order", "In stock", "Coming soon"). Add a buy link to send shoppers to
-    an external store, or leave it blank to use the pre-order / ask form. Deactivate to hide an item
-    without deleting it.</p>
+    <a href="shop.html" target="_blank" rel="noopener">Shop</a> page. <strong>"Price (USD, for online
+    payment)" is the storefront price</strong>: set it and the item can be ordered, and its card shows
+    the card and cash figures. The free-text "Price label" is a label only, shown on request-only items
+    and on items with an external buy link, so changing it will not change what a shopper pays. Status
+    is free text ("Pre-order", "In stock", "Coming soon"). Add a buy link to send shoppers to an
+    external store, or leave it blank to use our own order form. Deactivate to hide an item without
+    deleting it.</p>
 
   <div class="modal-error" id="pageError"></div>
 
@@ -146,8 +149,11 @@
       <div class="form-group"><label>Blurb</label>
         <textarea id="mi_blurb" placeholder="A short description of the item…"></textarea></div>
       <div class="form-row">
-        <div class="form-group"><label>Price (free text)</label>
-          <input type="text" id="mi_price" placeholder="US $40"></div>
+        <div class="form-group"><label>Price label (free text, display only)</label>
+          <input type="text" id="mi_price" placeholder="From $15">
+          <div class="field-note">A label, not the price we charge. It shows only on request-only items
+            and on items with an external buy link. To set the storefront price use "Price (USD, for
+            online payment)" at right.</div></div>
         <div class="form-group"><label>Status (free text)</label>
           <input type="text" id="mi_status" placeholder="Pre-order"></div>
       </div>

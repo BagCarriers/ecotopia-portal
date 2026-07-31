@@ -12,8 +12,9 @@ it is committed so it survives across machines and sessions.
 
 ## Migrations
 
-Migrations `0001`-`0006` were applied to the live database directly via the Supabase
-Management API (`POST https://api.supabase.com/v1/projects/wibnryfinfwbwwgsyojr/database/query`),
+Migrations `0001`-`0027` (every migration in `supabase/migrations/`) were applied to the
+live database directly via the Supabase Management API
+(`POST https://api.supabase.com/v1/projects/wibnryfinfwbwwgsyojr/database/query`),
 NOT via `supabase db push`. Because of that, the `supabase_migrations.schema_migrations`
 table is empty and the CLI does not know these migrations ran.
 
@@ -21,13 +22,12 @@ Before ever running `supabase db push` against this project, first register the
 already-applied migrations so the CLI does not try to re-run them:
 
 ```
-supabase migration repair --status applied 0001
-supabase migration repair --status applied 0002
-supabase migration repair --status applied 0003
-supabase migration repair --status applied 0004
-supabase migration repair --status applied 0005
-supabase migration repair --status applied 0006
+for n in $(seq -w 1 27); do supabase migration repair --status applied 00$n; done
 ```
+
+(equivalently, one `supabase migration repair --status applied <NNNN>` per file, `0001`
+through `0027`). Keep this range current: every new migration in this project is applied
+by hand through the Management API, so every new migration extends it.
 
 To apply a new migration by hand via the Management API, get the token with
 `security find-generic-password -s "Supabase CLI" -w` and POST `{"query": "<sql>"}`
@@ -181,12 +181,16 @@ Open Sesame Designs LLC document via `quote-print.html?id=<uuid>`.
 The 5 percent administration fee is the core rule:
 
 - Every quote stores `subtotal` (sum of the line-item amounts),
-  `admin_fee = round(subtotal * 0.05, 2)`, and `total = subtotal + admin_fee`.
+  `admin_fee = round(subtotal * 0.05, 2)`, and `total = subtotal + admin_fee`. All three
+  are BASE (cash) figures. See "Cash-discount pricing" below for how the card figures are
+  derived at display time.
+- The fee is computed on the BASE subtotal, never on the grossed one, so choosing to pay
+  by card does not enlarge the administration fee.
 - The fee percent lives in ONE place: the `ADMIN_FEE_RATE = 0.05` const in
-  `quotes.html`. Change it there and nowhere else.
-- Client-facing, the fee is a QUIET line ("Processing and administration") just above
-  the total on both the builder summary and the printed quote. It is deliberately NOT a
-  line item in the table.
+  `assets/pricing.js`. Change it there and nowhere else.
+- Client-facing, the fee is a QUIET line ("Administration") just above the total on both
+  the builder summary and the printed quote. It is deliberately NOT a line item in the
+  table.
 - Deposit is display/deduction only: it does not change the subtotal math. When a
   deposit is present the printed quote shows `DEPOSIT RECEIVED` and a final
   `BALANCE DUE = total - deposit`.
@@ -254,8 +258,9 @@ wired; there is no automated payment capture yet.
 
 Public page (`quote-view.html`): a standalone, marketing-branded document (NO `auth.js`,
 `noindex`). It reads `?t=`, calls `get_quote_by_token`, and renders the branded quote
-(gold header, line-item table, quiet "Processing and administration" line above TOTAL,
-deposit + balance). Action panel by state:
+(gold header, line-item table, quiet "Administration" line above TOTAL, deposit +
+balance). Amounts are grossed for card and paired with their cash figures, see
+"Cash-discount pricing". Action panel by state:
 
 - `sent`: an "Accept this quote" button reveals a "Type your name to accept" input and a
   confirm button that calls `accept_quote`, then re-fetches and shows the accepted state.
@@ -740,10 +745,11 @@ Schema changes:
 - `public.orders` (Supabase-owned). Columns: `order_token` (unique, 64 hex; the public
   status/pay page key), `customer_name`, `phone`, `email`, `items` (jsonb array of
   `{kind:'species'|'kit'|'merch', id, name, qty, unit_cents, tier?}`), `subtotal_cents`,
-  `status`, `pay_mode` (`pickup`/`online`), `square_order_id`, `square_pay_url`, `note`.
-  **No anon RLS policy** at all: a single `o_staff_all` policy for authenticated portal
-  users; anon reaches orders only through the security-definer edge function. Carries the
-  shared `set_updated_at` trigger.
+  `status`, `pay_mode` (`pickup`/`online`), `square_order_id`, `square_pay_url`, `note`,
+  plus `charge_cents`, `tender` and `amount_collected_cents` from migration `0027` (see
+  "Cash-discount pricing"). **No anon RLS policy** at all: a single `o_staff_all` policy
+  for authenticated portal users; anon reaches orders only through the security-definer
+  edge function. Carries the shared `set_updated_at` trigger.
 - `decrement_stock(p_kind, p_id, p_qty)` (security definer): draws down a tracked row's
   stock, floored at 0, leaving untracked (`null`) rows alone. **Execute is revoked from
   `public`/`anon`/`authenticated` and granted only to `service_role`** - it is called ONLY
@@ -773,18 +779,26 @@ endpoint, told apart by the `x-square-hmacsha256-signature` header then `body.ac
   pay_url}`. `online` but Square dark (or unreachable) -> `{token, configured:false}` (order
   stays `new`, treated as pickup). `pickup` -> `{token}`.
 - **`order_status`** (PUBLIC, anon) - `{action, token}` (>= 32 chars). Returns `{status,
-  items, subtotal_cents, pay_mode, pay_url, created_at}` for the public `order.html` page;
-  `404` otherwise.
-- **`staff_mark_paid`** (STAFF) - `{action, order_id}` with an `Authorization: Bearer
-  <staff JWT>`. The JWT is validated by resolving it against GoTrue `/user` directly (apikey
-  = service role) and confirming an active `portal_users` row. It exists because staff RLS
-  can update `orders` but **cannot** call the service-role-only `decrement_stock`; this
-  action sets `paid` AND draws down tracked stock in one call, for cash/check pickups.
+  items, subtotal_cents, charge_cents, pay_mode, pay_url, created_at}` for the public
+  `order.html` page; `404` otherwise.
+- **`staff_mark_paid`** (STAFF) - `{action, order_id, tender}` with an `Authorization:
+  Bearer <staff JWT>`. **`tender` is REQUIRED** and must be `cash`, `check` or `card`;
+  anything else is `400 {error:'bad_tender'}`. The JWT is validated by resolving it against
+  GoTrue `/user` directly (apikey = service role) and confirming an active `portal_users`
+  row. It exists because staff RLS can update `orders` but **cannot** call the
+  service-role-only `decrement_stock`; this action sets `paid` AND draws down tracked stock
+  in one call, for in-person pickups. It also records what was collected:
+  `amount_collected_cents = subtotal_cents` for cash/check, `cardCents(subtotal_cents)` for
+  card. Returns `{ok:true, status:'paid', collected_cents}` on the transition, or
+  `409 {ok:false, status}` when the order had already moved on.
 - **Webhook routing** - on a `COMPLETED` `payment.updated`, the function first looks up a
   `quotes` row by `square_order_id` (deposit flow, unchanged); if none matches it looks up an
-  `orders` row and, when the order is still `new`/`link_created`, sets it `paid` and
-  decrements tracked stock (idempotent; unknown order id is a `200` no-op). **This is the
-  same webhook URL Square already calls for deposit payments - order payments arrive here too.**
+  `orders` row and, when the order is still `new`/`link_created`, sets it `paid`,
+  `tender = 'card'`, `amount_collected_cents = <what Square took>` and decrements tracked
+  stock (idempotent; unknown order id is a `200` no-op). A collected amount that does not
+  equal `charge_cents` still marks the order paid but raises the mismatch flag described
+  under "Cash-discount pricing". **This is the same webhook URL Square already calls for
+  deposit payments - order payments arrive here too.**
 
 Where things live:
 
@@ -800,18 +814,162 @@ Where things live:
   timeline, a Square Pay button when a link exists and the order is unpaid, else a
   pay-at-pickup note. Poll-free (refresh to update). Every value is `esc()`'d.
 - Portal `orders.html` (the "Orders" nav link after Jobs): newest-first list with status
-  filters, status pills, items + total, customer contact, note, and actions - **Mark paid**
-  (via `staff_mark_paid`, decrements stock), **Mark ready**, **Mark completed**, **Cancel**
-  (plain staff status updates via `DataStore.updateOrder`), and **Copy order link**.
+  filters, status pills, items + total, customer contact, note, and actions - **Paid cash**
+  / **Paid check** / **Paid card** (three buttons, each calling `staff_mark_paid` with its
+  own `tender`; they decrement stock), **Mark ready**, **Mark completed**, **Cancel**
+  (plain staff status updates via `DataStore.updateOrder`), and **Copy order link**. A
+  settled row shows "Collected: $X <tender>" in place of the total.
   `dashboard.html` "Needs attention" surfaces "N new order(s)" (`new`/`link_created`).
 - Staff editors: `manage-plants.html` species + kit modals gain a "Stock (blank = untracked)"
   input; `manage-shop.html` gains "Stock" and "Price (USD, for online payment)" (stored as
-  `price_cents`, blank = request-only). Data helpers in `assets/data.js`: `getOrders`
+  `price_cents`, blank = request-only). **`price_cents` is the storefront price for a
+  payable item; the free-text `price_text` is a display label only** and appears just on
+  request-only cards and on cards with an external buy link, so editing it does not change
+  what a shopper pays. Data helpers in `assets/data.js`: `getOrders`
   (newest-first) and `updateOrder(id, ch)`; stock/price ride the existing camelCase mapping.
 
 The whole online-payment path runs **dark** until Square credentials exist (same five
 secrets as the deposit flow, see "Square deposit payments"); until then online orders save
 for pickup with no code change.
+
+## Cash-discount pricing (2026-07-30)
+
+Ecotopian EarthCare prices to cash. **Every displayed price carries the cost of accepting
+a card; cash and check pay the base price.** Nothing is added at checkout and no surcharge
+is ever named: the customer sees two figures and picks one.
+
+### The two rate mirrors
+
+`CARD_UPLIFT = 0.04` exists in exactly **two** places and they must move together:
+
+1. `assets/pricing.js` - the display authority, loaded by `order.html`, `plants.html`,
+   `quote-print.html`, `quote-view.html`, `quotes.html` and `shop.html`. It exposes
+   `EcoPricing = { CARD_UPLIFT, ADMIN_FEE_RATE, cardCents, cardDollars, quoteTotals }`.
+2. `supabase/functions/square-pay/index.ts` - the **charging** authority. Every amount we
+   actually take is computed here, from the live catalog, ignoring anything the client sent.
+
+`tests/pricing.test.js` reads the edge-function source and asserts its `CARD_UPLIFT`
+literal equals the one in `pricing.js`, so `npm test` fails loudly the moment either copy
+drifts. That guard was verified to genuinely fail when one side is changed alone.
+
+To change the rate: edit **both** constants, run `npm test`, then redeploy **both** the
+edge function (`supabase functions deploy square-pay --no-verify-jwt --project-ref
+wibnryfinfwbwwgsyojr`) and the static site. Deploying one without the other quotes a
+customer one number and charges another.
+
+Rounding is half-up to the cent throughout: `cardCents(baseCents)` for integer cents,
+`cardDollars(baseDollars)` for dollar amounts.
+
+### What is stored (migration `0027_cash_discount.sql`)
+
+Applied live via the Management API, so register it with
+`supabase migration repair --status applied 0027` before any `supabase db push`. It adds
+`orders.charge_cents`, `orders.tender`, `orders.amount_collected_cents` and
+`quotes.deposit_tender`. `tender` and `deposit_tender` are CHECK-constrained to
+`cash`/`check`/`card`. No new RLS policies (orders has no anon policy; quotes is staff-only
+plus its token-gated RPCs).
+
+- **`orders.subtotal_cents` is BASE**, un-grossed. Its meaning did not change, which is why
+  no backfill was needed.
+- **`orders.charge_cents` is what we charge**: `subtotal_cents` for `pickup`,
+  `cardCents(subtotal_cents)` for `online`. It is **nullable with no default and nothing
+  backfills it**. `null` means "not priced yet" and must **never** be coerced to
+  `subtotal_cents`: pre-0027 rows have no charge, and rendering `money(null)` would show
+  "$0.00" beside a Square link charging the real amount. `order.html` shows no total at all
+  in that case, and `orders.html` shows the base total.
+- **`orders.tender`** is null until the order settles, then records how it was paid.
+- **`orders.amount_collected_cents`** is what actually came in.
+- **`quotes.total` is the CASH total** (base subtotal + the 5 percent administration fee,
+  which is itself computed on the base subtotal). Unchanged in meaning, so again no
+  backfill. The card figures are derived at display time by `quoteTotals`, never stored.
+- **`quotes.deposit_tender`** is set to `card` by the Square deposit webhook.
+
+### Tender at pickup
+
+`orders.html` offers three buttons on an unsettled order: **Paid cash**, **Paid check**,
+**Paid card**. Each calls `staff_mark_paid` with its own `tender`, which is now
+**required** (`400 bad_tender` otherwise), and gets back
+`{ok, status, collected_cents}`.
+
+The collected amount is derived from **`subtotal_cents` and the tender, never from
+`charge_cents`**: base for cash and check, `cardCents(subtotal_cents)` for card. This is
+deliberate. An `online` order that never got a Square link (Square dark, or unreachable at
+create time) still carries the **card** `charge_cents` on the row, but the customer was
+routed down the pickup path and will hand over the **base** price. Reading `charge_cents`
+there would record, and invite staff to collect, 4 percent more than the customer owes.
+
+### Webhook mismatch flag
+
+On a `COMPLETED` payment the webhook records `amount_collected_cents` from the event and
+sets `tender = 'card'`. If that amount does not equal a non-null `charge_cents` (an event
+carrying **no** usable amount counts as a mismatch too, because we cannot confirm what was
+taken) the order is **still marked paid** - refusing would strand real money - and the
+function prefixes
+
+```
+AMOUNT MISMATCH: expected <charge_cents>, <what happened>. Review before fulfilling.
+```
+
+onto the note, separated from the customer's own text by a blank line. The customer's text
+is never overwritten: a mismatch is exactly when staff need the address and contact
+preference they wrote. A null `charge_cents` is never flagged, because there is nothing to
+compare against.
+
+`orders.html` raises an "Amount mismatch" chip when the note starts with that prefix and
+the order is `paid`, `ready` or `completed`. It stays visible past `paid` because staff
+advance a flagged order through `ready` and `completed`, and those are precisely the
+moments someone is about to hand over goods that may not have been paid for. A customer
+cannot set any of those three statuses, so the chip cannot be forged through the public
+order form.
+
+### Customer-facing copy
+
+**Never state a discount or surcharge percentage to a customer.** Show the two prices
+instead. Adding 4 percent and then taking 4 percent back off does not return to the base
+price (the true round trip off the grossed price is 3.846 percent), so any single stated
+percentage would be wrong about one of the two figures. Every surface therefore prints the
+pair:
+
+- `plants.html`: "$5.20 card · $5.00 cash or check" on the plant tray, and the same pair
+  in the kit modal directly above the tender choice (it updates with the size dropdown and
+  is `aria-live="polite"`).
+- `shop.html`: the pair on payable merch cards and in the order modal. Request-only items
+  and items with an external buy link keep their free-text `price_text` label instead.
+- `order.html`: a pickup order shows "Due at pickup ... cash or check" and "If paying by
+  card ..."; an order actually going to Square shows the single card total it will be
+  charged.
+- `quote-view.html` / `quote-print.html`: line items are printed grossed, the "Administration"
+  fee line sits above the card TOTAL, the cash total is stated beneath it, and the deposit
+  and balance rows each carry their own "By check or cash" counterpart.
+
+### Known characteristic: orders gross the subtotal, quotes gross each line
+
+`quoteTotals` deliberately sums **individually grossed lines** (`cardSubtotal`) rather than
+grossing the subtotal, because the client reads the grossed column on the printed quote and
+that column has to add up to the total beneath it.
+
+Orders do the opposite: `charge_cents = cardCents(subtotal_cents)`, one grossing of the
+whole subtotal, while the shop card shows a per-unit card figure. For a unit price that is
+not a whole dollar, `cardCents(unit) * qty` can differ from `cardCents(unit * qty)` by a
+cent or two. **Drift is exactly zero for every current price** ($5 plants, $72/$144/$200/$250
+kits, the $40 card game, all whole dollars), so nothing is wrong today. If a
+non-whole-dollar merch price is ever set, decide first which of the two figures the
+customer should see, because the per-unit display and the charged total can disagree by
+pennies.
+
+### Before production credentials
+
+**Open blocker.** If Jordan's Square account applies its own 4 percent service charge, this
+implementation double-charges: we gross $5.00 to $5.20 and Square collects $5.41. Square's
+documentation does not say whether Dashboard-configured automatic service charges attach to
+`quick_pay` payment links, and the sandbox account is a fresh auto-created one with no
+service charge, so it cannot answer the question. A completed sandbox order (2026-07-31,
+$15.00 base) came back with `total_money` 1560, `total_service_charge_money` 0 and
+`total_card_surcharge_money` 0, which shows Square added nothing **to an account that has
+nothing configured**; it does not settle what Jordan's account will do. **One real
+production payment must prove Square charges our amount and not more.** If it adds its own percentage, set
+`CARD_UPLIFT = 0` in both mirrors: every display then falls back to the base price
+automatically, because the display layer reads the same constant the server charges from.
 
 ## Deploy
 
