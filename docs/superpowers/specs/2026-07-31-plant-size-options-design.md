@@ -4,7 +4,11 @@ Design approved 2026-07-31. Native plants gain two size options at different pri
 
 ## Why
 
-Today every plant is $5.00 in a 3 by 5 inch container. Jordan also grows a more mature plant in a gallon pot, ready mid to late summer, worth $8.00. The two are seasonal rather than permanent: plugs sell in spring, gallons later in the year, and he needs to open and close each on his own schedule without editing fifty species by hand.
+Today every plant is $5.00 in a 3 by 5 inch container. Jordan also grows a more mature plant in a gallon pot, ready from mid summer, worth $8.00. The two are seasonal rather than permanent: plugs sell in spring, gallons run from mid summer into fall, and he needs to open and close each on his own schedule without editing fifty species by hand.
+
+Neither season has a scheduled end. Jordan switches each off when he runs out, which is why `active` is a plain boolean and not a date range. `reopen_date` stays available as courtesy copy for the closed state, not as a trigger.
+
+Customer-facing copy names readiness rather than a month ("ready from mid summer"), so it stays true in October without anyone editing it.
 
 ## Decisions
 
@@ -24,7 +28,7 @@ Mirrors the existing `service_settings` pattern, including its anon-read policy,
 |---|---|---|
 | `size_key` | text PK | `plug` or `gallon`, CHECK constrained |
 | `label` | text not null | "Spring plug", "Gallon pot" |
-| `blurb` | text not null | "3 by 5 inch container", "More mature, ready mid to late summer" |
+| `blurb` | text not null | "3 by 5 inch container", "More mature, ready from mid summer" |
 | `active` | boolean not null default false | Jordan's seasonal switch |
 | `off_message` | text | shown when closed, as services already do |
 | `reopen_date` | date | shown when closed |
