@@ -663,8 +663,10 @@ git commit -m "feat: quote builder shows card and cash totals, fee line renamed"
 - Modify: `quote-print.html` (totals block around line 201, line-item rows)
 
 **Interfaces:**
-- Consumes: `EcoPricing.cardDollars` and `EcoPricing.quoteTotals` from Task 1.
-- Produces: no new exports. `create_link` (unchanged in Task 3) continues to charge `quotes.deposit`, so Step 4 below is what makes it charge the card deposit.
+- Consumes: `EcoPricing.cardDollars` and `EcoPricing.quoteTotals` from Task 1; `cardCents` from Task 3 (already in the edge function).
+- Produces: no new exports. `handleCreateLink` gains the uplift, so the deposit link is minted for the card amount.
+
+**Also modify:** `supabase/functions/square-pay/index.ts` (`handleCreateLink`, the `quick_pay` body).
 
 - [ ] **Step 1: Load the pricing module in both pages**
 
@@ -697,9 +699,39 @@ In `quote-view.html` (lines 248-253) and the matching block in `quote-print.html
 
 where `t = EcoPricing.quoteTotals(q.lineItems, q.deposit)`. No percentage appears anywhere in this copy.
 
-- [ ] **Step 4: Charge the card deposit**
+- [ ] **Step 4: Charge the card deposit, SERVER-side**
 
-In `depositPanelHtml`, the Square button pays `t.cardDeposit` and the manual check instructions quote `t.cashDeposit`. Both numbers are shown side by side so the client can see the saving.
+This is the step the original plan got wrong. `handleCreateLink` computes the charge itself:
+
+```ts
+price_money: { amount: toCents(quote.deposit), currency: 'USD' },
+```
+
+`quotes.deposit` is the BASE deposit, so as written Square collects the base amount no matter what the page displays. **No client-side change can fix this**, because the client never sends the amount. Apply the uplift where the money is decided:
+
+```ts
+        quick_pay: {
+          name,
+          // The deposit carries the same uplift as everything else: quotes.deposit is
+          // the BASE figure staff entered, and this is the card path.
+          price_money: { amount: cardCents(toCents(quote.deposit)), currency: 'USD' },
+          location_id: locationId,
+        },
+```
+
+Note the idempotency key stays `quote.id + ':deposit'`. Square returns the ORIGINAL link for a reused key, so any deposit link minted before this change keeps its old base amount. There are no accepted quotes with minted links today (quote #1 is a draft with `deposit = 0`), so nothing is stranded, but verify that before deploying.
+
+- [ ] **Step 4b: Display both deposit figures**
+
+In `depositPanelHtml`, the Square button pays `t.cardDeposit`, matching what the function will now charge, and the manual check instructions quote `t.cashDeposit`. Both numbers appear side by side so the client can see the saving. The displayed card deposit and the minted amount must agree; that agreement is the point of the whole feature.
+
+- [ ] **Step 4c: Deploy and verify the deposit amount**
+
+```bash
+supabase functions deploy square-pay --no-verify-jwt --project-ref wibnryfinfwbwwgsyojr
+```
+
+Then mint a link for a test quote with a known base deposit and confirm Square's page shows the uplifted amount, the same way Task 3 confirmed `"amount":1040` on an order link. Delete the test quote afterward.
 
 - [ ] **Step 5: Verify both inline scripts parse**
 
