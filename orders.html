@@ -13,6 +13,7 @@
 <script src="assets/config.js"></script>
 <script src="assets/supabase-client.js"></script>
 <script src="assets/mapping.js"></script>
+<script src="assets/pricing.js"></script>
 <script src="assets/auth.js"></script>
 <script>if (!AuthManager.hasCachedSession()) location.replace('login.html');</script>
 <script src="assets/data.js"></script>
@@ -187,6 +188,21 @@ function actionsFor(o) {
 // Statuses an order can only reach after we recorded payment. Only staff can set them.
 const SETTLED = ['paid', 'ready', 'completed'];
 
+// What the recorded tender says the customer owed, or null when we cannot say.
+// Cash and check pay the BASE subtotal; card pays the card price. An order that went to
+// Square is held to the charge_cents its link was minted for rather than a fresh
+// calculation, so a later change to the card rate cannot make every live link look wrong.
+// Everything else grosses subtotal_cents, which is exactly what staff_mark_paid derives:
+// a pickup row's charge_cents is the BASE figure and comparing against it would raise a
+// mismatch on every card taken at the table.
+function expectedCents(o) {
+  if (!Number.isFinite(Number(o.subtotalCents))) return null;
+  if (o.tender === 'cash' || o.tender === 'check') return Number(o.subtotalCents);
+  if (o.tender !== 'card') return null; // no tender recorded: nothing to hold it to
+  if (o.payMode === 'online' && o.chargeCents != null) return Number(o.chargeCents);
+  return EcoPricing.cardCents(o.subtotalCents);
+}
+
 function render() {
   const el = document.getElementById('orderList');
   const rows = orders.filter(matchesFilter);
@@ -202,21 +218,23 @@ function render() {
     // there is no charged figure to report.
     const collected = o.amountCollectedCents == null ? ''
       : money(o.amountCollectedCents) + ' ' + esc(o.tender || '');
-    // The webhook prefixes this flag onto the note when Square took an amount we did not
-    // expect. The customer's own text still follows it, untouched, below.
+    // Raised off the money columns, never off the note. The note is customer free text and
+    // the webhook only rewrites it when there IS a mismatch, so keying the chip on its
+    // prefix let a customer type "AMOUNT MISMATCH" into their own order, pay their own
+    // Square link correctly, and raise the chip on a clean order with no staff action
+    // anywhere. A chip that cries wolf is one staff learn to ignore, and then a real short
+    // payment gets ignored with it. The webhook still writes the note, and it is still
+    // rendered below: that is where the detail is.
+    // Both columns are guarded. A null amountCollectedCents against a real expectation is
+    // itself a mismatch (a payment event that carried no usable amount: we cannot confirm
+    // what was taken), but a row with no tender recorded has nothing to be held to and is
+    // never flagged, which is what keeps pre-0027 rows quiet.
     // The chip has to survive past 'paid'. Staff advance a flagged order to 'ready' and
     // 'completed', and those are exactly the moments someone is about to hand over goods
-    // we may not have been paid for. Customers cannot set any of those three statuses.
-    // NOT forgery-proof, and do not read it as such. `note` is customer free text, and the
-    // webhook only rewrites it when there IS a mismatch, so a customer can type the prefix
-    // themselves, pay their own Square link correctly, and have the webhook set 'paid' with
-    // the forged text intact. No staff action anywhere in that: the chip is already up the
-    // first time this page is opened. The status gate only stops them raising it while the
-    // row is still unpaid. Closing it properly means flagging on
-    // amountCollectedCents !== chargeCents instead of trusting note text; until then a chip
-    // means "read the note", not "we were short-changed".
-    const mismatch = SETTLED.includes(o.status) &&
-      typeof o.note === 'string' && o.note.indexOf('AMOUNT MISMATCH') === 0;
+    // we may not have been paid for.
+    const expected = expectedCents(o);
+    const mismatch = SETTLED.includes(o.status) && expected != null &&
+      o.amountCollectedCents !== expected;
     return `
       <div class="o-card" data-id="${esc(o.id)}">
         <div class="o-top">

@@ -995,32 +995,58 @@ is never overwritten: a mismatch is exactly when staff need the address and cont
 preference they wrote. A null `charge_cents` is never flagged, because there is nothing to
 compare against.
 
-`orders.html` raises an "Amount mismatch" chip when the note starts with that prefix and
-the order is `paid`, `ready` or `completed`. It stays visible past `paid` because staff
-advance a flagged order through `ready` and `completed`, and those are precisely the
-moments someone is about to hand over goods that may not have been paid for. Customers
-cannot write any of those three statuses themselves (no anon policy on `orders`, and the
-public `create_order` action only ever writes `new` or `link_created`), though paying does
-settle the order through the webhook, which is the hole the next paragraph is about.
+### The staff "Amount mismatch" chip
 
-**The chip is NOT forgery-proof. Treat it as "read the note", not as proof we were
-short-changed.** `orders.note` is customer free text off the public order form
-(`index.ts:284`, stored verbatim at `:368`), the webhook rewrites it only when there IS a
-mismatch, and `staff_mark_paid` never touches it. So a customer who types
-`AMOUNT MISMATCH: ...` into their own note and then pays the correct amount ends up at
-`status = 'paid'` with that text intact, and the chip fires on a clean order. **No operator
-action is needed anywhere in that sequence**: on the online path the customer pays their own
-Square link and the webhook sets `paid` itself (`index.ts:159-174`), so the chip is already
-showing the first time staff open the page. It is customer-triggerable end to end. The
-status gate buys exactly one thing, and it is worth keeping: they cannot raise it on their
-own row while it is still unpaid, only once the order settles. Closing the hole properly
-means flagging on `amountCollectedCents !== chargeCents` rather than trusting note text,
-which would also survive an operator editing the note. That is not built.
+`orders.html` raises the chip off the **money columns**, never off the note. The gate is
+`SETTLED.includes(status) && expected != null && amountCollectedCents !== expected`, where
+`expectedCents(o)` is what the recorded tender says the customer owed:
 
-The gate deliberately excludes `cancelled`, so a flagged order that is cancelled loses its
-chip at exactly the moment someone is deciding whether to refund. The `AMOUNT MISMATCH`
-text is still in the note, which is rendered on the card, so the signal is not lost, only
-demoted.
+| `tender` | expected |
+| --- | --- |
+| `cash` or `check` | `subtotalCents` (base) |
+| `card`, `pay_mode = 'online'`, `chargeCents` non-null | `chargeCents` |
+| `card`, otherwise | `cardCents(subtotalCents)` |
+| null / anything else | null, and the row is never flagged |
+
+Two of those rows are load-bearing and neither is obvious. **Comparing against
+`chargeCents` alone would be wrong**: a pickup row's `charge_cents` is the BASE figure, so
+every card taken at the table (`collected = cardCents(subtotal)`) would raise a chip, as
+would every Square-dark `online` order paid in cash at pickup (`charge_cents` is the card
+figure, the customer hands over base). Both are correct-by-design outcomes described under
+"Tender at pickup", and flagging them would have been a systematic false positive on the
+commonest path in the shop. And an order that really did go to Square is held to the
+`charge_cents` its link was minted for rather than a fresh `cardCents()`, so **changing the
+card rate cannot make every live link look short** (the `CARD_UPLIFT = 0` fallback under
+"Before production credentials" would otherwise flag every link minted before the change).
+
+**What it catches**: a Square payment that settled for anything other than the amount its
+link charged, and a payment event that carried no usable amount at all (`collected` null
+against a real expectation, because we cannot confirm what was taken). Those are exactly
+the two conditions the webhook writes the `AMOUNT MISMATCH` note for, so the chip and the
+note now agree, and the chip survives an operator editing the note away.
+
+**What it does not catch**: anything on the `staff_mark_paid` path. That handler *derives*
+`amount_collected_cents` from the tender by the same rule this gate expects, so a pickup
+can never disagree with itself. If staff press "Paid cash" on a customer who handed over
+too little, nothing here will know. It also does not catch a refund or a partial capture
+made in Square after the order settled: the webhook only acts on the first transition out
+of `new`/`link_created`.
+
+The chip stays visible past `paid` because staff advance a flagged order through `ready`
+and `completed`, and those are precisely the moments someone is about to hand over goods
+that may not have been paid for. It deliberately excludes `cancelled`, so a flagged order
+that is cancelled loses its chip at exactly the moment someone is deciding whether to
+refund. The `AMOUNT MISMATCH` note text is still rendered on the card, so the signal is not
+lost there, only demoted.
+
+**It is no longer forgeable.** Before 2026-07-31 the chip keyed on the note starting with
+`AMOUNT MISMATCH`. `orders.note` is customer free text off the public order form
+(`index.ts:284`, stored verbatim at `:368`), so a customer could type that prefix into
+their own order, pay their own Square link correctly, and have the webhook settle the row
+with the forged text intact: the chip was already up the first time staff opened the page,
+with no operator action anywhere in the sequence. The money columns are written only by the
+webhook and by `staff_mark_paid`, and `orders` has no anon policy, so nothing a customer
+can reach moves them.
 
 ### Customer-facing copy
 
