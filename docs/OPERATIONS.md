@@ -978,6 +978,27 @@ create time) still carries the **card** `charge_cents` on the row, but the custo
 routed down the pickup path and will hand over the **base** price. Reading `charge_cents`
 there would record, and invite staff to collect, 4 percent more than the customer owes.
 
+### Quote to invoice bills the CASH total
+
+"Convert to invoice" on `quotes.html` writes `amount: q.total`, and `quotes.total` is the
+**cash** total. `invoices.amount` keeps that meaning: the invoice list, the totals across
+the top of that page and the reports all read it as one figure, and quietly writing a card
+figure into it would move all of them.
+
+So a job whose quote sheet says `TOTAL ESTIMATE: $10,900` becomes a `$10,500` invoice, and
+if that client pays by card the job is under-billed by the card cost. **Nothing automatic
+prevents this.** What the page does is refuse to let it happen quietly:
+
+- the confirmation names both figures and says which one it is about to create;
+- the invoice notes carry the card figure, so whoever sends it has the number without going
+  back to the quote;
+- the amount is editable on the Invoices page.
+
+Choosing which figure to bill is a judgement about how that client pays, and it is
+deliberately a human one. If invoices ever need to carry the tender themselves, that is a
+column on `invoices` plus a decision about what the reports should then count, and it is
+not built.
+
 ### Webhook mismatch flag
 
 On a `COMPLETED` payment the webhook records `amount_collected_cents` from the event and

@@ -639,7 +639,22 @@ async function convertToInvoice(id) {
   if (!q) return;
   if (q.status === 'invoiced') { errEl.textContent = 'This quote has already been converted to an invoice.'; return; }
   const label = q.quoteNumber + ' of ' + q.quoteYear;
-  if (!confirm('Create an invoice from quote ' + label + ' for ' + money(q.total) + '?')) return;
+  // q.total is the CASH total and invoices.amount keeps that meaning: it is what the
+  // invoice list, the totals across the top of that page and every report already assume,
+  // and quietly writing a card figure into it would move all of them. But a client paying
+  // by card owes the card total, and invoicing the cash figure under-bills that job. So
+  // the amount does not change and the difference is put in front of staff instead: both
+  // figures in the confirmation, and the card figure carried into the invoice notes so
+  // whoever sends it has the number without coming back here. Deciding which one to bill
+  // is a judgement about how that client pays, and it stays a human one.
+  const liRows = Array.isArray(q.lineItems) ? q.lineItems.filter(Boolean) : [];
+  const cardTotal = liRows.length ? computeTotals(liRows, Number(q.deposit) || 0).cardTotal : null;
+  const cardNote = cardTotal == null ? ''
+    : ' If this client pays by card, the amount is ' + money(cardTotal) + '.';
+  const ask = 'Create an invoice from quote ' + label + ' for ' + money(q.total) +
+    '?\n\nThat is the total by check or cash.' + cardNote +
+    (cardTotal == null ? '' : '\n\nThe invoice is created at the check or cash figure. Edit it on the Invoices page if this one is going on a card.');
+  if (!confirm(ask)) return;
   try {
     await DataStore.addInvoice({
       clientName: q.clientName,
@@ -649,7 +664,8 @@ async function convertToInvoice(id) {
       status: 'draft',
       issuedDate: new Date().toISOString().slice(0, 10),
       notes: 'From quote ' + q.quoteNumber + ' of ' + q.quoteYear +
-        '. Includes 5 percent administration fee ' + money(q.adminFee) + '.',
+        '. Includes 5 percent administration fee ' + money(q.adminFee) + '.' +
+        (cardTotal == null ? '' : ' Amount is the check or cash total; by card it is ' + money(cardTotal) + '.'),
     });
     await DataStore.updateQuote(id, { status: 'invoiced' });
     await refresh();
