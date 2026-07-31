@@ -223,7 +223,7 @@
       <div class="summary" id="summary">
         <div class="srow"><span>Subtotal</span><span id="s_subtotal">$0.00</span></div>
         <div class="srow muted"><span>Administration (5%)</span><span id="s_admin">$0.00</span></div>
-        <div class="srow"><span>Total (card)</span><span id="s_card">$0.00</span></div>
+        <div class="srow total"><span>Total (card)</span><span id="s_card">$0.00</span></div>
         <div class="srow"><span>Pay by check or cash</span><span id="s_cash">$0.00</span></div>
         <div class="srow balance" id="s_card_balance_row"><span>Balance due (card)</span><span id="s_card_balance">$0.00</span></div>
         <div class="srow balance" id="s_cash_balance_row"><span>Balance due by check or cash</span><span id="s_cash_balance">$0.00</span></div>
@@ -258,8 +258,6 @@
 
 <script>
 const esc = DataStore.esc;
-// The admin fee rate and the card uplift both live in assets/pricing.js now.
-const ADMIN_FEE_RATE = EcoPricing.ADMIN_FEE_RATE;
 // Public quote-view base (matches the live domain in supabase/functions + docs).
 const PUBLIC_BASE = window.location.origin;
 // Share token = two dash-stripped UUIDs concatenated (64 hex chars, well over the
@@ -284,6 +282,7 @@ function yearOf(dateStr) {
 }
 
 // Compute base subtotal / admin fee / cash and card totals from raw line items.
+// The admin fee rate and the card uplift both live in assets/pricing.js, nowhere else.
 function computeTotals(lineItems, deposit) {
   return EcoPricing.quoteTotals(lineItems, deposit);
 }
@@ -316,14 +315,23 @@ function renderTable() {
       ? `<span class="status-pill dep-pill pill-${esc(depStatus)}">Deposit: ${esc(depStatus)}</span>`
       : '';
     // The card figure is derived from the stored line items; q.total is the stored cash
-    // total and stays the authoritative one, so it is the one we print beside it.
-    const cardTotal = computeTotals(q.lineItems, deposit).cardTotal;
+    // total and stays the authoritative one, so it is the one we print beside it. The two
+    // agree only while a row and its line items agree, which holds because the builder is
+    // the only writer of both; a hand-edited row could show two prices that disagree.
+    // line_items is raw jsonb and defaults to '[]', so guard it: a single null entry would
+    // throw inside this map and blank the whole table, and an empty array has no card
+    // price to state, in which case we print the stored total on its own.
+    const liRows = Array.isArray(q.lineItems) ? q.lineItems.filter(Boolean) : [];
+    const cardTotal = liRows.length ? computeTotals(liRows, deposit).cardTotal : null;
+    const totalCell = cardTotal == null
+      ? `<strong>${money(q.total)}</strong>`
+      : `<strong>${money(cardTotal)}</strong><div class="cash-note">${money(q.total)} by check or cash</div>`;
     return `
     <tr>
       <td class="q-num">${label}</td>
       <td><strong>${esc(q.clientName)}</strong></td>
       <td>${q.quoteDate ? DataStore.formatDate(q.quoteDate + 'T00:00:00') : '-'}</td>
-      <td><strong>${money(cardTotal)}</strong><div class="cash-note">${money(q.total)} by check or cash</div></td>
+      <td>${totalCell}</td>
       <td>
         <span class="status-pill pill-${esc(q.status)}">${esc(q.status.charAt(0).toUpperCase() + q.status.slice(1))}</span>
         ${depPill}
