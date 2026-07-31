@@ -23,6 +23,7 @@
 <script src="assets/config.js"></script>
 <script src="assets/supabase-client.js"></script>
 <script src="assets/mapping.js"></script>
+<script src="assets/pricing.js"></script>
 <script src="assets/site.js"></script>
 <style>
 /* ── Shop page (marketing) ──────────────────────────────────────────────── */
@@ -47,7 +48,12 @@
 }
 .shop-blurb { margin: 0 0 14px; font-size: 1.04rem; line-height: 1.55; color: var(--ink-soft); }
 .shop-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 0 0 16px; }
-.shop-price { font-family: var(--font-util); font-weight: 700; font-size: 1.25rem; color: var(--green-dark); }
+/* Two figures now sit here (card, then cash or check), so it reads a size down from the
+   single headline price it replaced and is allowed to wrap. */
+.shop-price {
+  font-family: var(--font-util); font-weight: 700; font-size: 1.05rem;
+  line-height: 1.4; color: var(--green-dark);
+}
 .shop-status {
   font-family: var(--font-util); font-weight: 600; text-transform: uppercase;
   letter-spacing: 0.12em; font-size: 0.72rem; color: var(--amber-dark);
@@ -183,6 +189,18 @@
     return 'Something went wrong sending your order. Please try again, or email us at admin@ecotopianearthcare.com or call 814-631-5338.';
   }
   function isPayable(item) { return item.priceCents != null; }
+
+  // Cash-discount display: the card price leads, the cash price follows. Never a
+  // percentage. Both figures come off price_cents, the same base the edge function
+  // prices from, so what the card shows is what checkout collects. price_text is
+  // staff free text and states the base price alone, so it never stands in here.
+  // Returns HTML (it carries an entity) built from a number only, never from a DB
+  // string; callers interpolate it unescaped.
+  function twoPriceCents(baseCents) {
+    var base = Number(baseCents) || 0;
+    return '$' + (EcoPricing.cardCents(base) / 100).toFixed(2) + ' card &middot; $' +
+      (base / 100).toFixed(2) + ' cash or check';
+  }
   function isSoldOut(item) { return item.stockQty === 0; }
   function payModeHtml(name) {
     return (
@@ -260,10 +278,16 @@
             return '<img src="' + esc(t.src) + '" alt="' + esc(t.alt) + '" loading="lazy" width="681" height="900">';
           }).join('') + '</div>'
         : '';
+      // Payable items show the pair computed from price_cents. An item with no
+      // price_cents cannot be ordered at all (the edge function rejects it as
+      // not_payable), so it gets no card figure: it falls back to whatever price_text
+      // staff wrote, escaped as before.
+      var priceHtml = isPayable(m) ? twoPriceCents(m.priceCents)
+        : (m.priceText ? esc(m.priceText) : '');
       var meta = '';
-      if (m.priceText || m.statusText) {
+      if (priceHtml || m.statusText) {
         meta = '<div class="shop-meta">' +
-          (m.priceText ? '<span class="shop-price">' + esc(m.priceText) + '</span>' : '') +
+          (priceHtml ? '<span class="shop-price">' + priceHtml + '</span>' : '') +
           (m.statusText ? '<span class="shop-status">' + esc(m.statusText) + '</span>' : '') +
           '</div>';
       }
@@ -435,7 +459,9 @@
     body.innerHTML =
       '<p class="eco-lead-eyebrow">Order</p>' +
       '<h2 id="shopModalTitle">' + esc(item.name) + '</h2>' +
-      (item.priceText ? '<p class="eco-lead-tinynote">' + esc(item.priceText) + '</p>' : '') +
+      // Payable by definition here (openOrder guards on isPayable), so the pair comes
+      // from price_cents rather than the price_text this note used to quote.
+      '<p class="eco-lead-tinynote">' + twoPriceCents(item.priceCents) + ' each</p>' +
       '<form id="orderForm" novalidate>' +
         '<div class="eco-lead-grid">' +
           '<div class="eco-lead-field eco-lead-full"><label for="or-name">Name <span class="req">*</span></label>' +

@@ -23,6 +23,7 @@
 <script src="assets/config.js"></script>
 <script src="assets/supabase-client.js"></script>
 <script src="assets/mapping.js"></script>
+<script src="assets/pricing.js"></script>
 <script src="assets/site.js"></script>
 <style>
 /* ── Native Plants page (marketing) ─────────────────────────────────────── */
@@ -83,7 +84,12 @@
   font-weight: 700; font-size: 0.72rem; text-transform: uppercase;
   letter-spacing: 0.06em; color: var(--ink-soft);
 }
-.kit-price-table td.price { font-weight: 700; color: var(--amber-dark); text-align: right; }
+/* The price cell carries two figures now (card, then cash or check), so it needs the
+   room to wrap onto a second line inside a narrow kit card. */
+.kit-price-table td.price {
+  font-weight: 700; color: var(--amber-dark); text-align: right;
+  font-size: 0.86rem; line-height: 1.35;
+}
 .kit-price-table td.plugs { color: var(--ink-soft); text-align: right; }
 .kit-larger {
   font-family: var(--font-util); font-size: 0.9rem; color: var(--ink-soft);
@@ -300,7 +306,9 @@
     <div class="wrap">
       <p class="eyebrow">Browse the nursery</p>
       <h2 id="species-h">Wildflower species</h2>
-      <p class="lead">Fifty native perennial wildflowers, each $5 at our plant sale. Build a request below and we will confirm what is ready to reserve.</p>
+      <!-- The two figures here are the same pair the cards below render from
+           PLANT_PRICE. Change one and change the other. -->
+      <p class="lead">Fifty native perennial wildflowers, $5.20 card or $5.00 by cash or check at our plant sale. Build a request below and we will confirm what is ready to reserve.</p>
       <div class="filter-bar" id="filterBar" role="group" aria-label="Filter wildflowers"></div>
       <p class="filter-count" id="filterCount" aria-live="polite"></p>
       <div class="plant-grid" id="plantGrid"></div>
@@ -438,17 +446,29 @@
     return parts.join('\n');
   }
 
-  // Universal habitat-kit pricing. plugs = flower plugs included.
+  // Universal habitat-kit pricing. plugs = flower plugs included. price is the BASE
+  // (cash or check) price; the labels carry no figure, because the size dropdown they
+  // fill has no room for the pair and a bare base price there would contradict the
+  // price table on the card above it.
   var KIT_TIERS = [
-    { key: '50',  sqft: '50 sq ft',  plugs: 18, price: 72,  label: '50 sq ft kit - 18 plugs - $72' },
-    { key: '100', sqft: '100 sq ft', plugs: 36, price: 144, label: '100 sq ft kit - 36 plugs - $144' },
-    { key: '150', sqft: '150 sq ft', plugs: 54, price: 200, label: '150 sq ft kit - 54 plugs - $200' },
-    { key: '200', sqft: '200 sq ft', plugs: 72, price: 250, label: '200 sq ft kit - 72 plugs - $250' }
+    { key: '50',  sqft: '50 sq ft',  plugs: 18, price: 72,  label: '50 sq ft kit - 18 plugs' },
+    { key: '100', sqft: '100 sq ft', plugs: 36, price: 144, label: '100 sq ft kit - 36 plugs' },
+    { key: '150', sqft: '150 sq ft', plugs: 54, price: 200, label: '150 sq ft kit - 54 plugs' },
+    { key: '200', sqft: '200 sq ft', plugs: 72, price: 250, label: '200 sq ft kit - 72 plugs' }
   ];
   var TIER_BY_KEY = {};
   KIT_TIERS.forEach(function (t) { TIER_BY_KEY[t.key] = t; });
 
-  var PLANT_PRICE = 5; // dollars, per plant, at the spring sale
+  var PLANT_PRICE = 5; // dollars, per plant, at the spring sale (base, cash or check)
+
+  // Cash-discount display: the card price leads, the cash price follows. Never a
+  // percentage. Both numbers come from the same constant the server charges from.
+  // Returns HTML (it carries an entity), so callers interpolate it unescaped; it is
+  // built from page constants only, never from a DB or user string.
+  function twoPrice(baseDollars) {
+    var card = EcoPricing.cardDollars(baseDollars);
+    return '$' + card.toFixed(2) + ' card &middot; $' + Number(baseDollars).toFixed(2) + ' cash or check';
+  }
 
   // ── Live catalog state (loaded from the DB over anon) ────────────
   // KITS + species come from public.plant_kits / public.plant_species, which
@@ -509,7 +529,7 @@
     return KIT_TIERS.map(function (t) {
       return '<tr><td>' + esc(t.sqft) + '</td>' +
         '<td class="plugs">' + esc(String(t.plugs)) + ' plugs</td>' +
-        '<td class="price">$' + esc(String(t.price)) + '</td></tr>';
+        '<td class="price">' + twoPrice(t.price) + '</td></tr>';
     }).join('');
   }
 
@@ -579,7 +599,7 @@
         '</div>' +
         '<p class="plant-attracts">' + esc(p.attracts) + '</p>' +
         (p.fact ? '<p class="plant-fact">' + esc(p.fact) + '</p>' : '') +
-        '<p class="plant-price">$' + esc(String(PLANT_PRICE)) + ' each</p>' +
+        '<p class="plant-price">' + twoPrice(PLANT_PRICE) + ' each</p>' +
         (soldOut ? '<span class="sold-chip">Sold out this season</span>' : '') +
         '<button type="button" class="plant-add" data-id="' + esc(p.id) + '"' + (soldOut ? ' disabled' : '') + '>' +
           (soldOut ? 'Sold out' : '+ Add to request') + '</button>' +
@@ -845,7 +865,7 @@
       var p = PLANT_BY_ID[id];
       var qty = tray[id];
       return '<li class="tray-item" data-id="' + esc(id) + '">' +
-        '<div class="ti-name"><b>' + esc(p.common) + '</b><span><em>' + esc(p.botanical) + '</em> · $' + esc(String(PLANT_PRICE)) + ' each</span></div>' +
+        '<div class="ti-name"><b>' + esc(p.common) + '</b><span><em>' + esc(p.botanical) + '</em> · ' + twoPrice(PLANT_PRICE) + ' each</span></div>' +
         '<div class="tray-step">' +
           '<button type="button" class="ti-dec" data-id="' + esc(id) + '" aria-label="Decrease quantity">−</button>' +
           '<span class="ti-qty">' + esc(String(qty)) + '</span>' +
@@ -859,7 +879,7 @@
       '<p class="eco-lead-eyebrow">Your plant request</p>' +
       '<h2 id="plantModalTitle">Plant request</h2>' +
       '<ul class="tray-items">' + items + '</ul>' +
-      '<p class="tray-total">' + esc(String(trayCount())) + ' plants · $' + esc(String(total)) + '</p>' +
+      '<p class="tray-total">' + esc(String(trayCount())) + ' plants &middot; ' + twoPrice(total) + '</p>' +
       '<p class="tray-note">Reserve for pickup, or pay online now. We confirm availability either way.</p>' +
       '<form id="trayForm" novalidate>' +
         '<p class="eco-lead-sub">How can we reach you?</p>' +
