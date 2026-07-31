@@ -463,7 +463,11 @@
     { key: '150', sqft: '150 sq ft', plugs: 54, price: 200, label: '150 sq ft kit - 54 plugs' },
     { key: '200', sqft: '200 sq ft', plugs: 72, price: 250, label: '200 sq ft kit - 72 plugs' }
   ];
-  var TIER_BY_KEY = {};
+  // Object.create(null), not {}: a plain object answers TIER_BY_KEY['constructor'] with
+  // an inherited function, which is truthy, so a lookup for a prototype key would price a
+  // kit at "$0.00 card - $NaN cash or check" and let submitKit past its !tier guard with
+  // an undefined tier. A null prototype makes every non-tier key return undefined.
+  var TIER_BY_KEY = Object.create(null);
   KIT_TIERS.forEach(function (t) { TIER_BY_KEY[t.key] = t; });
 
   var PLANT_PRICE = 5; // dollars, per plant, at the spring sale (base, cash or check)
@@ -806,7 +810,7 @@
         '<div class="eco-lead-grid"><div class="eco-lead-field eco-lead-full">' +
           '<label for="pl-kit-msg">Anything to add?</label>' +
           '<textarea id="pl-kit-msg" placeholder="Optional. Soil conditions, an optional add-on, a delivery preference..."></textarea></div></div>' +
-        '<p class="kit-price-line" id="pl-kit-price">' + KIT_PRICE_PROMPT + '</p>' +
+        '<p class="kit-price-line" id="pl-kit-price" aria-live="polite">' + KIT_PRICE_PROMPT + '</p>' +
         '<div class="eco-lead-grid">' + payModeHtml('pl-kit-pay') + '</div>' +
         '<p class="eco-lead-tinynote">Reserve for pickup, or pay online now. Online payment lights up once our card processor is set up; until then your reservation is saved for pickup.</p>' +
         '<p class="eco-lead-error" id="plantModalError"></p>' +
@@ -826,6 +830,9 @@
   // customer just read. This line puts the pair back on screen directly above the tender
   // choice, which is the one moment both figures have to be visible for the customer to
   // choose between them. It follows the size dropdown, because the price does.
+  // The line is aria-live="polite" (set in openKit): the price changes when the size
+  // changes and nothing else announces it, so without that a screen reader user picks a
+  // size and hears nothing about what it now costs.
   function renderKitPrice(sizeKey) {
     var el = document.getElementById('pl-kit-price');
     if (!el) return;

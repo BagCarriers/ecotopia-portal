@@ -85,7 +85,10 @@
   .totals .trow { display: flex; justify-content: space-between; align-items: baseline;
     padding: 5px 2px; }
   .totals .lbl { font-weight: 700; letter-spacing: 0.03em; }
+  /* The card figure is the primary of the pair, so it has to outweigh the "By check or
+     cash" line beneath it (700, olive). Without this the secondary read bolder. */
   .trow.deposit .lbl, .trow.deposit .val { font-size: 1.35rem; }
+  .trow.deposit .val { font-weight: 800; }
   .trow.admin { color: #7a7259; }
   .trow.admin .lbl { font-weight: 500; font-size: 0.92rem; letter-spacing: 0.01em; }
   .trow.admin .val { font-weight: 600; font-size: 0.92rem; }

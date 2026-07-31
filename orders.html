@@ -184,6 +184,9 @@ function actionsFor(o) {
   return btns.join('');
 }
 
+// Statuses an order can only reach after we recorded payment. Only staff can set them.
+const SETTLED = ['paid', 'ready', 'completed'];
+
 function render() {
   const el = document.getElementById('orderList');
   const rows = orders.filter(matchesFilter);
@@ -202,7 +205,11 @@ function render() {
     // starts as free text off the public order form, and the webhook only ever writes
     // that prefix on the transition into 'paid', so an unpaid row cannot raise the chip
     // by typing it: this is a staff trust signal, not something the customer can forge.
-    const mismatch = o.status === 'paid' &&
+    // The chip has to survive past 'paid'. Staff advance a flagged order to 'ready' and
+    // 'completed', and those are exactly the moments someone is about to hand over goods
+    // we may not have been paid for. A customer cannot set any of these three statuses,
+    // so widening the gate keeps the anti-forgery property intact.
+    const mismatch = SETTLED.includes(o.status) &&
       typeof o.note === 'string' && o.note.indexOf('AMOUNT MISMATCH') === 0;
     return `
       <div class="o-card" data-id="${esc(o.id)}">
