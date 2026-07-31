@@ -96,9 +96,10 @@
       <p class="eyebrow">Shop</p>
       <h1>Shop Ecotopian EarthCare</h1>
       <p class="lead">Goods that carry our work into the world, from the Ecotopian EarthCare card game to
-        other native-plant projects in the making. Reserve or pre-order below. Where a price is shown you can
-        pay at pickup or pay online now, and cash or check costs a little less. For anything without a price,
-        nothing is charged online and we reach out to arrange the rest.</p>
+        other native-plant projects in the making. Reserve or pre-order below. Where you see a card price and
+        a cash price together, you can order it while stock lasts and pay whichever way suits, at pickup or
+        online now, with cash or check the lower of the two. The pre-order and ask-about items take no payment
+        online; we reach out to arrange those.</p>
     </div>
   </section>
   <div class="willow on-cream" data-opacity="0.4"></div>
@@ -479,7 +480,8 @@
         '</div>' +
         '<div class="eco-lead-grid">' + payModeHtml('or-pay') + '</div>' +
         '<p class="eco-lead-tinynote">Add an email or a phone number so we can reach you. Pay at pickup or ' +
-          'pay online, whichever suits; the two prices above show what each way comes to.</p>' +
+          'pay online, whichever suits; the two prices above are for one, so your total follows the ' +
+          'quantity you pick.</p>' +
         '<p class="eco-lead-error" id="shopModalError"></p>' +
         '<button type="submit" class="eco-lead-primary">Place order</button>' +
       '</form>';
@@ -531,7 +533,7 @@
           esc(b.pay_url) + '" target="_blank" rel="noopener">Pay online now</a>';
         sub = 'Your order is reserved. Pay securely online below, or pay at pickup by cash or check for a little less.';
       } else {
-        sub = 'We could not open the online payment just now, so your order is saved for pickup instead. We will reach out to arrange it.';
+        sub = 'Online payment is not available right now, so your order is saved for pickup instead. We will reach out to arrange it.';
       }
     } else {
       sub = 'We will reach out to arrange your order. Nothing is charged now.';
