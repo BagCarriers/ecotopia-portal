@@ -197,18 +197,22 @@ function render() {
     if (o.email) contactBits.push(`<a href="mailto:${esc(o.email)}">${esc(o.email)}</a>`);
     const payMode = o.payMode === 'online' ? 'Online' : 'Pickup';
     // A settled order shows what actually came in and how, so the drawer can be
-    // reconciled against this list. Unpaid rows keep showing the base total.
+    // reconciled against this list. An unsettled row always shows the BASE total, even an
+    // online one whose Square link is 4 percent higher: nothing has been collected yet, so
+    // there is no charged figure to report.
     const collected = o.amountCollectedCents == null ? ''
       : money(o.amountCollectedCents) + ' ' + esc(o.tender || '');
-    // The webhook prefixes this flag onto the note when Square took an amount we did
-    // not expect. The customer's own text still follows it, untouched, below. The note
-    // starts as free text off the public order form, and the webhook only ever writes
-    // that prefix on the transition into 'paid', so an unpaid row cannot raise the chip
-    // by typing it: this is a staff trust signal, not something the customer can forge.
+    // The webhook prefixes this flag onto the note when Square took an amount we did not
+    // expect. The customer's own text still follows it, untouched, below.
     // The chip has to survive past 'paid'. Staff advance a flagged order to 'ready' and
     // 'completed', and those are exactly the moments someone is about to hand over goods
-    // we may not have been paid for. A customer cannot set any of these three statuses,
-    // so widening the gate keeps the anti-forgery property intact.
+    // we may not have been paid for. Customers cannot set any of those three statuses.
+    // NOT forgery-proof, and do not read it as such. `note` is customer free text, and the
+    // webhook only rewrites it when there IS a mismatch, so a customer who types the prefix
+    // themselves and then pays correctly raises this chip the moment staff mark the order
+    // paid. The status gate only stops them raising it on their own unpaid row. Closing it
+    // properly means flagging on amountCollectedCents !== chargeCents instead of trusting
+    // note text; until then a chip means "read the note", not "we were short-changed".
     const mismatch = SETTLED.includes(o.status) &&
       typeof o.note === 'string' && o.note.indexOf('AMOUNT MISMATCH') === 0;
     return `

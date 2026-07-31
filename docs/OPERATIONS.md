@@ -188,9 +188,10 @@ The 5 percent administration fee is the core rule:
   by card does not enlarge the administration fee.
 - The fee percent lives in ONE place: the `ADMIN_FEE_RATE = 0.05` const in
   `assets/pricing.js`. Change it there and nowhere else.
-- Client-facing, the fee is a QUIET line ("Administration") just above the total on both
-  the builder summary and the printed quote. It is deliberately NOT a line item in the
-  table.
+- The fee is a QUIET line just above the total, never a line item in the table. It reads
+  **"Administration"** on the two client-facing documents (`quote-view.html:268`,
+  `quote-print.html:218`) and **"Administration (5%)"** on the staff builder summary
+  (`quotes.html:225`), where naming the rate is useful and no client sees it.
 - Deposit is display/deduction only: it does not change the subtotal math. When a
   deposit is present the printed quote shows `DEPOSIT RECEIVED` and a final
   `BALANCE DUE = total - deposit`.
@@ -303,16 +304,27 @@ token-gated `get_quote_by_token` RPC).
   returned as-is (idempotent re-click). Otherwise, if `SQUARE_ACCESS_TOKEN` or
   `SQUARE_LOCATION_ID` is unset it returns `{configured:false}` (dark mode). With both
   set, it creates a Square Payment Link (`quick_pay` for `Deposit - Quote N of YYYY -
-  Ecotopian EarthCare`, amount `round(deposit*100)` cents, `idempotency_key = <quote
-  id>:deposit`), saves `square_order_id` + `square_pay_url`, flips `deposit_status` to
-  `pending`, and returns `{configured:true, url}`.
+  Ecotopian EarthCare`, amount **`cardCents(round(deposit*100))`** cents, `idempotency_key
+  = <quote id>:deposit`), saves `square_order_id` + `square_pay_url`, flips
+  `deposit_status` to `pending`, and returns `{configured:true, url}`.
+  **The deposit carries the card uplift** (`index.ts:242`): `quotes.deposit` is the BASE
+  figure staff entered, and this is the card path, so a $200 deposit is charged **$208**.
+  `quote-view.html` prints `cardDollars(deposit)` beside a "By check or cash" figure of the
+  base, so the two agree. See "Cash-discount pricing".
 - **Square webhook (`payment.updated`)** - Square POSTs the event JSON signed with an
   HMAC-SHA256 over (`SQUARE_WEBHOOK_URL` + raw body), base64, in the
   `x-square-hmacsha256-signature` header. The function verifies that signature
   (constant-time) against `SQUARE_WEBHOOK_SIGNATURE_KEY`; a missing/unset key or a
   bad/missing signature is rejected `401`. On a `COMPLETED` payment it looks up the quote
-  by `square_order_id` (= `payment.order_id`) and sets `deposit_status = 'paid'`. Events
-  for unknown orders (or non-completed statuses) are a fast `200` no-op.
+  by `square_order_id` (= `payment.order_id`) and sets `deposit_status = 'paid'` **and
+  `deposit_tender = 'card'`** (`index.ts:141`). Events for unknown orders (or non-completed
+  statuses) are a fast `200` no-op.
+
+  **Do not reconcile off `deposit_tender`.** It is written in exactly that one place and
+  read nowhere. The manual "Mark deposit paid" action on `quotes.html` sets only
+  `deposit_status`, so a deposit taken by check or cash leaves the column null. Null
+  therefore means "not recorded", never "not a card", and the column cannot today tell the
+  two apart.
 
 Tokens and keys are never logged or returned; Square API error bodies are swallowed (the
 page just falls back to manual). Deployed `--no-verify-jwt` (the create_link path is anon;
@@ -589,8 +601,11 @@ Photo convention (identical to garden photos, but rooted at `assets/img/plants/`
   `gallery_staff_all` object policy covers these writes; public bucket read serves them).
 
 Public page (`plants.html`): reads active rows over anon (ordered `sort` then name),
-rendering the same filter chips, `$5` request tray, and 4-tier kit modals as before. The
-kit pricing table (`KIT_TIERS`) and `PLANT_PRICE` stay hardcoded (universal), and the card
+rendering the same filter chips, per-plant order tray, and 4-tier kit modals as before.
+Both the tray and the kit modal print two prices, "$5.20 card · $5.00 cash or check" and
+the kit equivalent, never a single figure: see "Cash-discount pricing". `PLANT_PRICE` (5,
+the BASE dollar price) and the kit pricing table (`KIT_TIERS`, also base) stay hardcoded
+(universal); the card price is always derived from them. The card
 game section is unchanged. The request tray now references species by row id (not array
 index) so a reorder in the portal cannot corrupt a pending request. Each section fails
 soft independently: a failed species fetch shows "The plant list is updating. Check back
@@ -669,7 +684,9 @@ Table `public.merch_items` columns:
 | ------------- | ----------------------------------------------------------------- |
 | `name`        | required                                                         |
 | `blurb`       | optional description                                             |
-| `price_text`  | free text ("US $40", "From $15")                                  |
+| `price_text`  | free text label, **display only**. NOT the price we charge, and a payable card does not render it at all: `shop.html:286` shows it only on request-only items and on items with an external buy link |
+| `price_cents` | integer, nullable (added by `0025`). **The storefront price.** Set = orderable, and the card shows the card and cash pair; null = request-only (`400 not_payable` if ordered) |
+| `stock_qty`   | integer, nullable (added by `0025`). null = untracked, 0 = sold out |
 | `status_text` | free text ("Pre-order", "In stock", "Coming soon")                |
 | `photo_path`  | `static:<path>` repo asset, or a gallery-bucket object (see below) |
 | `link_url`    | optional external buy link; the public card renders it ONLY when it starts with `https://` |
@@ -773,11 +790,15 @@ endpoint, told apart by the `x-square-hmacsha256-signature` header then `body.ac
   the live catalog and must be `active`; merch must have `price_cents` (else `400
   not_payable`). Any tracked item with `stock_qty < qty` -> `409 {error:'insufficient_stock',
   item}`. Recomputes `subtotal_cents` server-side and inserts the order (`order_token` = 64
-  hex). `pay_mode:'online'` + Square configured mints a `quick_pay` Payment Link (`Order
-  <first 8 of id> - Ecotopian EarthCare`, amount `subtotal_cents`, idempotency `<id>:order`),
-  saves `square_order_id`/`square_pay_url`, sets status `link_created`, returns `{token,
-  pay_url}`. `online` but Square dark (or unreachable) -> `{token, configured:false}` (order
-  stays `new`, treated as pickup). `pickup` -> `{token}`.
+  hex) with `charge_cents` = `subtotal_cents` for `pickup` and **`cardCents(subtotal_cents)`
+  for `online`**. `pay_mode:'online'` + Square configured mints a `quick_pay` Payment Link
+  (`Order <first 8 of id> - Ecotopian EarthCare`, **amount `charge_cents`, NOT
+  `subtotal_cents`** (`index.ts:394`) so Square is asked for the card price, idempotency
+  `<id>:order`), saves `square_order_id`/`square_pay_url`, sets status `link_created`,
+  returns `{token, pay_url}`. `online` but Square dark (or unreachable) ->
+  `{token, configured:false}` (order stays `new`, treated as pickup, and **it keeps the
+  card `charge_cents` while the customer will pay base**, which is why `staff_mark_paid`
+  ignores that column). `pickup` -> `{token}`.
 - **`order_status`** (PUBLIC, anon) - `{action, token}` (>= 32 chars). Returns `{status,
   items, subtotal_cents, charge_cents, pay_mode, pay_url, created_at}` for the public
   `order.html` page; `404` otherwise.
@@ -875,8 +896,11 @@ plus its token-gated RPCs).
   `cardCents(subtotal_cents)` for `online`. It is **nullable with no default and nothing
   backfills it**. `null` means "not priced yet" and must **never** be coerced to
   `subtotal_cents`: pre-0027 rows have no charge, and rendering `money(null)` would show
-  "$0.00" beside a Square link charging the real amount. `order.html` shows no total at all
-  in that case, and `orders.html` shows the base total.
+  "$0.00" beside a Square link charging the real amount, so `order.html` shows no total at
+  all in that case. The staff list never renders `charge_cents`: an unsettled row on
+  `orders.html` always shows `money(subtotalCents)`, the BASE total, including a
+  `link_created` online order whose Square link is 4 percent higher. Once settled it shows
+  `amount_collected_cents` instead.
 - **`orders.tender`** is null until the order settles, then records how it was paid.
 - **`orders.amount_collected_cents`** is what actually came in.
 - **`quotes.total` is the CASH total** (base subtotal + the 5 percent administration fee,
@@ -918,9 +942,24 @@ compare against.
 `orders.html` raises an "Amount mismatch" chip when the note starts with that prefix and
 the order is `paid`, `ready` or `completed`. It stays visible past `paid` because staff
 advance a flagged order through `ready` and `completed`, and those are precisely the
-moments someone is about to hand over goods that may not have been paid for. A customer
-cannot set any of those three statuses, so the chip cannot be forged through the public
-order form.
+moments someone is about to hand over goods that may not have been paid for. Customers
+cannot set any of those three statuses.
+
+**The chip is NOT forgery-proof. Treat it as "read the note", not as proof we were
+short-changed.** `orders.note` is customer free text off the public order form
+(`index.ts:284`, stored verbatim at `:368`), the webhook rewrites it only when there IS a
+mismatch, and `staff_mark_paid` never touches it. So a customer who types
+`AMOUNT MISMATCH: ...` into their own note and then pays the correct amount ends up at
+`status = 'paid'` with that text intact, and the chip fires on a clean order. What the
+status gate does buy is that they cannot raise it on their own unpaid row; it surfaces only
+once staff have marked the order paid. Closing the hole properly means flagging on
+`amountCollectedCents !== chargeCents` rather than trusting note text, which would also
+survive an operator editing the note. That is not built.
+
+The gate deliberately excludes `cancelled`, so a flagged order that is cancelled loses its
+chip at exactly the moment someone is deciding whether to refund. The `AMOUNT MISMATCH`
+text is still in the note, which is rendered on the card, so the signal is not lost, only
+demoted.
 
 ### Customer-facing copy
 
