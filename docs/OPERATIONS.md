@@ -393,8 +393,13 @@ Two things this does not do:
   reads the current link), so the exposure is a client who kept an old checkout page or
   bookmark. Closing it means storing Square's `payment_link.id` and calling
   `DELETE /v2/online-checkout/payment-links/{id}` on re-mint, which needs a new column.
-  Note that a payment on the old link would also **not** flip `deposit_status`: the webhook
-  matches on `square_order_id`, which now holds the new order.
+  **A payment on a superseded link is silently unrecorded, not merely unreconciled.**
+  `handleWebhook` looks the payment up in `quotes` by `square_order_id`, which now holds the
+  **new** order, finds nothing, falls through to `orders`, finds nothing there either, and
+  returns `{ok:true}`. The money lands in Square with **no portal record at all**: the
+  deposit stays `unpaid`, no row moves, nothing is logged. It will only ever surface in
+  Square's own reporting, so reconcile Square against the portal before writing a deposit
+  off as unpaid.
 
 ### Secrets checklist (set the night Jordan creates his Square account)
 
@@ -1053,6 +1058,13 @@ too little, nothing here will know. It also does not catch a refund or a partial
 made in Square after the order settled: the webhook only acts on the first transition out
 of `new`/`link_created`.
 
+**One known false positive, unreachable today.** A pre-0027 `online` row has a null
+`charge_cents` and a Square link minted before the uplift existed, so it charges BASE. If
+such a row settled now, `expectedCents` would fall through to `cardCents(subtotalCents)`
+while Square collected base, and the chip would fire on a correct payment. `orders` is empty
+in production (the shop has taken no orders), so no such row exists and none can be created.
+If one ever turns up, read the Square payment rather than the chip.
+
 The chip stays visible past `paid` because staff advance a flagged order through `ready`
 and `completed`, and those are precisely the moments someone is about to hand over goods
 that may not have been paid for. It deliberately excludes `cancelled`, so a flagged order
@@ -1132,12 +1144,27 @@ zero for every current price** ($5 plants, $72/$144/$200/$250 kits, the $40 card
 whole dollars), so nothing is wrong today.
 
 `order.html` prints a grossed column anyway, and settles the residual **on the last line**
-so the column always adds up to the figure beneath it. It does that only when the lines sum
-to `subtotal_cents`, which is the precondition for the charge having been computed from
-them; if they do not, the lines are printed grossed and left un-reconciled rather than
-having a fictional residual forced onto one of them. **What is charged never moves**: the
-residual is a presentation adjustment inside a total that is still `charge_cents` (or, on a
-settled order, `amount_collected_cents`) exactly as stored.
+so the column adds up to the figure beneath it. Two conditions gate that, and both matter:
+
+1. **The lines must sum to `subtotal_cents`**, which is the precondition for the charged
+   figure having been computed from them. If they do not, there is nothing to tie out
+   against and a residual would be a fiction.
+2. **The residual must be plausibly rounding: `abs(residual) <= lines.length`.**
+   `cardCents()` can move each line by at most half a cent either way and the target carries
+   half a cent of its own, so one cent per line is the ceiling for real drift.
+
+The second bound exists because on a **settled** order the target is
+`amount_collected_cents`, which is whatever Square actually reported, not a figure we
+computed. Without it, a short settlement (charge 5093, Square reports 100) rendered a
+literal `$-9.40` line item, and an over settlement rendered three $12.99 tins at $42.57. An
+over settlement is not hypothetical: if Jordan's Square account applies its own service
+charge (the open blocker below) it happens on **every** online order. When either gate
+fails, the column is printed honestly grossed and left un-reconciled; the figure beneath it
+still states what was really collected, and the two simply do not tie, which is the truth.
+
+**What is charged never moves.** The residual is a presentation adjustment inside a total
+that is still `charge_cents` (or, on a settled order, `amount_collected_cents`) exactly as
+stored.
 
 The shop card still shows a per-unit card figure, which is `cardCents(unit)`. If a
 non-whole-dollar merch price is ever set, that per-unit figure times the quantity can be a

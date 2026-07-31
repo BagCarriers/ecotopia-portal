@@ -182,8 +182,9 @@
   // beneath it quotes, so the two always agree and no unexplained increment ever appears
   // between them. On the card side the column is also tied to that figure exactly: the
   // charge grosses the subtotal once, whereas grossing each line separately can land a
-  // cent or two away when a unit price is not a whole dollar, so the residual is settled
-  // on the last line rather than left hanging under the total.
+  // cent or two away when a unit price is not a whole dollar, so a rounding-sized residual
+  // is settled on the last line rather than left hanging under the total. Only a
+  // rounding-sized one: see the bound below.
   function itemsHtml(o) {
     var items = o.items;
     if (!Array.isArray(items) || !items.length) return '';
@@ -206,7 +207,16 @@
       var baseSum = lines.reduce(function (s, l) { return s + l.base; }, 0);
       if (target && baseSum === Number(o.subtotal_cents)) {
         var grossSum = amounts.reduce(function (s, a) { return s + a; }, 0);
-        amounts[amounts.length - 1] += target.cents - grossSum;
+        var residual = target.cents - grossSum;
+        // And only when the residual is plausibly rounding. cardCents() can move each line
+        // by at most half a cent either way, and the target carries a half cent of its own,
+        // so one cent per line is the ceiling for real drift. Anything larger is not
+        // rounding: on a settled order the target is what Square actually reported, so a
+        // short or over settlement would otherwise dump the whole divergence onto the last
+        // item and print a negative or wildly inflated line on a customer's page at exactly
+        // the moment something has gone wrong. Leave the column honestly grossed instead;
+        // the figure beneath it still states what was really collected.
+        if (Math.abs(residual) <= lines.length) amounts[amounts.length - 1] += residual;
       }
     }
     var rows = lines.map(function (l, i) {
