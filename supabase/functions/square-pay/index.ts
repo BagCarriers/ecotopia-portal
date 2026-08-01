@@ -323,9 +323,12 @@ async function handleCreateOrder(body: any): Promise<Response> {
   // The key must apply the SAME sizeless-means-plug default the species branch applies,
   // or the two spellings of a plug (absent, and explicit 'plug') hash apart and each
   // clears the stock check on its own, which is exactly the split this merge prevents.
+  // Only a species has a size at all: the kit and merch branches ignore the field, so
+  // letting an untrusted `size` into their key would let a caller split one merch line
+  // into as many as it can invent names for and clear the stock cap on each.
   const merged = new Map<string, any>();
   for (const raw of rawItems) {
-    const sizePart = raw?.kind === 'species' ? (raw?.size ?? 'plug') : (raw?.size ?? '');
+    const sizePart = raw?.kind === 'species' ? (raw?.size ?? 'plug') : '';
     const key = [raw?.kind, raw?.id, raw?.tier ?? '', sizePart].join(':');
     const prev = merged.get(key);
     if (prev) prev.qty = Number(prev.qty) + Number(raw?.qty);
@@ -337,10 +340,16 @@ async function handleCreateOrder(body: any): Promise<Response> {
   // A failed read must not masquerade as a closed season. Treating it as one would empty
   // openSizes and tell every plant customer "sold out" while kits and merch kept selling,
   // so the failure has to be its own answer rather than a silent, plausible-looking one.
-  const { data: sizeRows, error: sizeErr } = await sb.from('plant_size_settings')
-    .select('size_key, active');
-  if (sizeErr) return json({ error: 'server_error' }, 500);
-  const openSizes = new Set((sizeRows || []).filter((r) => r.active).map((r) => r.size_key));
+  // And only a species line consults it, so only a cart holding one reads it at all: a
+  // kit or merch order has no business failing on a table it never asks about.
+  let openSizes = new Set<string>();
+  const hasSpecies = Array.from(merged.values()).some((raw) => raw?.kind === 'species');
+  if (hasSpecies) {
+    const { data: sizeRows, error: sizeErr } = await sb.from('plant_size_settings')
+      .select('size_key, active');
+    if (sizeErr) return json({ error: 'server_error' }, 500);
+    openSizes = new Set((sizeRows || []).filter((r) => r.active).map((r) => r.size_key));
+  }
 
   for (const raw of merged.values()) {
     const kind = raw?.kind;

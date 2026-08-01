@@ -843,7 +843,10 @@ the page deploy. Only an **explicitly unknown** size is an error.
 The cart merge key applies the same default. Without it the two spellings of a plug
 (absent, and explicit `'plug'`) would hash to different keys, and each half would clear
 the per-line stock check on its own, which is precisely the split the merge exists to
-prevent.
+prevent. **Only a species line contributes a size to the key.** The kit and merch
+branches ignore the field entirely, so letting their `size` into the key would let a
+crafted payload split one merch line into as many lines as it can invent size names for
+and clear the stock cap on each.
 
 ### Failure modes worth knowing
 
@@ -855,7 +858,9 @@ prevent.
   plant list is updating. Check back soon." instead of a false closed-season notice the
   customer could not tell from the truth.
 - **Seasons are read once per order**, before the line loop, so a season closing mid-cart
-  cannot half-accept it.
+  cannot half-accept it, and **only when the cart holds a species line**. A kit or merch
+  order never touches `plant_size_settings` and so cannot fail on it; that is what makes
+  the bullet above true rather than aspirational.
 - The public tray is keyed `<species id>:<size>`, not by species id, and the server's
   merge key carries the size too. A key that ignored the size would collapse a plug and a
   gallon of the same plant into one line priced at whichever size arrived first.
@@ -1087,13 +1092,22 @@ Where things live:
   `order_status`, renders items, total, a Received -> Paid/Pay-at-pickup -> Ready -> Completed
   timeline, a Square Pay button when a link exists and the order is unpaid, else a
   pay-at-pickup note. Poll-free (refresh to update). Every value is `esc()`'d.
+  A species line prints its size beside the name ("3x Anise Hyssop (Spring plug)"), the
+  same parenthetical a kit uses for its tier, so a mixed order does not read as the same
+  plant twice.
 - Portal `orders.html` (the "Orders" nav link after Jobs): newest-first list with status
   filters, status pills, items + total, customer contact, note, and actions - **Paid cash**
   / **Paid check** / **Paid card** (three buttons, each calling `staff_mark_paid` with its
   own `tender`; they decrement stock), **Mark ready**, **Mark completed**, **Cancel**
   (plain staff status updates via `DataStore.updateOrder`), and **Copy order link**. A row
   with a recorded `amount_collected_cents` shows "Collected: $X <tender>" in place of the
-  total; every other row shows the base total.
+  total; every other row shows the base total. Items carry the same size parenthetical
+  `order.html` prints, which is what a picker reads off the screen.
+  Both surfaces hold a `SIZE_LABEL` map of size key to display word, exactly the shape
+  `TIER_LABEL` already has for kit tiers. It carries **no price**: the two size prices
+  live in `PLANT_SIZES` (edge function, display mirror in `plants.html`) and the drift
+  guard still sees exactly two copies. A size key that is not an own property of the map
+  renders nothing, so a legacy sizeless line reads exactly as it always did.
   `dashboard.html` "Needs attention" surfaces "N new order(s)" (`new`/`link_created`).
 - Staff editors: the `manage-plants.html` kit modal gains a "Stock (blank = untracked)"
   input, and its species modal gains "Plug stock" and "Gallon stock" (one per size, since

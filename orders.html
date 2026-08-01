@@ -110,6 +110,15 @@ const esc = DataStore.esc;
 const ORDER_FN = window.ECO_CONFIG.SUPABASE_URL + '/functions/v1/square-pay';
 const ORDER_BASE = 'https://ecotopia.bagcarriers.dev';
 const TIER_LABEL = { '50': '50 sq ft', '100': '100 sq ft', '150': '150 sq ft', '200': '200 sq ft' };
+// Display labels only, the same shape TIER_LABEL already is for kits. The prices these
+// keys carry live in PLANT_SIZES (edge function, mirrored in plants.html) and are not
+// repeated here. A picker has to be able to tell 3 plugs from 1 gallon of one species.
+const SIZE_LABEL = { plug: 'Spring plug', gallon: 'Gallon pot' };
+// Own-property lookup: an item whose size is 'constructor' must answer nothing, not a
+// function that would then be stringified into the page.
+function sizeLabel(size) {
+  return Object.prototype.hasOwnProperty.call(SIZE_LABEL, size) ? SIZE_LABEL[size] : '';
+}
 const STATUS_LABEL = {
   new: 'New', link_created: 'Link sent', paid: 'Paid', ready: 'Ready',
   completed: 'Completed', cancelled: 'Cancelled'
@@ -132,7 +141,9 @@ function itemsSummary(items) {
   if (!Array.isArray(items) || !items.length) return '';
   return items.map(o => {
     const tier = o.tier && TIER_LABEL[o.tier] ? ' <span class="tier">(' + esc(TIER_LABEL[o.tier]) + ')</span>' : '';
-    return esc(String(o.qty || 0)) + '&times; ' + esc(o.name || '') + tier +
+    const sz = sizeLabel(o.size);
+    const size = sz ? ' <span class="tier">(' + esc(sz) + ')</span>' : '';
+    return esc(String(o.qty || 0)) + '&times; ' + esc(o.name || '') + tier + size +
       ' <span class="tier">' + money((Number(o.unit_cents) || 0) * (Number(o.qty) || 0)) + '</span>';
   }).join('<br>');
 }

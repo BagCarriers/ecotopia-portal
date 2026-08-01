@@ -96,6 +96,16 @@
     return '$' + ((Number(cents) || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
   var TIER_LABEL = { '50': '50 sq ft', '100': '100 sq ft', '150': '150 sq ft', '200': '200 sq ft' };
+  // Display labels only, the same shape TIER_LABEL already is for kits. The prices these
+  // keys carry live in PLANT_SIZES (edge function, mirrored in plants.html) and are not
+  // repeated here. Without it a mixed order prints the same species name twice with no
+  // way to tell which line is which.
+  var SIZE_LABEL = { plug: 'Spring plug', gallon: 'Gallon pot' };
+  // Own-property lookup: an item whose size is 'constructor' must answer nothing, not a
+  // function that would then be stringified into the page.
+  function sizeLabel(size) {
+    return Object.prototype.hasOwnProperty.call(SIZE_LABEL, size) ? SIZE_LABEL[size] : '';
+  }
   var SETTLED = ['paid', 'ready', 'completed'];
   var TENDER_WORD = { cash: 'cash', check: 'check', card: 'card' };
 
@@ -190,9 +200,11 @@
     if (!Array.isArray(items) || !items.length) return '';
     var lines = items.map(function (it) {
       var qty = Number(it.qty) || 0;
+      var sz = sizeLabel(it.size);
       return {
         name: esc(it.name || ''),
         tier: it.tier && TIER_LABEL[it.tier] ? ' <span class="tier">(' + esc(TIER_LABEL[it.tier]) + ')</span>' : '',
+        size: sz ? ' <span class="tier">(' + esc(sz) + ')</span>' : '',
         qty: qty,
         base: (Number(it.unit_cents) || 0) * qty,
       };
@@ -220,7 +232,7 @@
       }
     }
     var rows = lines.map(function (l, i) {
-      return '<tr><td class="q">' + esc(String(l.qty)) + '&times;</td><td>' + l.name + l.tier + '</td>' +
+      return '<tr><td class="q">' + esc(String(l.qty)) + '&times;</td><td>' + l.name + l.tier + l.size + '</td>' +
         '<td class="amt">' + money(amounts[i]) + '</td></tr>';
     }).join('');
     return '<table class="items"><tbody>' + rows + '</tbody></table>';
