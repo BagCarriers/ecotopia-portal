@@ -26,8 +26,19 @@
 Read these before touching anything.
 
 1. **Production Square is live.** Minting a payment link is free and safe; paying one is not. Test by reading the minted amount back through Square's API, never by completing a payment.
-2. The database holds **50 species, 0 orders, 1 draft quote**. Delete every test row you create.
-3. `stock_qty` is null on all 50 species, which is what makes dropping it safe. **Verify that is still true before the migration drops it.**
+2. The database holds **50 species, 2 real orders (both the owner's, one paid on production Square), and 1 draft quote**. Do not touch any of them. Delete every test row you create.
+3. `stock_qty` was null on all 50 species, which is what made dropping it safe. **Verify before dropping.**
+
+### What already went wrong here, so it does not happen twice
+
+Task 1 dropped `stock_qty` while the deployed edge function still selected it. **Plant checkout returned `item_unavailable` for about twelve minutes on a live site.** It was repaired out of band before Task 2 ran, in commit `418b962`, which also passes the size to `decrement_stock` so per-size counters actually move.
+
+Two rules follow, and they bind every remaining task:
+
+- **The deployed page and the deployed function must stay compatible at every single commit.** Never rely on "Task N deploys later" to make the system correct. Each deploy has to be safe standing alone, because the site is taking orders between them.
+- **A schema change that removes something must ship after the code that stops using it, not before.** Additive first, remove last.
+
+When Task 2 rewrites the species branch, it is rewriting the code from `418b962`, not the original.
 
 ## Where the spec's five tests actually live
 
@@ -241,7 +252,12 @@ Replace the `if (kind === 'species')` block (currently lines 326-335) with:
 
 ```ts
     if (kind === 'species') {
-      const size = typeof raw?.size === 'string' ? raw.size : '';
+      // A payload with NO size comes from a page built before sizes existed, and that
+      // page sold plugs, so that is what it means. This default is load-bearing until
+      // Task 4 deploys: the live plants.html does not send a size, and rejecting it
+      // here would break plant checkout on a site that is taking real orders. Only an
+      // explicitly unknown size is an error.
+      const size = raw?.size == null ? 'plug' : String(raw.size);
       if (!Object.prototype.hasOwnProperty.call(PLANT_SIZES, size)) {
         return json({ error: 'bad_size' }, 400);
       }
@@ -294,10 +310,15 @@ curl -s -X POST $FN -H 'Content-Type: application/json' \
 echo; echo "--- gallon, season closed: expect 409 size_closed ---"
 curl -s -X POST $FN -H 'Content-Type: application/json' \
  -d "{\"action\":\"create_order\",\"customer\":{\"name\":\"ZZ SIZE gallon\"},\"pay_mode\":\"pickup\",\"items\":[{\"kind\":\"species\",\"id\":\"$S\",\"size\":\"gallon\",\"qty\":1}]}"
-echo; echo "--- no size: expect 400 bad_size ---"
+echo; echo "--- NO size: must SUCCEED as a plug (the live page sends no size) ---"
 curl -s -X POST $FN -H 'Content-Type: application/json' \
  -d "{\"action\":\"create_order\",\"customer\":{\"name\":\"ZZ SIZE none\"},\"pay_mode\":\"pickup\",\"items\":[{\"kind\":\"species\",\"id\":\"$S\",\"qty\":1}]}"
+echo; echo "--- explicitly unknown size: expect 400 bad_size ---"
+curl -s -X POST $FN -H 'Content-Type: application/json' \
+ -d "{\"action\":\"create_order\",\"customer\":{\"name\":\"ZZ SIZE bogus\"},\"pay_mode\":\"pickup\",\"items\":[{\"kind\":\"species\",\"id\":\"$S\",\"size\":\"bucket\",\"qty\":1}]}"
 ```
+
+**The no-size case succeeding is not a nicety, it is the whole reason plant checkout is not broken right now.** If it returns an error, stop and fix it before deploying anything else.
 
 Then confirm the stored line carries the size and the base price:
 
