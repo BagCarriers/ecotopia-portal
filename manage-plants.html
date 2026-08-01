@@ -50,6 +50,25 @@
   .btn-sm.btn-danger { color: #b3261e; }
   .btn-sm.btn-danger:hover { color: #fff; background: #b3261e; border-color: #b3261e; }
 
+  /* Section headings inside a tab pane */
+  .section-h { font-family: 'Fraunces', serif; font-size: 1.15rem; color: var(--forest);
+    margin-bottom: 4px; }
+  .section-h.spaced { margin-top: 26px; }
+  .section-note { font-size: 0.85rem; color: var(--text-dim); margin-bottom: 12px;
+    max-width: 640px; line-height: 1.55; }
+
+  /* Season table (same shape as manage-services.html so the two pages read alike) */
+  .card { background: #fff; border-radius: 12px; border: 1px solid var(--border); overflow: hidden; }
+  table { width: 100%; border-collapse: collapse; }
+  thead th { text-align: left; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em;
+    color: var(--text-dim); padding: 12px 16px; border-bottom: 1px solid var(--border); font-weight: 700; }
+  tbody td { padding: 14px 16px; font-size: 0.9rem; border-bottom: 1px solid var(--border);
+    vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  .size-name { font-weight: 600; color: var(--forest); }
+  .msg-preview { color: var(--text-dim); font-size: 0.82rem; max-width: 280px; }
+  .muted { color: var(--text-dim); }
+
   /* Tabs */
   .tabs { display: flex; gap: 8px; margin-bottom: 18px; }
   .tab { padding: 8px 18px; border-radius: 20px; border: 1.5px solid var(--border);
@@ -102,6 +121,8 @@
     max-width: 520px; max-height: 90vh; overflow-y: auto;
     box-shadow: 0 20px 60px rgba(0,0,0,0.25); }
   .modal h2 { font-family: 'Fraunces', serif; color: var(--forest); margin-bottom: 18px; }
+  .modal h2.tight { margin-bottom: 6px; }
+  .modal .modal-sub { font-size: 0.85rem; color: var(--text-dim); margin-bottom: 18px; }
   .form-group { margin-bottom: 14px; }
   .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .form-group label { display: block; font-size: 0.78rem; font-weight: 600;
@@ -113,7 +134,16 @@
   .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
     outline: none; border-color: var(--forest-light); }
   .field-note { font-size: 0.76rem; color: var(--text-dim); margin-top: 4px; }
+  .field-note.row-note { margin-top: -8px; margin-bottom: 14px; }
   .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 6px; }
+
+  /* Checkbox list inside a form-group (labels here are sentence case, not the
+     uppercase field labels, and the inputs must not stretch to 100%). */
+  .check-list { display: flex; flex-direction: column; gap: 7px; margin-top: 2px; }
+  .check-list label { display: flex; align-items: center; gap: 8px; margin-bottom: 0;
+    font-size: 0.875rem; font-weight: 500; text-transform: none; letter-spacing: 0;
+    color: var(--text); cursor: pointer; }
+  .check-list input[type="checkbox"] { width: auto; padding: 0; accent-color: var(--forest-mid); }
 
   /* Kit plant rows */
   .kit-plant-rows { display: flex; flex-direction: column; gap: 8px; }
@@ -130,6 +160,11 @@
     .row { flex-wrap: wrap; }
     .form-row { grid-template-columns: 1fr; }
     .kit-plant-row { grid-template-columns: 1fr auto; }
+    thead { display: none; }
+    tbody td { display: block; padding: 8px 16px; border-bottom: none; }
+    tbody tr { display: block; border-bottom: 1px solid var(--border); padding: 10px 0; }
+    tbody tr:last-child { border-bottom: none; }
+    .msg-preview { max-width: none; }
   }
 </style>
 </head>
@@ -139,8 +174,9 @@
     <h1>Plants</h1>
   </div>
   <p class="page-intro">Edit the native plant shop shown on the public
-    <a href="plants.html" target="_blank" rel="noopener">Native Plants</a> page: wildflower
-    species and habitat kits. Deactivate to hide an entry from the shop without deleting it.
+    <a href="plants.html" target="_blank" rel="noopener">Native Plants</a> page: which sizes are in
+    season, plus the wildflower species and habitat kits themselves. Deactivate to hide an entry from
+    the shop without deleting it.
     Photo uploads are stored in the gallery bucket. Nothing is charged from this page.</p>
 
   <div class="tabs">
@@ -152,6 +188,14 @@
 
   <!-- Species tab -->
   <div id="speciesPane">
+    <h2 class="section-h">Plant seasons</h2>
+    <p class="section-note">Turn each size on or off for the season. While a size is off, the public
+      Native Plants page stops offering it and shows your out-of-season message instead. A species is
+      only orderable in a size when the season below is Active and that species is marked as grown in
+      that size.</p>
+    <div class="card" id="sizesCard"><div class="empty">Loading…</div></div>
+
+    <h2 class="section-h spaced">Species</h2>
     <div class="toolbar">
       <button class="btn btn-primary" onclick="openSpeciesModal(null)">+ Add species</button>
     </div>
@@ -192,10 +236,20 @@
         <input type="text" id="sp_tags" placeholder="spring, summer, bird">
         <div class="field-note">Comma-separated. Allowed: spring, summer, fall, shade, medicinal, edible, bird.</div>
       </div>
-      <div class="form-group"><label>Stock (blank = untracked)</label>
-        <input type="number" id="sp_stock" min="0" step="1" placeholder="Leave blank for untracked">
-        <div class="field-note">Blank means always available (untracked). A number tracks the count; 0 shows "Sold out this season" on the public page. Paid orders draw it down automatically.</div>
+      <div class="form-group"><label>Sizes grown</label>
+        <div class="check-list">
+          <label><input type="checkbox" id="sp_offers_plug"> Grown as spring plugs</label>
+          <label><input type="checkbox" id="sp_offers_gallon"> Grown as gallon pots</label>
+        </div>
+        <div class="field-note">Both the season switch above and this box must be on for a size to be orderable.</div>
       </div>
+      <div class="form-row">
+        <div class="form-group"><label>Plug stock</label>
+          <input type="number" id="sp_stock_plug" min="0" step="1" placeholder="Leave blank for untracked"></div>
+        <div class="form-group"><label>Gallon stock</label>
+          <input type="number" id="sp_stock_gallon" min="0" step="1" placeholder="Leave blank for untracked"></div>
+      </div>
+      <div class="field-note row-note">Each size counts down on its own. Blank means always available (untracked). A number tracks that size's count; 0 shows "Sold out" on the public page. Paid orders draw it down automatically.</div>
       <div class="form-group"><label>Photo</label>
         <input type="file" id="sp_photo" accept="image/*" onchange="onSpeciesPhotoChosen(this)">
         <div class="photo-preview" id="sp_photo_preview" style="display:none">
@@ -207,6 +261,31 @@
       <div class="modal-actions">
         <button type="button" class="btn-cancel" onclick="closeSpeciesModal()">Cancel</button>
         <button type="submit" class="btn btn-primary" id="speciesSaveBtn">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Season off / edit-message modal (mirrors the one in manage-services.html) -->
+<div class="modal-overlay" id="sizeOffModal">
+  <div class="modal">
+    <h2 class="tight" id="sizeOffTitle">Turn off size</h2>
+    <p class="modal-sub" id="sizeOffSub"></p>
+    <form id="sizeOffForm" novalidate>
+      <div class="form-group">
+        <label>Out-of-season message</label>
+        <textarea id="sz_off_message" placeholder="Spring plugs are done for this season."></textarea>
+        <div class="field-note">Shown on the public Native Plants page. Leave blank to use the default message.</div>
+      </div>
+      <div class="form-group">
+        <label>Reopen date (optional)</label>
+        <input type="date" id="sz_reopen_date">
+        <div class="field-note">If set, the note on the page adds when this size comes back.</div>
+      </div>
+      <div class="modal-error" id="sizeOffError"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" onclick="closeSizeOff()">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="sizeOffSaveBtn">Save</button>
       </div>
     </form>
   </div>
@@ -252,6 +331,8 @@ const TAG_ALLOW = ['spring', 'summer', 'fall', 'shade', 'medicinal', 'edible', '
 
 let species = [];
 let kits = [];
+let sizes = [];           // plant_size_settings rows, keyed by sizeKey ('plug' / 'gallon')
+let offSizeKey = null;    // size currently being edited in the off-message modal
 let currentTab = 'species';
 
 // Photo picker state (shared modal for add + edit; null id = add).
@@ -293,12 +374,108 @@ function parseTags(raw) {
 }
 
 // Stock input: blank -> null (untracked); otherwise a non-negative integer count.
-function parseStock(raw) {
+// `label` names the field in the error, since the species editor now has two of them.
+function parseStock(raw, label) {
   const s = String(raw == null ? '' : raw).trim();
   if (s === '') return { value: null };
-  if (!/^\d+$/.test(s)) return { error: 'Stock must be a whole number 0 or more, or blank for untracked.' };
+  if (!/^\d+$/.test(s)) {
+    return { error: (label || 'Stock') + ' must be a whole number 0 or more, or blank for untracked.' };
+  }
   return { value: parseInt(s, 10) };
 }
+
+// yyyy-mm-dd (or an ISO timestamp) -> "Aug 1, 2026". Same helper manage-services.html uses.
+function fmtDateOnly(s) {
+  if (!s) return '';
+  const p = String(s).split('T')[0].split('-');
+  if (p.length < 3) return esc(s);
+  const MO = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const m = Number(p[1]) - 1, d = Number(p[2]);
+  if (!(m >= 0 && m < 12) || !d) return esc(s);
+  return MO[m] + ' ' + d + ', ' + p[0];
+}
+
+// ── Plant seasons ────────────────────────────────────────────────────────────
+// One row per size, switched independently. Same table shape, pill classes and
+// off-message modal as manage-services.html, so the two pages read as one system.
+function renderSizes() {
+  const el = document.getElementById('sizesCard');
+  if (!sizes.length) { el.innerHTML = '<div class="empty">No plant sizes found.</div>'; return; }
+  el.innerHTML = `
+    <table>
+      <thead><tr><th>Size</th><th>Status</th><th>Off message</th><th>Reopen</th><th>Actions</th></tr></thead>
+      <tbody>
+        ${sizes.map(s => `
+          <tr>
+            <td><span class="size-name">${esc(s.label)}</span><div class="row-sub2">${esc(s.blurb || '')}</div></td>
+            <td><span class="status-pill ${s.active ? 'status-on' : 'status-off'}">${s.active ? 'Active' : 'Off'}</span></td>
+            <td class="msg-preview">${s.active ? '<span class="muted">n/a</span>' : (s.offMessage ? esc(s.offMessage) : '<span class="muted">Default message</span>')}</td>
+            <td>${(!s.active && s.reopenDate) ? fmtDateOnly(s.reopenDate) : '<span class="muted">n/a</span>'}</td>
+            <td>
+              <div class="row-actions">
+                ${s.active
+                  ? `<button class="btn-sm" onclick="openSizeOff('${esc(s.sizeKey)}')">Turn off</button>`
+                  : `<button class="btn-sm" onclick="turnSizeOn('${esc(s.sizeKey)}')">Turn on</button>
+                     <button class="btn-sm" onclick="openSizeOff('${esc(s.sizeKey)}')">Edit message</button>`}
+              </div>
+            </td>
+          </tr>`).join('')}
+      </tbody>
+    </table>`;
+}
+
+function sizeByKey(key) { return sizes.find(s => s.sizeKey === key); }
+
+async function turnSizeOn(key) {
+  const errEl = document.getElementById('pageError');
+  errEl.textContent = '';
+  try {
+    await DataStore.updatePlantSizeSetting(key, { active: true, offMessage: null, reopenDate: null });
+    await loadSizes();
+  } catch (err) {
+    errEl.textContent = 'Could not turn the size on. ' + err.message;
+  }
+}
+
+function openSizeOff(key) {
+  offSizeKey = key;
+  const s = sizeByKey(key);
+  document.getElementById('sizeOffError').textContent = '';
+  document.getElementById('sizeOffTitle').textContent = (s && s.active) ? 'Turn off size' : 'Edit off message';
+  document.getElementById('sizeOffSub').textContent = s ? s.label : '';
+  document.getElementById('sz_off_message').value = (s && s.offMessage) ? s.offMessage : '';
+  document.getElementById('sz_reopen_date').value = (s && s.reopenDate) ? String(s.reopenDate).split('T')[0] : '';
+  document.getElementById('sizeOffSaveBtn').textContent = (s && s.active) ? 'Turn off' : 'Save message';
+  document.getElementById('sizeOffModal').classList.add('open');
+  document.getElementById('sz_off_message').focus();
+}
+function closeSizeOff() {
+  document.getElementById('sizeOffModal').classList.remove('open');
+  offSizeKey = null;
+}
+document.getElementById('sizeOffModal').addEventListener('click', function (e) {
+  if (e.target === this) closeSizeOff();
+});
+
+document.getElementById('sizeOffForm').addEventListener('submit', async function (e) {
+  e.preventDefault();
+  if (!offSizeKey) return;
+  const errEl = document.getElementById('sizeOffError');
+  errEl.textContent = '';
+  const msg = document.getElementById('sz_off_message').value.trim();
+  const reopen = document.getElementById('sz_reopen_date').value;  // yyyy-mm-dd or ''
+  try {
+    await DataStore.updatePlantSizeSetting(offSizeKey, {
+      active: false,
+      offMessage: msg || null,
+      reopenDate: reopen || null,
+    });
+    closeSizeOff();
+    await loadSizes();
+  } catch (err) {
+    errEl.textContent = 'Could not save. ' + err.message;
+  }
+});
 
 // ── Tabs ─────────────────────────────────────────────────────────────────────
 function switchTab(tab) {
@@ -426,7 +603,11 @@ function openSpeciesModal(id) {
   document.getElementById('sp_attracts').value = p ? (p.attracts || '') : '';
   document.getElementById('sp_fact').value = p ? (p.fact || '') : '';
   document.getElementById('sp_tags').value = p && p.tags ? p.tags.join(', ') : '';
-  document.getElementById('sp_stock').value = (p && p.stockQty != null) ? p.stockQty : '';
+  // Both sizes default on for a new species, matching the column defaults.
+  document.getElementById('sp_offers_plug').checked = p ? p.offersPlug !== false : true;
+  document.getElementById('sp_offers_gallon').checked = p ? p.offersGallon !== false : true;
+  document.getElementById('sp_stock_plug').value = (p && p.stockPlug != null) ? p.stockPlug : '';
+  document.getElementById('sp_stock_gallon').value = (p && p.stockGallon != null) ? p.stockGallon : '';
   document.getElementById('sp_photo').value = '';
   renderSpeciesPhoto(spPhotoCurrentPath ? catalogPhotoSrc(spPhotoCurrentPath) : '');
   document.getElementById('speciesModal').classList.add('open');
@@ -448,8 +629,10 @@ document.getElementById('speciesForm').addEventListener('submit', async function
     errEl.textContent = 'Unknown tag(s): ' + bad.join(', ') + '. Allowed: ' + TAG_ALLOW.join(', ') + '.';
     return;
   }
-  const spStock = parseStock(document.getElementById('sp_stock').value);
-  if (spStock.error) { errEl.textContent = spStock.error; return; }
+  const spPlugStock = parseStock(document.getElementById('sp_stock_plug').value, 'Plug stock');
+  if (spPlugStock.error) { errEl.textContent = spPlugStock.error; return; }
+  const spGallonStock = parseStock(document.getElementById('sp_stock_gallon').value, 'Gallon stock');
+  if (spGallonStock.error) { errEl.textContent = spGallonStock.error; return; }
   const changes = {
     common,
     botanical: document.getElementById('sp_botanical').value.trim() || null,
@@ -458,7 +641,10 @@ document.getElementById('speciesForm').addEventListener('submit', async function
     attracts: document.getElementById('sp_attracts').value.trim() || null,
     fact: document.getElementById('sp_fact').value.trim() || null,
     tags,
-    stockQty: spStock.value,
+    offersPlug: document.getElementById('sp_offers_plug').checked,
+    offersGallon: document.getElementById('sp_offers_gallon').checked,
+    stockPlug: spPlugStock.value,
+    stockGallon: spGallonStock.value,
   };
   // Resolve photo change: new upload replaces; "remove" clears; else keep.
   let newPath = null;
@@ -698,18 +884,22 @@ document.addEventListener('keydown', function (e) {
   if (e.key !== 'Escape') return;
   closeSpeciesModal();
   closeKitModal();
+  closeSizeOff();
 });
 
 // ── Load / render ────────────────────────────────────────────────────────────
 async function loadSpecies() { species = await DataStore.getPlantSpecies(); renderSpecies(); }
 async function loadKits() { kits = await DataStore.getPlantKits(); renderKits(); }
+async function loadSizes() { sizes = await DataStore.getPlantSizeSettings(); renderSizes(); }
 
 (async function init() {
   try {
     await AuthManager.requireAuth();
     Nav.render();
-    await Promise.all([loadSpecies(), loadKits()]);
+    await Promise.all([loadSizes(), loadSpecies(), loadKits()]);
   } catch (err) {
+    document.getElementById('sizesCard').innerHTML =
+      '<div class="empty">Could not load the plant seasons (' + esc(err.message) + ').</div>';
     document.getElementById('speciesList').innerHTML =
       '<div class="empty">Could not load the catalog (' + esc(err.message) +
       '). <a href="javascript:location.reload()">Retry</a></div>';
