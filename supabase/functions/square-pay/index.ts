@@ -27,10 +27,14 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 // public paths are anon; staff_mark_paid validates its own JWT; the webhook path is
 // authed by its own signature), pinned in supabase/config.toml.
 //
-// Pricing authority (single source): PLANT_PRICE_CENTS, KIT_TIERS, and CARD_UPLIFT live
+// Pricing authority (single source): PLANT_SIZES, KIT_TIERS, and CARD_UPLIFT live
 // HERE. The plants page shows matching display prices, but only these server constants
 // are charged.
-const PLANT_PRICE_CENTS = 500;
+// Two sizes, priced here and nowhere else. plants.html mirrors these for display.
+const PLANT_SIZES: Record<string, number> = {
+  plug: 500,
+  gallon: 800,
+};
 const KIT_TIERS: Record<string, number> = {
   '50': 7200,
   '100': 14400,
@@ -189,7 +193,9 @@ async function decrementOrderStock(sb: ReturnType<typeof admin>, items: any): Pr
     try {
       // Species stock is per size since 0028, so the size has to reach the RPC or
       // neither species branch matches and the counter silently never moves. Lines
-      // written before sizes existed carry none; those were plugs.
+      // written before sizes existed carry none; those were plugs, which is the same
+      // default create_order applies to a sizeless payload. Real unpaid orders from
+      // before 0028 are still sitting in the table, so this default is not theoretical.
       const size = it?.size ?? (kind === 'species' ? 'plug' : null);
       await sb.rpc('decrement_stock', { p_kind: kind, p_id: id, p_qty: qty, p_size: size });
     } catch (_e) { /* one line failing must not sink the rest */ }
@@ -307,18 +313,25 @@ async function handleCreateOrder(body: any): Promise<Response> {
   if (rawItems.length > 40) return json({ error: 'too_many_lines' }, 400);
 
   const sb = admin();
-  const lines: Array<{ kind: string; id: string; name: string; qty: number; unit_cents: number; tier?: string }> = [];
+  const lines: Array<{ kind: string; id: string; name: string; qty: number; unit_cents: number; tier?: string; size?: string }> = [];
   let subtotal = 0;
 
-  // Merge duplicate lines (same kind:id:tier) so per-line stock checks see the
-  // aggregate quantity; a crafted payload cannot split its way past a stock cap.
+  // Merge duplicate lines (same kind:id:tier:size) so per-line stock checks see the
+  // aggregate quantity; a crafted payload cannot split its way past a stock cap. Size
+  // belongs in the key: without it two sizes of one species would collapse into a
+  // single line and be charged at whichever price the first one happened to be.
   const merged = new Map<string, any>();
   for (const raw of rawItems) {
-    const key = String(raw?.kind) + ':' + String(raw?.id) + ':' + String(raw?.tier ?? '');
+    const key = [raw?.kind, raw?.id, raw?.tier ?? '', raw?.size ?? ''].join(':');
     const prev = merged.get(key);
     if (prev) prev.qty = Number(prev.qty) + Number(raw?.qty);
     else merged.set(key, { ...raw });
   }
+
+  // Which sizes are open right now. Read once: an order is priced against a single
+  // snapshot, so a season closing mid-loop cannot half-accept a cart.
+  const { data: sizeRows } = await sb.from('plant_size_settings').select('size_key, active');
+  const openSizes = new Set((sizeRows || []).filter((r) => r.active).map((r) => r.size_key));
 
   for (const raw of merged.values()) {
     const kind = raw?.kind;
@@ -328,19 +341,30 @@ async function handleCreateOrder(body: any): Promise<Response> {
     if (!(qty >= 1 && qty <= 20)) return json({ error: 'bad_quantity' }, 400);
 
     if (kind === 'species') {
-      // Migration 0028 replaced stock_qty with per-size counters. A payload with no
-      // size comes from a page built before sizes existed, so it means the plug, which
-      // is the size that was on sale then. Task 2 adds the full per-size gating; this
-      // keeps checkout working for an already-deployed page in the meantime.
-      const size = raw?.size === 'gallon' ? 'gallon' : 'plug';
+      // A payload with NO size comes from a page built before sizes existed, and that
+      // page sold plugs, so that is what it means. This default is load-bearing until
+      // Task 4 deploys: the live plants.html does not send a size, and rejecting it
+      // here would break plant checkout on a site that is taking real orders. Only an
+      // explicitly unknown size is an error.
+      const size = raw?.size == null ? 'plug' : String(raw.size);
+      if (!Object.prototype.hasOwnProperty.call(PLANT_SIZES, size)) {
+        return json({ error: 'bad_size' }, 400);
+      }
       const { data: row } = await sb.from('plant_species')
-        .select('id, common, active, stock_plug, stock_gallon').eq('id', id).maybeSingle();
+        .select('id, common, active, offers_plug, offers_gallon, stock_plug, stock_gallon')
+        .eq('id', id).maybeSingle();
       if (!row || row.active === false) return json({ error: 'item_unavailable' }, 400);
+      // Both layers must agree. The page hides closed sizes, but a stale tab or a
+      // crafted payload must not be able to buy one.
+      const offered = size === 'plug' ? row.offers_plug !== false : row.offers_gallon !== false;
+      if (!openSizes.has(size) || !offered) {
+        return json({ error: 'size_closed', item: row.common }, 409);
+      }
       const stock = size === 'plug' ? row.stock_plug : row.stock_gallon;
       if (stock != null && stock < qty) {
         return json({ error: 'insufficient_stock', item: row.common }, 409);
       }
-      const unit = PLANT_PRICE_CENTS;
+      const unit = PLANT_SIZES[size];
       subtotal += unit * qty;
       lines.push({ kind, id, name: row.common, qty, unit_cents: unit, size });
     } else if (kind === 'kit') {
