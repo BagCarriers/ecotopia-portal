@@ -12,7 +12,7 @@ it is committed so it survives across machines and sessions.
 
 ## Migrations
 
-Migrations `0001`-`0027` (every migration in `supabase/migrations/`) were applied to the
+Migrations `0001`-`0030` (every migration in `supabase/migrations/`) were applied to the
 live database directly via the Supabase Management API
 (`POST https://api.supabase.com/v1/projects/wibnryfinfwbwwgsyojr/database/query`),
 NOT via `supabase db push`. Because of that the CLI does not know any of them ran: the
@@ -24,11 +24,11 @@ Before ever running `supabase db push` against this project, first register the
 already-applied migrations so the CLI does not try to re-run them:
 
 ```
-for n in $(seq -w 1 27); do supabase migration repair --status applied 00$n; done
+for n in $(seq -w 1 30); do supabase migration repair --status applied 00$n; done
 ```
 
 (equivalently, one `supabase migration repair --status applied <NNNN>` per file, `0001`
-through `0027`). Keep this range current: every new migration in this project is applied
+through `0030`). Keep this range current: every new migration in this project is applied
 by hand through the Management API, so every new migration extends it.
 
 To apply a new migration by hand via the Management API, get the token with
@@ -648,10 +648,11 @@ Photo convention (identical to garden photos, but rooted at `assets/img/plants/`
 
 Public page (`plants.html`): reads active rows over anon (ordered `sort` then name),
 rendering the same filter chips, per-plant order tray, and 4-tier kit modals as before.
-Both the tray and the kit modal print two prices, "$5.20 card · $5.00 cash or check" and
-the kit equivalent, never a single figure: see "Cash-discount pricing". `PLANT_PRICE` (5,
-the BASE dollar price) and the kit pricing table (`KIT_TIERS`, also base) stay hardcoded
-(universal); the card price is always derived from them. The card
+Every price on the page is printed as a pair, "$5.20 card · $5.00 cash or check" and the
+kit equivalent, never a single figure: see "Cash-discount pricing". Plant prices are per
+size and live in `PLANT_SIZES` (see "Plant sizes and seasons"); the kit pricing table
+(`KIT_TIERS`, base dollars) stays hardcoded and universal. The card price is always
+derived from the base. The card
 game section is unchanged. The request tray now references species by row id (not array
 index) so a reorder in the portal cannot corrupt a pending request. Each section fails
 soft independently: a failed species fetch shows "The plant list is updating. Check back
@@ -669,6 +670,195 @@ first, then the row. New rows get `sort = max(existing) + 10`. Data helpers live
 `assets/data.js`: `getPlantSpecies` / `getPlantKits` (staff reads, inactive included),
 `addPlantSpecies` / `updatePlantSpecies` / `deletePlantSpecies` (and the kit equivalents),
 plus `plantPhotoUrl` for gallery-bucket paths.
+
+## Plant sizes and seasons (2026-08-01)
+
+Migrations `0028_plant_sizes.sql`, `0029_plant_size_settings_rls.sql` and
+`0030_plant_size_settings_touch.sql`. Applied live via the Management API, so register
+each one (`supabase migration repair --status applied 0028`, and the same for `0029` and
+`0030`) before any `supabase db push`.
+
+Every wildflower species is sold in up to two sizes, each independently switchable by
+season:
+
+| size key | label and blurb | base price | card price |
+| -------- | --------------- | ---------- | ---------- |
+| `plug`   | Spring plug, "3 by 5 inch container" | $5.00 | $5.20 |
+| `gallon` | Gallon pot, "More mature, ready from mid summer" | $8.00 | $8.32 |
+
+The base price is what cash or check pays; the card price is derived from it by the shared
+uplift. Both figures are always shown together and **a discount percentage is never stated
+to a customer anywhere in this project**, on any surface, for any product. See
+"Cash-discount pricing" for why a single percentage would be wrong about one of the two
+figures.
+
+### Where a plant price lives
+
+`PLANT_SIZES` in `supabase/functions/square-pay/index.ts` maps a size key to integer
+CENTS (`plug: 500`, `gallon: 800`). That is the only figure ever charged. `plants.html`
+holds a display mirror keyed exactly the same way but carrying DOLLARS plus the label and
+blurb copy the card renders, the same deliberate shape difference `KIT_TIERS` already has
+between the two files.
+
+**Never put a plant price in the database.** Migration `0028` says so in its own header,
+and the reason is the drift guard: it can only compare two constants it can scrape out of
+two files. A price in a table would be invisible to it.
+
+`tests/pricing.test.js` reads both files and asserts they agree:
+
+- "the edge function prices both sizes and nowhere else does" scrapes `PLANT_SIZES` out of
+  the edge function, requires `plug: 500` and `gallon: 800`, and fails if the retired
+  `PLANT_PRICE_CENTS` reappears.
+- "plants.html states each size price and it matches the constant" evaluates the page's own
+  object literal and requires base 5 and 8, card 5.20 and 8.32.
+
+Change one file, change the other, or the suite fails. The older test that scraped a
+single `PLANT_PRICE` out of a sentence of marketing copy is gone: no static sentence can
+state a plant price that stays true now, so no price appears in the page's prose at all.
+Every figure the page prints is rendered from `PLANT_SIZES`.
+
+### Orderable means both are true
+
+A size is orderable only when `plant_size_settings.active` **AND**
+`plant_species.offers_<size>` are both true. **A species narrows, never widens**: with the
+gallon season closed, ticking "Grown as gallon pots" on a species changes nothing a
+customer can see or buy.
+
+The rule is applied in three places, and the server one is the one that counts:
+
+- `plants.html` renders a size row only when the season is open and the species offers it.
+- `addToTray` re-applies the same test (plus known-species, known-size and sold-out
+  guards) before it will put anything in the tray, so a re-rendered or hand-poked button
+  cannot add a size the card was not entitled to show.
+- `square-pay` re-checks both facts server-side against a fresh read of
+  `plant_size_settings` and answers `409 {error:'size_closed', item}`. **This is the only
+  check that catches a season that closed after the page loaded**, because the page's own
+  two checks share one in-memory snapshot taken at load. A stale tab or a hand-written
+  payload cannot buy a closed size.
+
+`offers_plug` and `offers_gallon` are `not null default true`, and every reader treats a
+missing flag as yes (`!== false`), so all 50 existing species offer both sizes today
+(confirmed live 2026-08-01: 50 of 50 on each flag).
+
+### Seasons are a plain switch with no scheduled end
+
+`public.plant_size_settings`, one row per size, primary key `size_key` (CHECK constrained
+to `plug` / `gallon`), mirroring the `service_settings` shape: `label`, `blurb`, `active`,
+`off_message`, `reopen_date`, `sort`, `updated_at`.
+
+- **`active` is a switch, not a schedule.** Nothing closes a season on a date. Jordan
+  closes a size when he runs out of it, by hand, in the portal.
+- **`reopen_date` is courtesy copy, not a trigger.** When every size is closed the public
+  card prints the off message plus "We reopen <date>." if one is set. Nothing reads that
+  date, and it never reopens anything; turning the size back on is a manual click.
+- Seed state (still live as of 2026-08-01): `plug` active, `gallon` inactive. The
+  migration therefore changed nothing a customer could see. The gallon size becomes
+  visible the moment Jordan turns that season on.
+- **`label` and `blurb` exist in two places and only one of them is public.** The public
+  card renders the label and blurb out of `PLANT_SIZES` in `plants.html`, next to the
+  price; the row's `label` / `blurb` columns are what the portal's seasons table shows.
+  Editing those columns changes the staff view only. `off_message` and `reopen_date` are
+  the only columns the public page reads text out of.
+
+Closed-season copy on the public card: if some size is still open, a species that offers
+none of the open ones says "Not available in the sizes we have right now." If every season
+is closed, each closed size gets its say. One message (or the same message twice) prints
+once with no label; two different messages each print prefixed with the size label, so a
+gallon-specific note is never swallowed by the plug's; and if staff left every message
+blank it falls back to "Plant sales are closed for the season." The messages and dates are
+staff-entered strings, so both are escaped at render.
+
+RLS on `plant_size_settings`:
+
+| policy | who | what |
+| ------ | --- | ---- |
+| `pss_anon_read`  | anon | SELECT, `using (true)` |
+| `pss_staff_read` | authenticated | SELECT, `using (true)` |
+| `pss_staff_write`| authenticated | ALL, `using (is_portal_user()) with check (is_portal_user())` |
+
+**Migration `0029` tightened the write policy.** `0028` shipped it as `using (true)`,
+which is wider than every sibling settings table: any authenticated account, including a
+deactivated one, could open or close a plant season and write the off message a customer
+reads. `is_portal_user()` is the gate `service_settings` already uses. Anon read is
+deliberately preserved so a logged-out visitor still sees the closed-season note.
+
+**Migration `0030`** attached the shared `set_updated_at` trigger, which `0028` declared a
+column for but never wired up, so `updated_at` was advertising an audit trail it did not
+keep.
+
+### Who switches what, and where
+
+`manage-plants.html`, Species tab:
+
+- A **Plant seasons** card sits above the species list: one row per size with a status
+  pill, the off message, the reopen date, and Turn off / Turn on / Edit message. Turning a
+  size ON clears `off_message` and `reopen_date` in the same write. Turning it off opens
+  the message-plus-optional-reopen-date modal, the same shape `manage-services.html` uses.
+- The species modal gained "Sizes grown" checkboxes (`offers_plug` / `offers_gallon`) and
+  separate "Plug stock" / "Gallon stock" inputs.
+
+Data helpers in `assets/data.js`: `getPlantSizeSettings()` (ordered by `sort`) and
+`updatePlantSizeSetting(sizeKey, changes)`, keyed on `size_key`, not `id`.
+
+### Per-size stock
+
+`0028` **dropped `plant_species.stock_qty`** and replaced it with `stock_plug` and
+`stock_gallon` (both nullable integer, same semantics as before: null = untracked, an
+integer = a tracked count, 0 = sold out). One counter could not express plugs selling out
+while gallons remained. The drop was safe because `stock_qty` was null on all 50 species
+rows, checked immediately before the migration ran and recorded in its header comment.
+Both new columns are still null on all 50 rows today, meaning every species is untracked.
+**`plant_kits.stock_qty` and `merch_items.stock_qty` still exist and are unchanged.**
+
+`decrement_stock` gained a fourth argument. Its live signature is now
+`decrement_stock(p_kind text, p_id uuid, p_qty integer, p_size text default null)`; the
+old three-argument version was dropped, and execute on the new one is again revoked from
+`public`/`anon`/`authenticated` and granted to `service_role`. Species lines pass
+`plug` or `gallon`. Kit and merch lines pass null, and their branches ignore `p_size`
+entirely.
+
+**A NULL `p_size` on a species line silently decrements nothing.** Both species branches
+match on `p_size = 'plug'` / `p_size = 'gallon'`, and NULL matches neither, so the call
+succeeds and no counter moves. That is exactly why the caller (`decrementOrderStock`)
+defaults a sizeless species line to `plug` rather than passing the size straight through.
+Order rows written before `0028` carry no `size` on their line items, and one of them was
+still unpaid when this was checked live on 2026-08-01, so the default has a real row to
+serve.
+
+### The sizeless-means-plug default is load-bearing
+
+`create_order` reads a species line with **no `size` at all** as a `plug`. A page built
+before sizes existed sold plugs, so that is what such a payload means, and this is what
+kept plant checkout working on a live site through the window between the migration and
+the page deploy. Only an **explicitly unknown** size is an error.
+
+| species line payload | result |
+| -------------------- | ------ |
+| no `size` key at all | priced and stocked as `plug` |
+| `size: 'plug'` or `size: 'gallon'` | that size |
+| any other `size` value | `400 {error:'bad_size'}` |
+| a known size whose season is closed, or which the species does not offer | `409 {error:'size_closed', item}` |
+| a known, open size with `stock_<size> < qty` | `409 {error:'insufficient_stock', item}` |
+
+The cart merge key applies the same default. Without it the two spellings of a plug
+(absent, and explicit `'plug'`) would hash to different keys, and each half would clear
+the per-line stock check on its own, which is precisely the split the merge exists to
+prevent.
+
+### Failure modes worth knowing
+
+- **A failed season read is its own answer, never a closed season.** `create_order`
+  returns `500 {error:'server_error'}` if the `plant_size_settings` read errors, rather
+  than continuing with an empty open-size set, which would tell every plant customer
+  "sold out" while kits and merch kept selling. `plants.html` puts its season read inside
+  the same try block as the species fetch for the same reason: a failure renders "The
+  plant list is updating. Check back soon." instead of a false closed-season notice the
+  customer could not tell from the truth.
+- **Seasons are read once per order**, before the line loop, so a season closing mid-cart
+  cannot half-accept it.
+- The public tray is keyed `<species id>:<size>`, not by species id, and the server's
+  merge key carries the size too. A key that ignored the size would collapse a plug and a
+  gallon of the same plant into one line priced at whichever size arrived first.
 
 ## Public questions ("Ask us anything")
 
@@ -802,12 +992,17 @@ Schema changes:
 - `plant_species.stock_qty`, `plant_kits.stock_qty`, `merch_items.stock_qty` (all nullable
   integer). **Stock semantics: `null` = untracked (always available); an integer = a tracked
   count; `0` = sold out** (the public page shows a "Sold out" chip and disables the button).
+  **Superseded for species by migration `0028`**, which dropped `plant_species.stock_qty`
+  in favour of `stock_plug` / `stock_gallon` with the same semantics per size (see "Plant
+  sizes and seasons"). The kit and merch columns are untouched.
 - `merch_items.price_cents` (nullable integer): the **payable** price. `price_text` stays
   display-only. A merch item with `price_cents = null` is **request-only** (it uses the old
   ask/pre-order form and cannot be ordered online); setting `price_cents` makes it orderable.
 - `public.orders` (Supabase-owned). Columns: `order_token` (unique, 64 hex; the public
   status/pay page key), `customer_name`, `phone`, `email`, `items` (jsonb array of
-  `{kind:'species'|'kit'|'merch', id, name, qty, unit_cents, tier?}`), `subtotal_cents`,
+  `{kind:'species'|'kit'|'merch', id, name, qty, unit_cents, tier?, size?}`; `size` is
+  written on species lines since `0028`, and lines older than that carry none),
+  `subtotal_cents`,
   `status`, `pay_mode` (`pickup`/`online`), `square_order_id`, `square_pay_url`, `note`,
   plus `charge_cents`, `tender` and `amount_collected_cents` from migration `0027` (see
   "Cash-discount pricing"). **No anon RLS policy** at all: a single `o_staff_all` policy
@@ -816,30 +1011,39 @@ Schema changes:
 - `decrement_stock(p_kind, p_id, p_qty)` (security definer): draws down a tracked row's
   stock, floored at 0, leaving untracked (`null`) rows alone. **Execute is revoked from
   `public`/`anon`/`authenticated` and granted only to `service_role`** - it is called ONLY
-  by the `square-pay` edge function.
+  by the `square-pay` edge function. **Migration `0028` replaced it** with
+  `decrement_stock(p_kind, p_id, p_qty, p_size default null)`; the three-argument version
+  no longer exists. Species callers must pass a size or nothing is decremented (see "Plant
+  sizes and seasons"); kits and merch pass null and behave exactly as before.
 
 **Order lifecycle:** `new` -> `link_created` (online, a Square link was minted) -> `paid`
 -> `ready` -> `completed`, or `cancelled`. Stock is drawn down exactly once, on the first
 transition into `paid` (idempotent: re-marking paid never double-decrements).
 
-**Pricing authority (single source):** `PLANT_PRICE_CENTS` (500) and `KIT_TIERS`
-(`50`->7200, `100`->14400, `150`->20000, `200`->25000 cents) live in the `square-pay`
-edge function. Client-sent prices are always ignored; the server re-prices every line from
+**Pricing authority (single source):** `PLANT_SIZES` (`plug`->500, `gallon`->800 cents)
+and `KIT_TIERS` (`50`->7200, `100`->14400, `150`->20000, `200`->25000 cents) live in the
+`square-pay` edge function. `PLANT_SIZES` replaced the old single `PLANT_PRICE_CENTS` in
+migration `0028`'s companion change, and a test fails if that name comes back. Client-sent
+prices are always ignored; the server re-prices every line from
 the live catalog. `merch` lines are priced from `price_cents` (request-only items rejected).
 
 The `square-pay` edge function gained three public/staff actions plus a webhook branch (one
 endpoint, told apart by the `x-square-hmacsha256-signature` header then `body.action`):
 
 - **`create_order`** (PUBLIC, anon) - `{action, customer:{name, phone?, email?}, items:
-  [{kind,id,qty,tier?}], pay_mode, note?}`. Validates server-side: name required; 1-40
+  [{kind,id,qty,tier?,size?}], pay_mode, note?}`. Validates server-side: name required; 1-40
   lines; qty 1-20 (kits forced 1-5, tier required and in `KIT_TIERS`); each row loaded from
   the live catalog and must be `active`; merch must have `price_cents` (else `400
-  not_payable`). Any tracked item with `stock_qty < qty` -> `409 {error:'insufficient_stock',
+  not_payable`). A species line also carries a size, defaulting to `plug` when absent, and
+  must clear the season and species-flag check (`400 bad_size` / `409 size_closed`, see
+  "Plant sizes and seasons"). Any tracked item short of the quantity asked
+  (`stock_plug` / `stock_gallon` for a species, `stock_qty` for a kit or merch item) ->
+  `409 {error:'insufficient_stock',
   item}`. Recomputes `subtotal_cents` server-side and inserts the order (`order_token` = 64
   hex) with `charge_cents` = `subtotal_cents` for `pickup` and **`cardCents(subtotal_cents)`
   for `online`**. `pay_mode:'online'` + Square configured mints a `quick_pay` Payment Link
   (`Order <first 8 of id> - Ecotopian EarthCare`, **amount `charge_cents`, NOT
-  `subtotal_cents`** (`index.ts:407`) so Square is asked for the card price, idempotency
+  `subtotal_cents`** (`index.ts:450`) so Square is asked for the card price, idempotency
   `<id>:order`), saves `square_order_id`/`square_pay_url`, sets status `link_created`,
   returns `{token, pay_url}`. `online` but Square dark (or unreachable) ->
   `{token, configured:false}` (order stays `new`, treated as pickup, and **it keeps the
@@ -872,7 +1076,10 @@ Where things live:
 - Public `plants.html`: the plant tray and the kit modal now create orders (replacing the
   old `intake_submissions` + `jobs` writes). Each carries a pay-mode choice ("Reserve and pay
   at pickup" [default] / "Pay online now"); online falls back to a saved-for-pickup note when
-  Square is dark. Sold-out species/kits (`stock_qty === 0`) show a chip and a disabled button.
+  Square is dark. Since `0028` a species card carries one block per open size, each with its
+  own price pair and its own Add button; a sold-out size (`stock_plug` / `stock_gallon` at 0)
+  shows a chip and disables that size's button only, and a sold-out kit (`stock_qty === 0`)
+  does the same for the kit.
 - Public `shop.html`: payable merch (`price_cents` set) uses an "Order this" modal that
   creates an order; request-only merch keeps the ask/pre-order form; sold-out items are
   disabled. Branch flag: `isPayable = priceCents != null`.
@@ -888,8 +1095,9 @@ Where things live:
   with a recorded `amount_collected_cents` shows "Collected: $X <tender>" in place of the
   total; every other row shows the base total.
   `dashboard.html` "Needs attention" surfaces "N new order(s)" (`new`/`link_created`).
-- Staff editors: `manage-plants.html` species + kit modals gain a "Stock (blank = untracked)"
-  input; `manage-shop.html` gains "Stock" and "Price (USD, for online payment)" (stored as
+- Staff editors: the `manage-plants.html` kit modal gains a "Stock (blank = untracked)"
+  input, and its species modal gains "Plug stock" and "Gallon stock" (one per size, since
+  `0028`); `manage-shop.html` gains "Stock" and "Price (USD, for online payment)" (stored as
   `price_cents`, blank = request-only). **`price_cents` is the storefront price for a
   payable item; the free-text `price_text` is a display label only** and appears just on
   request-only cards and on cards with an external buy link, so editing it does not change
@@ -1089,9 +1297,12 @@ price (the true round trip off the grossed price is 3.846 percent), so any singl
 percentage would be wrong about one of the two figures. Every surface therefore prints the
 pair:
 
-- `plants.html`: "$5.20 card · $5.00 cash or check" on the plant tray, and the same pair
-  in the kit modal directly above the tender choice (it updates with the size dropdown and
-  is `aria-live="polite"`).
+- `plants.html`: the pair on every species card, once per open size ("$5.20 card · $5.00
+  cash or check" for a spring plug, "$8.32 card · $8.00 cash or check" for a gallon pot),
+  the same pair per line and on the total in the plant tray, and the kit equivalent in the
+  kit modal directly above the tender choice (it updates with the size dropdown and is
+  `aria-live="polite"`). No figure appears in the page's prose: prices vary by size and
+  each size opens on its own season, so a written sentence could not stay true.
 - `shop.html`: the pair on payable merch cards and in the order modal. Request-only items
   and items with an external buy link keep their free-text `price_text` label instead.
 - `order.html`: an order still owing money at pickup shows "Due at pickup ... cash or check"
@@ -1140,8 +1351,8 @@ that column has to add up to the total beneath it.
 Orders charge the other way: `charge_cents = cardCents(subtotal_cents)`, one grossing of the
 whole subtotal. For a unit price that is not a whole dollar, `cardCents(unit * qty)` summed
 over the lines can differ from `cardCents(subtotal)` by a cent or two. **Drift is exactly
-zero for every current price** ($5 plants, $72/$144/$200/$250 kits, the $40 card game, all
-whole dollars), so nothing is wrong today.
+zero for every current price** ($5 plugs, $8 gallon pots, $72/$144/$200/$250 kits, the $40
+card game, all whole dollars), so nothing is wrong today.
 
 `order.html` prints a grossed column anyway, and settles the residual **on the last line**
 so the column adds up to the figure beneath it. Two conditions gate that, and both matter:
