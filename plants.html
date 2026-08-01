@@ -455,6 +455,12 @@
     if (res.status === 409 && b.error === 'insufficient_stock') {
       return 'Sorry, ' + (b.item || 'one of these plants') + ' just sold out or is low on stock. Please adjust your request and try again.';
     }
+    // A season closed (or the species stopped being grown in that size) while this tray
+    // was open. Name the plant so they know which line to pull out; the server sends the
+    // common name only, and one plant can sit in the tray in both sizes.
+    if (res.status === 409 && b.error === 'size_closed') {
+      return 'Sorry, ' + (b.item || 'one of these plants') + ' is no longer offered in the size you picked. Please remove that line from your request and try again.';
+    }
     return 'Something went wrong sending your request. Please try again, or email us at admin@ecotopianearthcare.com or call 814-631-5338.';
   }
   // Fold the extra contact fields (no dedicated order columns) into the order note.
@@ -673,13 +679,31 @@
   }
   // Nothing orderable: keep the card (this page is a catalogue too) and explain.
   // off_message and reopen_date are staff-entered DB strings, so both are esc()'d.
+  // Every size has its own message and reopen date, so every closed size gets a say:
+  // reading only the plug's row would silently swallow a gallon-specific note.
   function closedNoteHtml() {
     var open = SIZE_ORDER.filter(function (k) { return openSizes[k]; });
     if (open.length) return '<p class="plant-closed">Not available in the sizes we have right now.</p>';
-    var m = sizeMeta.plug || {};
-    var msg = m.offMessage ? m.offMessage : 'Plant sales are closed for the season.';
-    var when = m.reopenDate ? ' We reopen ' + esc(String(m.reopenDate).split('T')[0]) + '.' : '';
-    return '<p class="plant-closed">' + esc(msg) + when + '</p>';
+    // Every season is closed. Collect what each closed size has to say, skipping the
+    // ones staff left blank.
+    var notes = [];
+    SIZE_ORDER.forEach(function (key) {
+      var m = sizeMeta[key] || {};
+      var msg = m.offMessage ? String(m.offMessage).trim() : '';
+      var when = m.reopenDate ? 'We reopen ' + String(m.reopenDate).split('T')[0] + '.' : '';
+      var text = [msg, when].filter(Boolean).join(' ');
+      if (text) notes.push({ key: key, text: text });
+    });
+    if (!notes.length) return '<p class="plant-closed">Plant sales are closed for the season.</p>';
+    // One thing to say, or the same thing twice: say it once, plainly, with no label.
+    var distinct = [];
+    notes.forEach(function (n) { if (distinct.indexOf(n.text) === -1) distinct.push(n.text); });
+    if (distinct.length === 1) return '<p class="plant-closed">' + esc(distinct[0]) + '</p>';
+    // Two different messages: name the size each one belongs to, or neither reads as
+    // being about anything in particular.
+    return notes.map(function (n) {
+      return '<p class="plant-closed">' + esc(PLANT_SIZES[n.key].label + ': ' + n.text) + '</p>';
+    }).join('');
   }
 
   function renderPlants() {
@@ -739,19 +763,21 @@
     updateTrayCount();
   }
 
+  // Count, lines and total all read trayEntries(), which is what the modal renders and
+  // what submitTray() posts. Walking Object.keys(tray) here instead would quote a total
+  // over a different set of lines than the one on screen, and would throw on an entry
+  // whose size is not in PLANT_SIZES rather than dropping it the way the renderer does.
   function trayCount() {
     var n = 0;
-    Object.keys(tray).forEach(function (k) { n += tray[k].qty; });
+    trayEntries().forEach(function (e) { n += e.qty; });
     return n;
   }
-  function trayLines() { return Object.keys(tray).length; }
+  function trayLines() { return trayEntries().length; }
   // Base dollars for the whole tray. Sizes are mixed, so this sums each line at its own
   // price; multiplying one price by the plant count would misprice any mixed tray.
   function trayTotal() {
     var t = 0;
-    Object.keys(tray).forEach(function (k) {
-      t += PLANT_SIZES[tray[k].size].price * tray[k].qty;
-    });
+    trayEntries().forEach(function (e) { t += PLANT_SIZES[e.size].price * e.qty; });
     return t;
   }
 
