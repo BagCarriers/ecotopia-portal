@@ -222,6 +222,13 @@ const DataStore = (() => {
     getServiceSettings: () => list('service_settings', 'name'),
     updateServiceSetting: async (slug, ch) =>
       fromDb(unwrap(await sb.from('service_settings').update(toDb(ch)).eq('slug', slug).select().single())),
+    // Plant size seasons (staff switch; anon-readable so plants.html can render
+    // only the sizes that are open). Keyed by size_key ('plug' / 'gallon'), not id.
+    getPlantSizeSettings: () => list('plant_size_settings', 'sort'),
+    updatePlantSizeSetting: async (sizeKey, ch) =>
+      fromDb(unwrap(await sb.from('plant_size_settings').update(toDb(ch))
+        .eq('size_key', sizeKey).select().single())),
+
     getWaitlist: async () =>
       fromDbAll(unwrap(await sb.from('service_waitlist').select('*')
         .order('created_at', { ascending: false }))),

@@ -25,6 +25,9 @@
 <script src="assets/mapping.js"></script>
 <script src="assets/pricing.js"></script>
 <script src="assets/site.js"></script>
+<!-- DataStore: this page reads plant_size_settings through it (anon-readable), the
+     same accessor manage-plants.html writes the seasonal switch with. -->
+<script src="assets/data.js"></script>
 <style>
 /* ── Native Plants page (marketing) ─────────────────────────────────────── */
 .plants-intro .lead { max-width: 60ch; }
@@ -157,6 +160,16 @@
   font-family: var(--font-util); font-weight: 700; font-size: 0.94rem;
   color: var(--amber-dark); margin: 0 0 12px;
 }
+/* One block per size that is on sale, stacked at the foot of the card. The wrapper
+   carries the margin-top:auto the single Add button used to, so every card in a row
+   still lines its buttons up, and it also makes :first-of-type below mean "first size
+   row" rather than "first div in the card" (which would be .plant-meta). */
+.plant-sizes { margin-top: auto; }
+.plant-size { border-top: 1px solid var(--line); padding-top: 10px; margin-top: 10px; }
+.plant-size:first-of-type { border-top: 0; margin-top: 0; }
+.plant-size-name { font-family: var(--font-util); font-weight: 700; font-size: 0.9rem; margin: 0; }
+.plant-size-blurb { font-size: 0.82rem; color: var(--ink-soft); margin: 2px 0 6px; }
+.plant-closed { font-size: 0.88rem; color: var(--ink-soft); font-style: italic; margin: 10px 0 0; }
 .plant-card .plant-add {
   margin-top: auto; width: 100%; padding: 10px; border-radius: 999px;
   border: 1.5px solid var(--green); background: #fff; color: var(--green-dark);
@@ -312,10 +325,10 @@
     <div class="wrap">
       <p class="eyebrow">Browse the nursery</p>
       <h2 id="species-h">Wildflower species</h2>
-      <!-- The two figures here are the same pair the cards below render from
-           PLANT_PRICE. Change one and change the other: tests/pricing.test.js scrapes
-           this sentence and fails if it stops matching PLANT_PRICE and its card price. -->
-      <p class="lead">Fifty native perennial wildflowers, $5.20 card or $5.00 by cash or check at our plant sale. Build a request below and we will confirm what is ready to reserve.</p>
+      <!-- No figures in this sentence. Prices vary by size now and each size opens and
+           closes on its own season, so the only place a price is stated is the card
+           itself, which renders it from PLANT_SIZES. A figure here could not stay true. -->
+      <p class="lead">Fifty native perennial wildflowers, nursery-grown for our plant sale. Each card shows the sizes on offer this season and what each one costs. Build a request below and we will confirm what is ready to reserve.</p>
       <div class="filter-bar" id="filterBar" role="group" aria-label="Filter wildflowers"></div>
       <p class="filter-count" id="filterCount" aria-live="polite"></p>
       <div class="plant-grid" id="plantGrid"></div>
@@ -470,7 +483,19 @@
   var TIER_BY_KEY = Object.create(null);
   KIT_TIERS.forEach(function (t) { TIER_BY_KEY[t.key] = t; });
 
-  var PLANT_PRICE = 5; // dollars, per plant, at the spring sale (base, cash or check)
+  // Display mirror of PLANT_SIZES in supabase/functions/square-pay/index.ts.
+  // tests/pricing.test.js asserts these two agree; if you change one, change both.
+  // Note the two files hold different shapes on purpose, exactly as KIT_TIERS does:
+  // the server maps a key to integer CENTS, this maps a key to DOLLARS plus copy.
+  // price is the BASE (cash or check) figure; twoPrice renders the pair.
+  var PLANT_SIZES = {
+    plug:   { price: 5, label: 'Spring plug', blurb: '3 by 5 inch container' },
+    gallon: { price: 8, label: 'Gallon pot',  blurb: 'More mature, ready from mid summer' }
+  };
+  // Order the size rows render in, and the tie-breaker the tray sorts on.
+  var SIZE_ORDER = Object.keys(PLANT_SIZES);
+  var openSizes = {};   // filled from plant_size_settings on load
+  var sizeMeta  = {};   // label / blurb / off_message / reopen_date from the DB
 
   // Cash-discount display: the card price leads, the cash price follows. Never a
   // percentage. Both numbers come from the same constant the server charges from.
@@ -535,8 +560,13 @@
   FILTERS.forEach(function (f) { FILTER_KEYS[f.key] = true; });
 
   // ── Runtime state (in-page only, no persistence) ─────────────────────────
-  var tray = {};        // species id (uuid) -> qty
+  // Keyed '<species id>:<size>', NOT by species id: a plug and a gallon of the same
+  // plant are two different products at two different prices, and a key that ignored
+  // the size would merge them into one line priced at whichever size got there first.
+  // The edge function's merge key carries the size for the same reason.
+  var tray = {};        // '<uuid>:<size>' -> { id, size, qty }
   var activeFilter = 'all';
+  function trayKey(id, size) { return id + ':' + size; }
 
   // ── Render: habitat kits ─────────────────────────────────────────────────
   function priceRows() {
@@ -598,11 +628,64 @@
     });
   }
 
+  // Orderable = the season is open AND the species is grown in that size. A species
+  // narrows, never widens. The flags are offers_plug / offers_gallon, camelCased by
+  // EcoMapping; a missing flag means yes, matching the column defaults.
+  function speciesOffers(p, key) {
+    return key === 'plug' ? p.offersPlug !== false : p.offersGallon !== false;
+  }
+  function speciesStock(p, key) {
+    return key === 'plug' ? p.stockPlug : p.stockGallon;
+  }
+  function sizeSoldOut(p, key) {
+    var stock = speciesStock(p, key);
+    return stock != null && stock <= 0;
+  }
+  // "Woodland Phlox, Spring plug". The same phrasing the tray labels its lines with.
+  function sizeAriaName(p, key) {
+    return p.common + ', ' + PLANT_SIZES[key].label;
+  }
+  // One row per size that is BOTH open this season and grown in that size.
+  function sizeRowsHtml(p) {
+    var out = '';
+    SIZE_ORDER.forEach(function (key) {
+      if (!openSizes[key] || !speciesOffers(p, key)) return;
+      var meta = PLANT_SIZES[key];
+      var soldOut = sizeSoldOut(p, key);
+      out +=
+        '<div class="plant-size">' +
+          '<p class="plant-size-name">' + esc(meta.label) + '</p>' +
+          '<p class="plant-size-blurb">' + esc(meta.blurb) + '</p>' +
+          '<p class="plant-price">' + twoPrice(meta.price) + ' each</p>' +
+          (soldOut ? '<span class="sold-chip">Sold out</span>' : '') +
+          // The visible label is just "Add", and a card can carry two of them, so the
+          // accessible name has to say which plant in which size. setSizeButton keeps it
+          // in step with the toggled state.
+          '<button type="button" class="plant-add" data-id="' + esc(p.id) + '"' +
+            ' data-size="' + esc(key) + '"' + (soldOut ? ' disabled' : '') +
+            ' aria-label="Add ' + esc(sizeAriaName(p, key)) + '">' +
+            'Add' +
+          '</button>' +
+        '</div>';
+    });
+    if (!out) out = closedNoteHtml();
+    return '<div class="plant-sizes">' + out + '</div>';
+  }
+  // Nothing orderable: keep the card (this page is a catalogue too) and explain.
+  // off_message and reopen_date are staff-entered DB strings, so both are esc()'d.
+  function closedNoteHtml() {
+    var open = SIZE_ORDER.filter(function (k) { return openSizes[k]; });
+    if (open.length) return '<p class="plant-closed">Not available in the sizes we have right now.</p>';
+    var m = sizeMeta.plug || {};
+    var msg = m.offMessage ? m.offMessage : 'Plant sales are closed for the season.';
+    var when = m.reopenDate ? ' We reopen ' + esc(String(m.reopenDate).split('T')[0]) + '.' : '';
+    return '<p class="plant-closed">' + esc(msg) + when + '</p>';
+  }
+
   function renderPlants() {
     var grid = document.getElementById('plantGrid');
     grid.innerHTML = PLANTS.map(function (p) {
       var src = plantPhotoSrc(p.photoPath);
-      var soldOut = p.stockQty === 0;
       return '<article class="plant-card" data-id="' + esc(p.id) + '">' +
         (src ? '<img class="plant-photo" src="' + esc(src) + '" alt="' + esc(p.common) + '" loading="lazy" width="640" height="480">' : '') +
         '<h3>' + esc(p.common) + '</h3>' +
@@ -613,15 +696,14 @@
         '</div>' +
         '<p class="plant-attracts">' + esc(p.attracts) + '</p>' +
         (p.fact ? '<p class="plant-fact">' + esc(p.fact) + '</p>' : '') +
-        '<p class="plant-price">' + twoPrice(PLANT_PRICE) + ' each</p>' +
-        (soldOut ? '<span class="sold-chip">Sold out this season</span>' : '') +
-        '<button type="button" class="plant-add" data-id="' + esc(p.id) + '"' + (soldOut ? ' disabled' : '') + '>' +
-          (soldOut ? 'Sold out' : '+ Add to request') + '</button>' +
+        sizeRowsHtml(p) +
         '</article>';
     }).join('');
     grid.querySelectorAll('.plant-add').forEach(function (btn) {
       if (btn.disabled) return;
-      btn.addEventListener('click', function () { togglePlant(btn.getAttribute('data-id'), btn); });
+      btn.addEventListener('click', function () {
+        addToTray(btn.getAttribute('data-id'), btn.getAttribute('data-size'));
+      });
     });
     applyFilter();
   }
@@ -642,30 +724,58 @@
   }
 
   // ── Tray state ───────────────────────────────────────────────────────────
-  function togglePlant(id, btn) {
-    if (!PLANT_BY_ID[id]) return; // allowlist: only known species ids
-    if (PLANT_BY_ID[id].stockQty === 0) return; // sold out: never addable
-    if (tray[id]) { delete tray[id]; btn.classList.remove('added'); btn.textContent = '+ Add to request'; }
-    else { tray[id] = 1; btn.classList.add('added'); btn.textContent = '✓ Added'; }
+  // Clicking an Add button toggles that one size of that one species in and out of the
+  // tray, so the other size of the same plant is untouched. Every gate the card render
+  // applied is re-applied here: a stale card cannot add a size whose season has closed.
+  function addToTray(id, size) {
+    var p = PLANT_BY_ID[id];
+    if (!p) return;                                          // allowlist: known species
+    if (!Object.prototype.hasOwnProperty.call(PLANT_SIZES, size)) return; // allowlist: known size
+    if (!openSizes[size] || !speciesOffers(p, size)) return;  // both must be true
+    if (sizeSoldOut(p, size)) return;                         // sold out: never addable
+    var key = trayKey(id, size);
+    if (tray[key]) { delete tray[key]; setSizeButton(id, size, false); }
+    else { tray[key] = { id: id, size: size, qty: 1 }; setSizeButton(id, size, true); }
     updateTrayCount();
   }
 
   function trayCount() {
     var n = 0;
-    Object.keys(tray).forEach(function (k) { n += tray[k]; });
+    Object.keys(tray).forEach(function (k) { n += tray[k].qty; });
     return n;
   }
   function trayLines() { return Object.keys(tray).length; }
+  // Base dollars for the whole tray. Sizes are mixed, so this sums each line at its own
+  // price; multiplying one price by the plant count would misprice any mixed tray.
+  function trayTotal() {
+    var t = 0;
+    Object.keys(tray).forEach(function (k) {
+      t += PLANT_SIZES[tray[k].size].price * tray[k].qty;
+    });
+    return t;
+  }
 
   function updateTrayCount() {
     document.getElementById('trayCount').textContent = String(trayCount());
   }
 
-  function setPlantButton(id, added) {
-    var btn = document.querySelector('.plant-add[data-id="' + id + '"]');
-    if (!btn) return;
-    if (added) { btn.classList.add('added'); btn.textContent = '✓ Added'; }
-    else { btn.classList.remove('added'); btn.textContent = '+ Add to request'; }
+  // Matched by reading attributes rather than by building a selector from a DB id.
+  function setSizeButton(id, size, added) {
+    var grid = document.getElementById('plantGrid');
+    if (!grid) return;
+    var p = PLANT_BY_ID[id];
+    var what = (p && PLANT_SIZES[size]) ? sizeAriaName(p, size) : '';
+    grid.querySelectorAll('.plant-add').forEach(function (btn) {
+      if (btn.getAttribute('data-id') !== id || btn.getAttribute('data-size') !== size) return;
+      // setAttribute writes text, not markup, so `what` is passed through unescaped.
+      if (added) {
+        btn.classList.add('added'); btn.textContent = '✓ Added';
+        btn.setAttribute('aria-label', 'Remove ' + what);   // clicking again removes it
+      } else {
+        btn.classList.remove('added'); btn.textContent = 'Add';
+        btn.setAttribute('aria-label', 'Add ' + what);
+      }
+    });
   }
 
   // ── Modal shell (page-local, styled with .eco-lead-* classes) ────────────
@@ -876,17 +986,25 @@
     showModal();
   }
 
-  // Tray species ids, filtered to known species, sorted by their catalog sort.
-  function trayIds() {
+  // Tray entries, filtered to known species and known sizes, sorted by their catalog
+  // sort and then by size, so the two sizes of one plant sit next to each other.
+  function trayEntries() {
     return Object.keys(tray)
-      .filter(function (id) { return PLANT_BY_ID[id]; })
-      .sort(function (a, b) { return (PLANT_BY_ID[a].sort || 0) - (PLANT_BY_ID[b].sort || 0); });
+      .map(function (k) { return tray[k]; })
+      .filter(function (e) {
+        return PLANT_BY_ID[e.id] &&
+          Object.prototype.hasOwnProperty.call(PLANT_SIZES, e.size);
+      })
+      .sort(function (a, b) {
+        var d = (PLANT_BY_ID[a.id].sort || 0) - (PLANT_BY_ID[b.id].sort || 0);
+        return d || (SIZE_ORDER.indexOf(a.size) - SIZE_ORDER.indexOf(b.size));
+      });
   }
 
   function renderTrayModal() {
     var body = document.getElementById('plantModalBody');
-    var ids = trayIds();
-    if (!ids.length) {
+    var entries = trayEntries();
+    if (!entries.length) {
       body.innerHTML =
         '<p class="eco-lead-eyebrow">Your plant request</p>' +
         '<h2 id="plantModalTitle">Plant request</h2>' +
@@ -895,20 +1013,24 @@
       document.getElementById('plantModalDone').addEventListener('click', closeModal);
       return;
     }
-    var items = ids.map(function (id) {
-      var p = PLANT_BY_ID[id];
-      var qty = tray[id];
-      return '<li class="tray-item" data-id="' + esc(id) + '">' +
-        '<div class="ti-name"><b>' + esc(p.common) + '</b><span><em>' + esc(p.botanical) + '</em> · ' + twoPrice(PLANT_PRICE) + ' each</span></div>' +
+    var items = entries.map(function (e) {
+      var p = PLANT_BY_ID[e.id];
+      var meta = PLANT_SIZES[e.size];
+      var key = trayKey(e.id, e.size);
+      // The size belongs in the line's name: two lines can otherwise carry the same
+      // plant at two prices with nothing on screen to tell them apart.
+      var name = esc(p.common) + ', ' + esc(meta.label);
+      return '<li class="tray-item" data-key="' + esc(key) + '">' +
+        '<div class="ti-name"><b>' + name + '</b><span><em>' + esc(p.botanical) + '</em> · ' + twoPrice(meta.price) + ' each</span></div>' +
         '<div class="tray-step">' +
-          '<button type="button" class="ti-dec" data-id="' + esc(id) + '" aria-label="Decrease quantity">−</button>' +
-          '<span class="ti-qty">' + esc(String(qty)) + '</span>' +
-          '<button type="button" class="ti-inc" data-id="' + esc(id) + '" aria-label="Increase quantity">+</button>' +
+          '<button type="button" class="ti-dec" data-key="' + esc(key) + '" aria-label="Decrease quantity">−</button>' +
+          '<span class="ti-qty">' + esc(String(e.qty)) + '</span>' +
+          '<button type="button" class="ti-inc" data-key="' + esc(key) + '" aria-label="Increase quantity">+</button>' +
         '</div>' +
-        '<button type="button" class="ti-remove" data-id="' + esc(id) + '" aria-label="Remove ' + esc(p.common) + '">&times;</button>' +
+        '<button type="button" class="ti-remove" data-key="' + esc(key) + '" aria-label="Remove ' + name + '">&times;</button>' +
         '</li>';
     }).join('');
-    var total = trayCount() * PLANT_PRICE;
+    var total = trayTotal();
     body.innerHTML =
       '<p class="eco-lead-eyebrow">Your plant request</p>' +
       '<h2 id="plantModalTitle">Plant request</h2>' +
@@ -925,15 +1047,15 @@
         '<p class="eco-lead-error" id="plantModalError"></p>' +
         '<button type="submit" class="eco-lead-primary" id="traySubmit">Place order</button>' +
       '</form>';
-    // Steppers + remove (event-delegated, validated against known species ids).
+    // Steppers + remove (validated against keys the tray actually holds).
     body.querySelectorAll('.ti-inc').forEach(function (b) {
-      b.addEventListener('click', function () { stepQty(b.getAttribute('data-id'), 1); });
+      b.addEventListener('click', function () { stepQty(b.getAttribute('data-key'), 1); });
     });
     body.querySelectorAll('.ti-dec').forEach(function (b) {
-      b.addEventListener('click', function () { stepQty(b.getAttribute('data-id'), -1); });
+      b.addEventListener('click', function () { stepQty(b.getAttribute('data-key'), -1); });
     });
     body.querySelectorAll('.ti-remove').forEach(function (b) {
-      b.addEventListener('click', function () { removeItem(b.getAttribute('data-id')); });
+      b.addEventListener('click', function () { removeItem(b.getAttribute('data-key')); });
     });
     document.getElementById('trayForm').addEventListener('submit', function (e) {
       e.preventDefault();
@@ -941,19 +1063,21 @@
     });
   }
 
-  function stepQty(id, delta) {
-    if (!PLANT_BY_ID[id] || !tray[id]) return;
-    var q = tray[id] + delta;
+  function stepQty(key, delta) {
+    var e = tray[key];
+    if (!e || !PLANT_BY_ID[e.id]) return;
+    var q = e.qty + delta;
     if (q < 1) q = 1;
-    if (q > 20) q = 20;
-    tray[id] = q;
+    if (q > 20) q = 20;   // the edge function caps a line at 20 too
+    e.qty = q;
     updateTrayCount();
     renderTrayModal();
   }
-  function removeItem(id) {
-    if (!tray[id]) return;
-    delete tray[id];
-    setPlantButton(id, false);
+  function removeItem(key) {
+    var e = tray[key];
+    if (!e) return;
+    delete tray[key];
+    setSizeButton(e.id, e.size, false);
     updateTrayCount();
     renderTrayModal();
   }
@@ -961,8 +1085,8 @@
   async function submitTray() {
     var errEl = document.getElementById('plantModalError');
     errEl.textContent = '';
-    var ids = trayIds();
-    if (!ids.length) { errEl.textContent = 'Add at least one plant to your request.'; return; }
+    var entries = trayEntries();
+    if (!entries.length) { errEl.textContent = 'Add at least one plant to your request.'; return; }
     var c = readContact();
     var msg = (document.getElementById('pl-c-msg').value || '').trim();
     var payMode = readPayMode('pl-tray-pay');
@@ -970,7 +1094,11 @@
       errEl.textContent = 'Please add your name and a phone number so we can reach you.';
       return;
     }
-    var items = ids.map(function (id) { return { kind: 'species', id: id, qty: tray[id] }; });
+    // Every line carries its size. The function still reads a sizeless line as a plug,
+    // so an older tab keeps working, but this page is explicit about what it is buying.
+    var items = entries.map(function (e) {
+      return { kind: 'species', id: e.id, size: e.size, qty: e.qty };
+    });
     var btn = document.getElementById('traySubmit');
     if (btn) btn.disabled = true;
     var res = await createOrder({
@@ -983,7 +1111,7 @@
     if (btn) btn.disabled = false;
     if (!res.ok || !res.body.token) { errEl.textContent = orderErrorMessage(res); return; }
     // Clear the tray on success.
-    ids.forEach(function (id) { setPlantButton(id, false); });
+    entries.forEach(function (e) { setSizeButton(e.id, e.size, false); });
     tray = {};
     updateTrayCount();
     showOrderConfirm(res, payMode);
@@ -1020,6 +1148,18 @@
   }
   async function loadAndRenderSpecies() {
     try {
+      // Seasons first: which sizes are open decides what every card can offer. This
+      // sits inside the same try on purpose. If the read fails we must NOT fall through
+      // with an empty openSizes, because that renders as "closed for the season" on
+      // every card, which is a lie the customer cannot tell from the truth. The catch
+      // below says the list is updating instead, which is what actually happened.
+      var sizeRows = await DataStore.getPlantSizeSettings();
+      openSizes = {};
+      sizeMeta = {};
+      sizeRows.forEach(function (r) {
+        sizeMeta[r.sizeKey] = r;
+        if (r.active) openSizes[r.sizeKey] = true;
+      });
       PLANTS = await loadSpecies();
       PLANT_BY_ID = {};
       PLANTS.forEach(function (p) { PLANT_BY_ID[p.id] = p; });
