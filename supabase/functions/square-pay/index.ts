@@ -320,9 +320,13 @@ async function handleCreateOrder(body: any): Promise<Response> {
   // aggregate quantity; a crafted payload cannot split its way past a stock cap. Size
   // belongs in the key: without it two sizes of one species would collapse into a
   // single line and be charged at whichever price the first one happened to be.
+  // The key must apply the SAME sizeless-means-plug default the species branch applies,
+  // or the two spellings of a plug (absent, and explicit 'plug') hash apart and each
+  // clears the stock check on its own, which is exactly the split this merge prevents.
   const merged = new Map<string, any>();
   for (const raw of rawItems) {
-    const key = [raw?.kind, raw?.id, raw?.tier ?? '', raw?.size ?? ''].join(':');
+    const sizePart = raw?.kind === 'species' ? (raw?.size ?? 'plug') : (raw?.size ?? '');
+    const key = [raw?.kind, raw?.id, raw?.tier ?? '', sizePart].join(':');
     const prev = merged.get(key);
     if (prev) prev.qty = Number(prev.qty) + Number(raw?.qty);
     else merged.set(key, { ...raw });
@@ -330,7 +334,12 @@ async function handleCreateOrder(body: any): Promise<Response> {
 
   // Which sizes are open right now. Read once: an order is priced against a single
   // snapshot, so a season closing mid-loop cannot half-accept a cart.
-  const { data: sizeRows } = await sb.from('plant_size_settings').select('size_key, active');
+  // A failed read must not masquerade as a closed season. Treating it as one would empty
+  // openSizes and tell every plant customer "sold out" while kits and merch kept selling,
+  // so the failure has to be its own answer rather than a silent, plausible-looking one.
+  const { data: sizeRows, error: sizeErr } = await sb.from('plant_size_settings')
+    .select('size_key, active');
+  if (sizeErr) return json({ error: 'server_error' }, 500);
   const openSizes = new Set((sizeRows || []).filter((r) => r.active).map((r) => r.size_key));
 
   for (const raw of merged.values()) {
