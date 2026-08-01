@@ -100,3 +100,47 @@ test('quoteTotals prices around a null line item instead of throwing', () => {
   assert.strictEqual(t.cashTotal, 813.75);
   assert.strictEqual(t.cardTotal, 844.75);
 });
+
+// ── Plant sizes ─────────────────────────────────────────────────────────────
+// node:fs and node:path are already required at the top of this file.
+
+test('both plant sizes gross exactly', () => {
+  const { cardCents } = globalThis.EcoPricing;
+  assert.strictEqual(cardCents(500), 520);  // spring plug
+  assert.strictEqual(cardCents(800), 832);  // gallon pot
+});
+
+test('the edge function prices both sizes and nowhere else does', () => {
+  const src = fs.readFileSync(
+    path.join(__dirname, '..', 'supabase', 'functions', 'square-pay', 'index.ts'), 'utf8');
+  const m = src.match(/const PLANT_SIZES[^=]*=\s*\{([^}]*)\}/);
+  assert.ok(m, 'PLANT_SIZES not found in the edge function');
+  assert.match(m[1], /plug:\s*500/);
+  assert.match(m[1], /gallon:\s*800/);
+  assert.ok(!/PLANT_PRICE_CENTS/.test(src), 'the old single plant price still exists');
+});
+
+test('plants.html states each size price and it matches the constant', () => {
+  const { cardDollars } = globalThis.EcoPricing;
+  const html = fs.readFileSync(path.join(__dirname, '..', 'plants.html'), 'utf8');
+  const m = html.match(/var PLANT_SIZES\s*=\s*(\{[\s\S]*?\});/);
+  assert.ok(m, 'PLANT_SIZES not found in plants.html');
+  // eval, deliberately: the input is a JS object literal read out of a file in this
+  // repo, never user or network input, and JSON.parse cannot read it (bare keys). The
+  // point is to evaluate what the BROWSER evaluates, so a rewrite that parsed it some
+  // other way would stop testing the thing that ships.
+  const sizes = eval('(' + m[1] + ')');
+  assert.strictEqual(sizes.plug.price, 5);
+  assert.strictEqual(sizes.gallon.price, 8);
+  assert.strictEqual(cardDollars(sizes.plug.price), 5.2);
+  assert.strictEqual(cardDollars(sizes.gallon.price), 8.32);
+});
+
+test('orderable requires the season AND the species flag', () => {
+  // Mirrors the rule in the edge function and in plants.html. Both must be true.
+  const orderable = (seasonOpen, speciesOffers) => seasonOpen && speciesOffers;
+  assert.strictEqual(orderable(true, true), true);
+  assert.strictEqual(orderable(true, false), false);
+  assert.strictEqual(orderable(false, true), false);
+  assert.strictEqual(orderable(false, false), false);
+});
