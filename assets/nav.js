@@ -118,8 +118,11 @@ const Nav = (() => {
         height: 64px;
         box-shadow: 0 -2px 12px rgba(0,0,0,0.18);
       }
+      /* flex:1 is load-bearing. The bar itself is display:flex on mobile, so without
+         it this single child shrinks to its content width and packs against the left
+         edge, running the five labels together as "HomeJobsGardensVolunteersMore". */
       #eco-bottomnav .bn-items {
-        display: flex; height: 100%;
+        display: flex; height: 100%; flex: 1; min-width: 0;
       }
       #eco-bottomnav .bn-item {
         flex: 1; display: flex; flex-direction: column;
@@ -129,6 +132,9 @@ const Nav = (() => {
         font-family: 'DM Sans', sans-serif;
         transition: color 0.15s;
         border: none; background: none;
+        /* Equal shares that can actually shrink: min-width:0 lets a long label like
+           Volunteers narrow instead of forcing the row wider than the screen. */
+        min-width: 0; padding: 0 2px; text-align: center; line-height: 1.1;
       }
       #eco-bottomnav .bn-item .bn-icon { font-size: 1.3rem; line-height:1; }
       #eco-bottomnav .bn-item.active,
