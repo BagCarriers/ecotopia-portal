@@ -108,7 +108,9 @@
 <script>
 const esc = DataStore.esc;
 const ORDER_FN = window.ECO_CONFIG.SUPABASE_URL + '/functions/v1/square-pay';
-const ORDER_BASE = 'https://ecotopia.bagcarriers.dev';
+// Whatever host staff are on, matching quotes.html. Hardcoding the dev domain sent
+// customers an ecotopia.bagcarriers.dev link for an Ecotopian EarthCare order.
+const ORDER_BASE = window.location.origin;
 const TIER_LABEL = { '50': '50 sq ft', '100': '100 sq ft', '150': '150 sq ft', '200': '200 sq ft' };
 // Display labels only, the same shape TIER_LABEL already is for kits. The prices these
 // keys carry live in PLANT_SIZES (edge function, mirrored in plants.html) and are not
