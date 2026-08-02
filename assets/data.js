@@ -293,6 +293,24 @@ const DataStore = (() => {
     plantPhotoUrl: (photoPath) =>
       sb.storage.from('gallery').getPublicUrl(photoPath).data.publicUrl, // sync
 
+    // Team members (staff-editable, rendered on the public about page). Public
+    // listing only: a row here grants no portal access. The public page reads
+    // active rows over anon; staff methods use the authenticated policy and see
+    // hidden rows too. Uploads land in the gallery bucket under team/<uuid>.jpg;
+    // 'static:<file>' paths are repo assets and are never touched in storage.
+    getTeamMembers: () => list('team_members', 'sort'),
+    getPublicTeam: async () =>
+      fromDbAll(unwrap(await sb.from('team_members').select('*')
+        .eq('active', true)
+        .order('sort', { ascending: true }).order('name', { ascending: true }))),
+    addTeamMember: (r) => insert('team_members', r),
+    updateTeamMember: (id, ch) => update('team_members', id, ch),
+    removeTeamMember: async (id) => {
+      unwrap(await sb.from('team_members').delete().eq('id', id));
+    },
+    teamPhotoUrl: (photoPath) =>
+      sb.storage.from('gallery').getPublicUrl(photoPath).data.publicUrl, // sync
+
     // Public questions (anon "Ask us anything" -> staff inbox). Anon inserts use
     // return=minimal (submit) so no anon select policy is needed; reads, answers,
     // status updates, and deletes are staff-only (authenticated + is_portal_user).
