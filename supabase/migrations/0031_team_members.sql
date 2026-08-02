@@ -41,7 +41,14 @@ create trigger team_members_set_updated_at
 -- Seed only when the table is empty. "on conflict do nothing" would not help
 -- here: there is no unique constraint to conflict on, so a re-apply would insert
 -- eleven duplicates with fresh ids. The emptiness guard also means that once
--- Jordan edits or removes a member, a re-apply will not resurrect the original.
+-- Jordan edits or removes a member, a re-apply will not resurrect the original,
+-- unless every row is removed first: on a truncated or fully emptied table the
+-- guard sees no rows and reinserts all eleven as active, republishing people who
+-- were deliberately taken off the public page.
+--
+-- The guard takes no lock, so two applies running at the same time would both
+-- see an empty table and both insert. Immaterial for a migration applied by hand
+-- by one person, but it is the one way the idempotency claim can fail.
 insert into public.team_members (name, role, photo_path, sort)
 select v.name, v.role, v.photo_path, v.sort
 from (values
