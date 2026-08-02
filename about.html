@@ -23,6 +23,8 @@
 <script src="assets/config.js"></script>
 <script src="assets/supabase-client.js"></script>
 <script src="assets/mapping.js"></script>
+<script src="assets/data.js"></script>
+<script src="assets/team.js"></script>
 <script src="assets/site.js"></script>
 <style>
 /* ── About page (marketing) ─────────────────────────────────────────────── */
@@ -43,6 +45,13 @@
 .team-card img {
   width: 100%; aspect-ratio: 1 / 1; object-fit: cover; display: block;
   background: var(--cream);
+}
+.team-card .team-initials {
+  width: 100%; aspect-ratio: 1 / 1; display: flex;
+  align-items: center; justify-content: center;
+  background: var(--cream); color: var(--green-dark);
+  font-family: 'Fraunces', serif; font-size: 3rem; line-height: 1;
+  letter-spacing: 0.02em;
 }
 .team-card figcaption { padding: 18px 20px 22px; }
 .team-card h3 {
@@ -89,85 +98,7 @@
       <p class="eyebrow">Who we are</p>
       <h2 id="team-h">Meet the team</h2>
       <p class="lead">The designers, herbalists, growers, and stewards who tend this work across the neighborhoods of the Altoona area.</p>
-      <div class="team-grid">
-        <figure class="team-card reveal">
-          <img src="assets/img/team/team-jordan.jpg" alt="Jordan Sesame Wild" loading="lazy" width="400" height="400">
-          <figcaption>
-            <h3>Jordan Sesame Wild</h3>
-            <p>Founder, Manager, Ecological Landscape Designer, Permaculturist, Project Scout, and President of WildOnes Nonprofit.</p>
-          </figcaption>
-        </figure>
-        <figure class="team-card reveal">
-          <img src="assets/img/team/team-jenna.jpg" alt="Jenna Rose Wild" loading="lazy" width="400" height="400">
-          <figcaption>
-            <h3>Jenna Rose Wild</h3>
-            <p>Cofounder, Herbalist, Medicine Woman and Guide, Nursery Caretaker, Ecological Landscape Designer, and a Holistic Birth and Postpartum Doula.</p>
-          </figcaption>
-        </figure>
-        <figure class="team-card reveal">
-          <img src="assets/img/team/team-kat.jpg" alt="Kat Weakland" loading="lazy" width="400" height="400">
-          <figcaption>
-            <h3>Kat Weakland</h3>
-            <p>Community Food Systems Consultant, Botanical Weaver, and down-to-earth Garden Mentor.</p>
-          </figcaption>
-        </figure>
-        <figure class="team-card reveal">
-          <img src="assets/img/team/team-samuel.jpg" alt="Samuel Mohnkern" loading="lazy" width="400" height="400">
-          <figcaption>
-            <h3>Samuel Mohnkern</h3>
-            <p>Landscape Designer, Ecosystem Steward, Arborist, and Invasive Plant Remover. Contracting through his neighboring business Restoration LandCare.</p>
-          </figcaption>
-        </figure>
-        <figure class="team-card reveal">
-          <img src="assets/img/team/team-joshua.jpg" alt="Joshua Ritchey" loading="lazy" width="400" height="400">
-          <figcaption>
-            <h3>Joshua Ritchey</h3>
-            <p>Lead Landscape and Garden Tender.</p>
-          </figcaption>
-        </figure>
-        <figure class="team-card reveal">
-          <img src="assets/img/team/team-jordansneed.jpg" alt="Jordan Sneed" loading="lazy" width="400" height="400">
-          <figcaption>
-            <h3>Jordan Sneed</h3>
-            <p>Pawpaw Seedling Grower and Ecological Landscaper for his nearby neighborhoods of Juniata, Juniata Gap, Wehnwood, and Fairview.</p>
-          </figcaption>
-        </figure>
-        <figure class="team-card reveal">
-          <img src="assets/img/team/team-tricia.jpg" alt="Tricia Lynn" loading="lazy" width="400" height="400">
-          <figcaption>
-            <h3>Tricia Lynn</h3>
-            <p>Ecological Landscaper for her neighborhoods of East End, Greenwood, Little Italy, Downtown, Centre City, Dutch Hill, 6th Ward, AASD School District, and Columbia Park.</p>
-          </figcaption>
-        </figure>
-        <figure class="team-card reveal">
-          <img src="assets/img/team/team-john.jpg" alt="John Peacefire" loading="lazy" width="400" height="400">
-          <figcaption>
-            <h3>John Peacefire</h3>
-            <p>Ecological Landscaper for his nearby neighborhoods of Lakemont, Frankstown, and Garden Heights.</p>
-          </figcaption>
-        </figure>
-        <figure class="team-card reveal">
-          <img src="assets/img/team/team-brendan.jpg" alt="Brendan" loading="lazy" width="400" height="400">
-          <figcaption>
-            <h3>Brendan</h3>
-            <p>Ecological Landscaper for his nearby neighborhoods of Llyswen, Mansion Park, Knickerbocker, and Highland Park.</p>
-          </figcaption>
-        </figure>
-        <figure class="team-card reveal">
-          <img src="assets/img/team/team-emily.jpg" alt="Emily Evey" loading="lazy" width="400" height="400">
-          <figcaption>
-            <h3>Emily Evey</h3>
-            <p>Program Coordinator.</p>
-          </figcaption>
-        </figure>
-        <figure class="team-card reveal">
-          <img src="assets/img/team/team-russ.jpg" alt="Russ Replogle" loading="lazy" width="400" height="400">
-          <figcaption>
-            <h3>Russ Replogle</h3>
-            <p>Tractor and Mower service for Lawn to Meadow and Food Forest Conversion.</p>
-          </figcaption>
-        </figure>
-      </div>
+      <div class="team-grid" id="teamGrid"></div>
     </div>
   </section>
 
@@ -222,7 +153,29 @@
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   EcoSite.renderNav('about');
+  renderTeam();
 });
+
+// The team grid is portal-managed content. Everything here comes from the
+// database, so every value is escaped before it reaches innerHTML.
+async function renderTeam() {
+  const esc = EcoSite.esc;
+  const grid = document.getElementById('teamGrid');
+  if (!grid) return;
+  let members = [];
+  try { members = await DataStore.getPublicTeam(); } catch (e) { members = []; }
+  if (!members.length) { grid.innerHTML = ''; return; }
+  grid.innerHTML = members.map(function (m) {
+    const src = EcoTeam.teamPhotoSrc(m.photoPath, DataStore.teamPhotoUrl);
+    const visual = src
+      ? '<img src="' + esc(src) + '" alt="' + esc(m.name) + '" loading="lazy" width="400" height="400">'
+      : '<div class="team-initials" aria-hidden="true">' + esc(EcoTeam.teamInitials(m.name)) + '</div>';
+    return '<figure class="team-card reveal">' + visual +
+      '<figcaption><h3>' + esc(m.name) + '</h3>' +
+      '<p>' + esc(m.role) + '</p></figcaption></figure>';
+  }).join('');
+  EcoSite.decorate(); // reveal the freshly-added .team-card.reveal cards
+}
 </script>
 <!-- Bag Carriers thin powered-by footer (locked attribution component) -->
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Libre+Baskerville:ital@1&display=swap" rel="stylesheet">
