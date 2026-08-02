@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Team - Ecotopia</title>
+<meta name="robots" content="noindex">
+  <link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/assets/img/favicon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="/assets/img/favicon-192.png">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="assets/supabase.js"></script>
+<script src="assets/config.js"></script>
+<script src="assets/supabase-client.js"></script>
+<script src="assets/mapping.js"></script>
+<script src="assets/auth.js"></script>
+<script>if (!AuthManager.hasCachedSession()) location.replace('login.html');</script>
+<script src="assets/data.js"></script>
+<script src="assets/nav.js"></script>
+<script src="assets/team.js"></script>
+<style>
+  :root {
+    --forest: #1B4332; --forest-mid: #2D6A4F; --forest-light: #52B788;
+    --sage: #D8F3DC; --sage-dim: #B7E4C7; --earth: #8B5E3C;
+    --earth-light: #C68642; --gold: #F4A261; --cream: #F9F6F0;
+    --cream-dim: #E8E0D5; --text: #1C1C1C; --text-dim: #5A5A5A;
+    --border: rgba(45,106,79,0.2); --amber: #B8730A; --amber-bg: #FDF0DA;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--text); }
+  .page { padding: 28px 32px; max-width: 1000px; }
+  .page-header { display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; margin-bottom: 8px; }
+  h1 { font-family: 'Fraunces', serif; font-size: 1.9rem; color: var(--forest); }
+  .page-intro { font-size: 0.9rem; color: var(--text-dim); margin-bottom: 10px;
+    max-width: 680px; line-height: 1.6; }
+  /* Same muted voice as .page-intro; kept separate so the logins line reads as its
+     own beat under the intro rather than another sentence in the same paragraph. */
+  .page-note { font-size: 0.9rem; color: var(--text-dim); margin-bottom: 20px;
+    max-width: 680px; line-height: 1.6; }
+
+  .btn { padding: 10px 18px; border-radius: 8px; border: none; font-size: 0.875rem;
+    font-weight: 600; cursor: pointer; font-family: 'DM Sans', sans-serif;
+    text-decoration: none; display: inline-flex; gap: 6px; align-items: center;
+    transition: background 0.15s; }
+  .btn-primary { background: var(--forest); color: #fff; }
+  .btn-primary:hover { background: var(--forest-mid); }
+  .btn-cancel { background: var(--cream-dim); color: var(--text); padding: 10px 18px;
+    border-radius: 8px; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; }
+  .btn-sm { font-size: 0.78rem; padding: 5px 10px; background: transparent;
+    border: 1px solid var(--border); border-radius: 6px; cursor: pointer;
+    color: var(--text-dim); font-family: 'DM Sans', sans-serif; transition: all 0.15s; }
+  .btn-sm:hover { color: var(--forest); border-color: var(--forest-light); background: var(--sage); }
+  .btn-sm:disabled { opacity: 0.35; cursor: not-allowed; }
+  .btn-sm.btn-danger { color: #b3261e; }
+  .btn-sm.btn-danger:hover { color: #fff; background: #b3261e; border-color: #b3261e; }
+
+  .muted { color: var(--text-dim); }
+  .toolbar { display: flex; justify-content: flex-end; margin-bottom: 14px; }
+
+  /* List rows (same shape as manage-plants.html so the two pages read alike) */
+  .list { display: flex; flex-direction: column; gap: 10px; }
+  .row { background: #fff; border: 1px solid var(--border); border-radius: 12px;
+    padding: 12px 14px; display: flex; align-items: center; gap: 14px; }
+  .row.inactive { opacity: 0.62; }
+  .row-thumb { width: 52px; height: 52px; flex-shrink: 0; border-radius: 8px;
+    object-fit: cover; background: var(--cream-dim); border: 1px solid var(--border); }
+  .row-thumb.placeholder { display: flex; align-items: center; justify-content: center;
+    font-family: 'Fraunces', serif; font-size: 1rem; font-weight: 700;
+    letter-spacing: 0.02em; color: var(--forest); }
+  .row-main { flex: 1; min-width: 0; }
+  .row-title { font-weight: 600; color: var(--forest); font-size: 0.98rem; }
+  .row-sub { font-size: 0.82rem; color: var(--text-dim);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .row-sub2 { font-size: 0.78rem; color: var(--text-dim); margin-top: 2px; }
+  .tie-flag { color: var(--amber); font-weight: 600; }
+  .status-pill { display: inline-block; padding: 2px 10px; border-radius: 20px;
+    font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+  .status-on { background: var(--sage); color: var(--forest); }
+  .status-off { background: var(--amber-bg); color: var(--amber); }
+  .row-sort { display: flex; flex-direction: column; gap: 2px; }
+  .row-sort button { width: 26px; height: 22px; line-height: 1; }
+  .row-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+
+  .empty { padding: 30px 16px; color: var(--text-dim); font-size: 0.9rem; text-align: center; }
+  .modal-error { color: #b3261e; font-size: 0.85rem; margin-top: 8px; }
+  #pageError { margin-bottom: 14px; }
+  #pageError:empty { display: none; }
+
+  /* Photo picker */
+  .photo-preview { margin-top: 8px; display: flex; align-items: center; gap: 12px; }
+  .photo-preview img { width: 72px; height: 72px; object-fit: cover; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--cream-dim); }
+  .photo-preview a { font-size: 0.8rem; color: #b3261e; cursor: pointer; text-decoration: none; }
+  .photo-preview a:hover { text-decoration: underline; }
+
+  /* Modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+    z-index: 500; align-items: center; justify-content: center; padding: 20px; }
+  .modal-overlay.open { display: flex; }
+  .modal { background: #fff; border-radius: 16px; padding: 28px; width: 100%;
+    max-width: 520px; max-height: 90vh; overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.25); }
+  .modal h2 { font-family: 'Fraunces', serif; color: var(--forest); margin-bottom: 18px; }
+  .form-group { margin-bottom: 14px; }
+  .form-group label { display: block; font-size: 0.78rem; font-weight: 600;
+    color: var(--text-dim); margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .form-group input, .form-group textarea, .form-group select {
+    width: 100%; padding: 9px 11px; border-radius: 7px; border: 1.5px solid var(--border);
+    font-size: 0.875rem; font-family: 'DM Sans', sans-serif; color: var(--text); background: #fff; }
+  .form-group textarea { min-height: 70px; resize: vertical; }
+  .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+    outline: none; border-color: var(--forest-light); }
+  .field-note { font-size: 0.76rem; color: var(--text-dim); margin-top: 4px; }
+  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 6px; }
+
+  /* Checkbox list inside a form-group (labels here are sentence case, not the
+     uppercase field labels, and the inputs must not stretch to 100%). */
+  .check-list { display: flex; flex-direction: column; gap: 7px; margin-top: 2px; }
+  .check-list label { display: flex; align-items: center; gap: 8px; margin-bottom: 0;
+    font-size: 0.875rem; font-weight: 500; text-transform: none; letter-spacing: 0;
+    color: var(--text); cursor: pointer; }
+  .check-list input[type="checkbox"] { width: auto; padding: 0; accent-color: var(--forest-mid); }
+
+  @media (max-width: 700px) {
+    .page { padding: 20px 16px; }
+    .row { flex-wrap: wrap; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="page-header">
+    <h1>Team</h1>
+  </div>
+  <p class="page-intro">Edit the people shown in "Meet the team" on the public
+    <a href="about.html" target="_blank" rel="noopener">About</a> page: name, role, photo and order.
+    Hide someone to take them off the page without losing their role or photo. Photo uploads are
+    stored in the gallery bucket. A member with no photo shows a cream tile with their initials.</p>
+  <p class="page-note">Everyone here appears on the public About page. This does not
+create a portal login: sign-in accounts are managed on the Users page.</p>
+
+  <div class="modal-error" id="pageError"></div>
+
+  <div class="toolbar">
+    <button class="btn btn-primary" onclick="openMemberModal(null)">+ Add member</button>
+  </div>
+  <div class="list" id="memberList"><div class="empty">Loading…</div></div>
+</div>
+
+<!-- Member modal -->
+<div class="modal-overlay" id="memberModal">
+  <div class="modal">
+    <h2 id="memberModalTitle">Add member</h2>
+    <form id="memberForm" novalidate>
+      <div class="form-group"><label>Name *</label>
+        <input type="text" id="tm_name" placeholder="Jordan Sesame Wild"></div>
+      <div class="form-group"><label>Role *</label>
+        <textarea id="tm_role" placeholder="Founder, ecological landscaper and herbalist"></textarea>
+        <div class="field-note">The line printed under the name on the About page.</div>
+      </div>
+      <div class="form-group"><label>Photo</label>
+        <input type="file" id="tm_photo" accept="image/*" onchange="onMemberPhotoChosen(this)">
+        <div class="photo-preview" id="tm_photo_preview" style="display:none">
+          <img id="tm_photo_thumb" alt="">
+          <a onclick="removeMemberPhoto()">Remove photo</a>
+        </div>
+        <div class="field-note">Any shape works: the card center-crops it to a square. Leave it
+          empty to show the member's initials instead.</div>
+      </div>
+      <div class="form-group"><label>Sort</label>
+        <input type="number" id="tm_sort" min="0" step="1" placeholder="0">
+        <div class="field-note">Lowest first. Give everyone a different number: two members
+          sharing one are ordered alphabetically by name, which is stable but not chosen.</div>
+      </div>
+      <div class="form-group"><label>Visibility</label>
+        <div class="check-list">
+          <label><input type="checkbox" id="tm_active"> Show on website</label>
+        </div>
+      </div>
+      <div class="modal-error" id="memberError"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" onclick="closeMemberModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="memberSaveBtn">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+const esc = DataStore.esc;
+
+let members = [];
+
+// Photo picker state (shared modal for add + edit; null id = add).
+let tmEditId = null, tmPhotoFile = null, tmPhotoRemove = false, tmPhotoCurrentPath = null;
+
+// ── Photo helpers ────────────────────────────────────────────────────────────
+// Resolution lives in assets/team.js so this page and the public About page cannot
+// drift: 'static:<file>' is a repo asset under assets/img/team/ (charset-guarded so
+// it cannot escape the folder), anything else is a gallery-bucket object.
+function teamPhotoSrc(photoPath) {
+  return EcoTeam.teamPhotoSrc(photoPath, DataStore.teamPhotoUrl);
+}
+async function uploadTeamPhoto(file) {
+  const blob = await DataStore.resizeImage(file, 1600);
+  const path = `team/${crypto.randomUUID()}.jpg`;
+  const up = await window.ecoSupabase.storage.from('gallery')
+    .upload(path, blob, { contentType: blob.type || 'image/jpeg', upsert: false });
+  if (up.error) throw new Error(up.error.message);
+  return path;
+}
+// Best-effort removal of a gallery object. 'static:' paths are the eleven original
+// repo files and must never be deleted from storage, because they are not in storage.
+async function removeTeamPhotoObject(path) {
+  if (!path || String(path).slice(0, 7) === 'static:') return;
+  try { await window.ecoSupabase.storage.from('gallery').remove([path]); } catch (e) { /* ignore */ }
+}
+
+// Sort input: a whole number 0 or more. Blank is treated as 0, the column default.
+function parseSort(raw) {
+  const s = String(raw == null ? '' : raw).trim();
+  if (s === '') return { value: 0 };
+  if (!/^\d+$/.test(s)) return { error: 'Sort must be a whole number 0 or more.' };
+  return { value: parseInt(s, 10) };
+}
+
+// ── Member list ──────────────────────────────────────────────────────────────
+function renderMembers() {
+  const el = document.getElementById('memberList');
+  if (!members.length) { el.innerHTML = '<div class="empty">No team members yet. Add the first one.</div>'; return; }
+  // sort has no unique constraint, so flag ties: the order between them is decided
+  // by name, not by Jordan, and a nudge here is cheaper than a puzzled email later.
+  const tally = {};
+  members.forEach(m => { const k = m.sort || 0; tally[k] = (tally[k] || 0) + 1; });
+  el.innerHTML = members.map((m, i) => {
+    const src = teamPhotoSrc(m.photoPath);
+    const thumb = src
+      ? `<img class="row-thumb" src="${esc(src)}" alt="" loading="lazy">`
+      : `<div class="row-thumb placeholder">${esc(EcoTeam.teamInitials(m.name))}</div>`;
+    const pill = m.active
+      ? '<span class="status-pill status-on">Shown</span>'
+      : '<span class="status-pill status-off">Hidden</span>';
+    const sortVal = m.sort || 0;
+    const tie = tally[sortVal] > 1 ? ' <span class="tie-flag">tied</span>' : '';
+    return `
+      <div class="row ${m.active ? '' : 'inactive'}">
+        <div class="row-sort">
+          <button class="btn-sm" onclick="moveMember('${esc(m.id)}',-1)" ${i === 0 ? 'disabled' : ''} aria-label="Move up">▲</button>
+          <button class="btn-sm" onclick="moveMember('${esc(m.id)}',1)" ${i === members.length - 1 ? 'disabled' : ''} aria-label="Move down">▼</button>
+        </div>
+        ${thumb}
+        <div class="row-main">
+          <div class="row-title">${esc(m.name)} ${pill}</div>
+          <div class="row-sub">${esc(m.role || '')}</div>
+          <div class="row-sub2">Sort ${esc(String(sortVal))}${tie}</div>
+        </div>
+        <div class="row-actions">
+          <button class="btn-sm" onclick="openMemberModal('${esc(m.id)}')">Edit</button>
+          <button class="btn-sm" onclick="toggleMemberActive('${esc(m.id)}')">${m.active ? 'Hide' : 'Show'}</button>
+          <button class="btn-sm btn-danger" onclick="deleteMember('${esc(m.id)}')">Delete</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function memberById(id) { return members.find(m => m.id === id); }
+
+async function moveMember(id, dir) {
+  const i = members.findIndex(m => m.id === id);
+  const j = i + dir;
+  if (i < 0 || j < 0 || j >= members.length) return;
+  const order = members.slice();
+  order.splice(j, 0, order.splice(i, 1)[0]);
+  const errEl = document.getElementById('pageError');
+  errEl.textContent = '';
+  try {
+    // Renumber the whole list 1..n rather than swapping the pair's two values.
+    // sort defaults to 0 and has no unique constraint, so a pair can already tie,
+    // and swapping equal values would move nothing. Only changed rows are written.
+    const writes = order
+      .map((m, k) => (m.sort === k + 1 ? null : DataStore.updateTeamMember(m.id, { sort: k + 1 })))
+      .filter(Boolean);
+    await Promise.all(writes);
+    await loadMembers();
+  } catch (err) {
+    errEl.textContent = 'Could not reorder. ' + err.message;
+  }
+}
+
+async function toggleMemberActive(id) {
+  const m = memberById(id);
+  if (!m) return;
+  const errEl = document.getElementById('pageError');
+  errEl.textContent = '';
+  try {
+    await DataStore.updateTeamMember(id, { active: !m.active });
+    await loadMembers();
+  } catch (err) {
+    errEl.textContent = 'Could not update. ' + err.message;
+  }
+}
+
+async function deleteMember(id) {
+  const m = memberById(id);
+  if (!m) return;
+  if (!confirm(`Delete "${m.name}"? This permanently removes them from the About page. Hide them instead to keep the entry.`)) return;
+  const errEl = document.getElementById('pageError');
+  errEl.textContent = '';
+  try {
+    // DataStore.removeTeamMember drops the row only, so the bucket object goes first
+    // or it orphans; removeTeamPhotoObject skips 'static:' repo files.
+    await removeTeamPhotoObject(m.photoPath);
+    await DataStore.removeTeamMember(id);
+    await loadMembers();
+  } catch (err) {
+    errEl.textContent = 'Could not delete. ' + err.message;
+  }
+}
+
+// ── Member modal ─────────────────────────────────────────────────────────────
+function renderMemberPhoto(url) {
+  const wrap = document.getElementById('tm_photo_preview');
+  const thumb = document.getElementById('tm_photo_thumb');
+  if (url) { thumb.src = url; wrap.style.display = 'flex'; }
+  else { wrap.style.display = 'none'; thumb.src = ''; }
+}
+function onMemberPhotoChosen(input) {
+  const file = (input.files || [])[0] || null;
+  tmPhotoFile = file;
+  tmPhotoRemove = false;
+  renderMemberPhoto(file ? URL.createObjectURL(file)
+    : (tmPhotoCurrentPath ? teamPhotoSrc(tmPhotoCurrentPath) : ''));
+}
+function removeMemberPhoto() {
+  tmPhotoFile = null;
+  tmPhotoRemove = true;
+  document.getElementById('tm_photo').value = '';
+  renderMemberPhoto('');
+}
+
+function openMemberModal(id) {
+  tmEditId = id || null;
+  tmPhotoFile = null;
+  tmPhotoRemove = false;
+  const m = id ? memberById(id) : null;
+  tmPhotoCurrentPath = m ? (m.photoPath || null) : null;
+  document.getElementById('memberModalTitle').textContent = m ? 'Edit member' : 'Add member';
+  document.getElementById('memberError').textContent = '';
+  document.getElementById('tm_name').value = m ? (m.name || '') : '';
+  document.getElementById('tm_role').value = m ? (m.role || '') : '';
+  // A new member lands after everyone else, on their own number.
+  const nextSort = members.length ? Math.max.apply(null, members.map(x => x.sort || 0)) + 1 : 1;
+  document.getElementById('tm_sort').value = m ? (m.sort == null ? 0 : m.sort) : nextSort;
+  document.getElementById('tm_active').checked = m ? m.active !== false : true;
+  document.getElementById('tm_photo').value = '';
+  renderMemberPhoto(tmPhotoCurrentPath ? teamPhotoSrc(tmPhotoCurrentPath) : '');
+  document.getElementById('memberModal').classList.add('open');
+  document.getElementById('tm_name').focus();
+}
+function closeMemberModal() { document.getElementById('memberModal').classList.remove('open'); }
+document.getElementById('memberModal').addEventListener('click', function (e) {
+  if (e.target === this) closeMemberModal();
+});
+
+document.getElementById('memberForm').addEventListener('submit', async function (e) {
+  e.preventDefault();
+  const errEl = document.getElementById('memberError');
+  errEl.textContent = '';
+  const name = document.getElementById('tm_name').value.trim();
+  if (!name) { errEl.textContent = 'A name is required.'; return; }
+  const role = document.getElementById('tm_role').value.trim();
+  if (!role) { errEl.textContent = 'A role is required. It is the line under the name.'; return; }
+  const sort = parseSort(document.getElementById('tm_sort').value);
+  if (sort.error) { errEl.textContent = sort.error; return; }
+  const changes = {
+    name,
+    role,
+    sort: sort.value,
+    active: document.getElementById('tm_active').checked,
+  };
+  // Resolve photo change: new upload replaces; "remove" clears; else keep.
+  let newPath = null;
+  if (tmPhotoFile) {
+    try { newPath = await uploadTeamPhoto(tmPhotoFile); }
+    catch (err) { errEl.textContent = 'Could not upload photo. ' + err.message; return; }
+    changes.photoPath = newPath;
+  } else if (tmPhotoRemove) {
+    changes.photoPath = null;
+  }
+  const btn = document.getElementById('memberSaveBtn');
+  btn.disabled = true;
+  try {
+    if (tmEditId) {
+      await DataStore.updateTeamMember(tmEditId, changes);
+    } else {
+      await DataStore.addTeamMember(changes);
+    }
+    // Photo swapped/removed: delete the old gallery object best-effort.
+    if ((newPath || tmPhotoRemove) && tmPhotoCurrentPath && tmPhotoCurrentPath !== newPath) {
+      removeTeamPhotoObject(tmPhotoCurrentPath);
+    }
+    closeMemberModal();
+    await loadMembers();
+  } catch (err) {
+    if (newPath) removeTeamPhotoObject(newPath); // row write failed; clean orphan
+    errEl.textContent = 'Could not save. ' + err.message;
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.addEventListener('keydown', function (e) {
+  if (e.key !== 'Escape') return;
+  closeMemberModal();
+});
+
+// ── Load / render ────────────────────────────────────────────────────────────
+async function loadMembers() { members = await DataStore.getTeamMembers(); renderMembers(); }
+
+(async function init() {
+  try {
+    await AuthManager.requireAuth();
+    Nav.render();
+    await loadMembers();
+  } catch (err) {
+    document.getElementById('memberList').innerHTML =
+      '<div class="empty">Could not load the team (' + esc(err.message) +
+      '). <a href="javascript:location.reload()">Retry</a></div>';
+  }
+})();
+</script>
+
+<!-- Bag Carriers thin powered-by footer (locked attribution component) -->
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Libre+Baskerville:ital@1&display=swap" rel="stylesheet">
+<style>
+body { min-height: 100vh; display: flex; flex-direction: column; }
+.bc-thinfoot { margin-top: auto; }
+.bc-thinfoot {
+  --bc-ink:#0a0c10; --bc-bone:#f0ece4; --bc-sienna:#7a4520; --bc-muted:#8a8172;
+  flex: 0 0 auto;
+  background:var(--bc-ink);
+  font-family:'Bebas Neue',sans-serif;
+  padding:12px 20px;
+  display:flex; align-items:center; justify-content:center; gap:8px;
+  border-top:2px solid var(--bc-sienna);
+  text-align:center;
+}
+.bc-thinfoot__label {
+  font-family:'Libre Baskerville',serif; font-style:italic;
+  font-size:11px; letter-spacing:.02em; color:var(--bc-muted);
+}
+.bc-thinfoot__mark {
+  font-family:'Bebas Neue',sans-serif; letter-spacing:.08em;
+  font-size:15px; line-height:1; color:var(--bc-bone);
+  text-decoration:none;
+}
+.bc-thinfoot__mark:hover { opacity:.85; }
+.bc-thinfoot__mark .bc-systems { color:var(--bc-sienna); }
+.bc-thinfoot__mark .bc-dot { color:var(--bc-sienna); }
+</style>
+<footer class="bc-thinfoot">
+  <span class="bc-thinfoot__label">Powered by</span>
+  <a class="bc-thinfoot__mark" href="https://bagcarriers.com/systems" target="_blank" rel="noopener">
+    BAG CARRIERS <span class="bc-systems">SYSTEMS</span><span class="bc-dot">.</span>
+  </a>
+</footer>
+</body>
+</html>
