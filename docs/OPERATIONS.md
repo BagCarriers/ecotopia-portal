@@ -12,7 +12,7 @@ it is committed so it survives across machines and sessions.
 
 ## Migrations
 
-Migrations `0001`-`0030` (every migration in `supabase/migrations/`) were applied to the
+Migrations `0001`-`0032` (every migration in `supabase/migrations/`) were applied to the
 live database directly via the Supabase Management API
 (`POST https://api.supabase.com/v1/projects/wibnryfinfwbwwgsyojr/database/query`),
 NOT via `supabase db push`. Because of that the CLI does not know any of them ran: the
@@ -24,11 +24,11 @@ Before ever running `supabase db push` against this project, first register the
 already-applied migrations so the CLI does not try to re-run them:
 
 ```
-for n in $(seq -w 1 30); do supabase migration repair --status applied 00$n; done
+for n in $(seq -w 1 32); do supabase migration repair --status applied 00$n; done
 ```
 
 (equivalently, one `supabase migration repair --status applied <NNNN>` per file, `0001`
-through `0030`). Keep this range current: every new migration in this project is applied
+through `0032`). Keep this range current: every new migration in this project is applied
 by hand through the Management API, so every new migration extends it.
 
 To apply a new migration by hand via the Management API, get the token with
@@ -1449,3 +1449,128 @@ against production.
   strip (up to 3, hidden when none).
 - Deliberately NO Review/AggregateRating schema markup: Google disallows rich-result
   markup for self-collected reviews. Revisit if a GBP is created later.
+
+## Team members (2026-08-02)
+
+Migrations `0031_team_members.sql` and `0032_team_members_anon_active.sql` move the
+"Meet the team" grid on `about.html` out of eleven hardcoded `<figure>` blocks and into
+`public.team_members`, edited on `manage-team.html` ("Team" in the portal nav, after
+Shop). Both were applied live via the Management API, so register each one
+(`supabase migration repair --status applied 0031`, and the same for `0032`) before any
+`supabase db push`.
+
+**A row here is public listing content and nothing else. It grants no portal access.**
+Logins are `portal_users` rows and are managed on the Users page; adding someone to the
+team grid does not give them an account, and removing them does not take one away.
+
+Table `public.team_members` columns:
+
+| column       | notes                                                              |
+| ------------ | ------------------------------------------------------------------ |
+| `id`         | uuid primary key, default `gen_random_uuid()`                      |
+| `name`       | required; also the tie-breaker in both listing queries             |
+| `role`       | required; the line printed under the name on the card              |
+| `photo_path` | nullable. `static:<file>` repo asset, or a gallery-bucket object (see below); null renders an initials tile |
+| `sort`       | integer, not null, default 0, ascending. No unique constraint      |
+| `active`     | boolean, not null, default true. False hides the member from the public page, and from anon reads entirely |
+| `created_at` | not null, default `now()`                                          |
+| `updated_at` | nullable; maintained by the shared `set_updated_at` trigger, attached by `0031` at table creation |
+
+RLS is enabled and there are exactly three policies:
+
+- `tm_anon_read` - SELECT to `anon`, `using (active)`.
+- `tm_staff_read` - SELECT to `authenticated`, `using (true)`. Deliberately wider than
+  the anon policy: the portal has to keep seeing hidden rows so Jordan can unhide them.
+- `tm_staff_write` - ALL to `authenticated`, `using (is_portal_user())` and
+  `with check (is_portal_user())`. Not `using (true)`: an auth account that is not an
+  active portal user must not be able to edit content that renders on the public site.
+
+There is no anon INSERT, UPDATE or DELETE policy, and RLS is enabled, so the anon key
+can only read. The anon role does hold the usual Supabase table grants on this table
+(SELECT, INSERT, UPDATE, DELETE), so RLS is the entire barrier, which is why the policy
+list above is the thing to check if this ever looks wrong. Verified live over the anon
+key on 2026-08-02: INSERT rejected `42501` ("new row violates row-level security
+policy"), PATCH matched zero rows and left `updated_at` null on all eleven.
+
+**`0032` is a security fix, not a tidy-up.** `0031` shipped `tm_anon_read` as
+`using (true)`, so a hidden member's name, role and photo stayed readable by anyone
+holding the anon key. The `.eq('active', true)` in `DataStore.getPublicTeam` was a
+client-side filter, not a boundary, which defeats the point of the hide toggle. Every
+sibling content table already gated anon on visibility (`plant_species`, `plant_kits`
+and `merch_items` on `active`; `events` on `is_public`). With the policy scoped to
+`active`, a hidden row is therefore visible to the service role and invisible over the
+anon key, which is how it was verified when `0032` went in.
+
+Seed: `0031` inserted the eleven members from the then-hardcoded `about.html` markup in
+their existing order, `sort` 1 through 11, each `photo_path` a `static:` repo file, so
+shipping the feature changed nothing a visitor sees. The insert is guarded by
+`where not exists (select 1 from team_members)`, not `on conflict do nothing`: there is
+no unique constraint for a conflict to fire on, so a re-apply would otherwise insert
+eleven duplicates with fresh ids. **Consequence worth knowing: the guard keys on the
+table being empty, so if every row is ever deleted, a re-apply reseeds all eleven as
+active, republishing people who were deliberately taken off the page.**
+
+Photo convention (rooted at `assets/img/team/`, resolved by `EcoTeam.teamPhotoSrc` in
+`assets/team.js`, shared by the public page and the portal page so the two cannot drift):
+
+- `static:<file>` -> a repo static asset served from `assets/img/team/<file>`. The
+  filename is charset-guarded (`/^[A-Za-z0-9._-]+$/`, anchored) so a crafted value
+  cannot escape the folder; anything that fails the guard resolves to no photo, which
+  falls back to the initials tile. All eleven seeded photos use this form (e.g.
+  `static:team-jordan.jpg`). **`static:` files are never deleted from storage, because
+  they are not in storage**; `removeTeamPhotoObject` returns early on them.
+- any other value -> a `gallery` bucket object served via its public URL. Staff uploads
+  on `manage-team.html` go through `DataStore.resizeImage(file, 1600)` (long edge scaled
+  to 1600px, JPEG q0.85; a file already inside 1600px is uploaded unchanged, so the
+  `.jpg` name does not by itself guarantee JPEG bytes) and land under
+  `team/<uuid>.jpg`. The existing `gallery_staff_all` object policy covers these writes
+  and the public bucket read serves them.
+
+Storage cleanup, in the order it actually happens:
+
+- Delete a member: the bucket object is removed first, best-effort, then the row.
+  `DataStore.removeTeamMember` drops the row only, so doing it the other way round
+  would orphan the object.
+- Replace or clear a photo: the new file is uploaded first, then the row is written,
+  and only then is the old object removed best-effort. If the row write fails, the
+  freshly uploaded object is deleted so a failed save leaves no orphan.
+
+No photo (null, or a `static:` value that fails the charset guard) renders a cream tile
+with the member's initials: first letter of the first word plus first letter of the last
+word, uppercased, one letter for a single-word name (so "Brendan" is `B`).
+`EcoTeam.teamInitials` is covered by `tests/team.test.js` (`npm test`).
+
+Public page (`about.html`): `renderTeam()` reads active rows over anon via
+`DataStore.getPublicTeam` (ordered `sort` then `name`) and writes the cards into
+`#teamGrid`, escaping every database value before it reaches `innerHTML`. A failed
+fetch, or no rows, leaves the grid empty rather than throwing; the surrounding heading
+and lead paragraph still render. **It calls `EcoSite.decorate()` after rendering, and
+that call is load-bearing**: the cards carry `class="reveal"`, and `.reveal` is
+`opacity: 0` in `assets/site.css` until `decorate()` adds `.in` through its
+IntersectionObserver. Drop the call and the section renders invisible to everyone
+except visitors with `prefers-reduced-motion: reduce`, for whom the stylesheet forces
+`.reveal` back to `opacity: 1`. That is a nasty way to find the bug, so if the grid is
+blank in a browser, check the console before touching the policies.
+
+Staff page (`manage-team.html`): one compact list (photo thumb or initials placeholder,
+name, Shown/Hidden pill, role, sort number) with up/down arrows, Edit, Hide/Show and
+Delete per row. Delete is a hard delete and says so in the confirm, pointing at Hide as
+the reversible option. The Add form pre-fills `sort` with `max(existing sort) + 1`, or 1
+when the list is empty, so a new member lands at the end on their own number; the field
+is editable and accepts any whole number 0 or more, blank meaning 0. The page is in
+`robots.txt` under `Disallow`.
+
+Two things about `sort` worth knowing before someone reports a bug:
+
+- It has no unique constraint and defaults to 0, so two members can tie. Both listing
+  queries break the tie on `name`, and the portal list flags tied rows with a "tied"
+  chip so the order looks decided rather than random.
+- The up/down arrows renumber the whole list 1..n instead of swapping the two rows'
+  values, writing only the rows whose number actually changed. A swap would be a no-op
+  between two rows that already tie.
+
+Data helpers (`assets/data.js`): `getTeamMembers` (staff read, hidden rows included),
+`getPublicTeam` (anon read, active only), both ordered `sort` then `name`;
+`addTeamMember` / `updateTeamMember` / `removeTeamMember(id)`; plus `teamPhotoUrl` for
+gallery-bucket paths. Note `removeTeamMember` takes only the id and does not touch
+storage: the caller removes the object.
