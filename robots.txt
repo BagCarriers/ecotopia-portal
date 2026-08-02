@@ -24,6 +24,7 @@ Disallow: /users.html
 Disallow: /manage-services.html
 Disallow: /manage-plants.html
 Disallow: /manage-shop.html
+Disallow: /manage-team.html
 Disallow: /question-inbox.html
 Disallow: /login.html
 Disallow: /accept-invite.html
