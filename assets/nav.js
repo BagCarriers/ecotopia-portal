@@ -98,10 +98,16 @@ const Nav = (() => {
         background: rgba(255,255,255,0.1); color:#fff;
       }
 
-      /* Main content offset */
+      /* Main content offset. Column flex so the attribution footer, which this
+         wrapper swallows along with the page content, can be pushed to the bottom
+         by its own margin-top:auto. Without it a short page (an empty Gallery, say)
+         leaves the footer floating mid-screen with cream below it. */
       #eco-main {
         margin-left: 220px; flex: 1; min-width: 0;
+        display: flex; flex-direction: column; min-height: 100vh;
       }
+      /* The page body grows; the footer keeps its own height. */
+      #eco-main > .bc-thinfoot { flex: 0 0 auto; margin-top: auto; }
 
       /* Mobile bottom nav */
       #eco-bottomnav {
