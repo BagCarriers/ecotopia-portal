@@ -33,6 +33,12 @@ test('teamPhotoSrc refuses a static: path that tries to escape the folder', () =
   const url = (p) => 'BUCKET/' + p;
   assert.strictEqual(teamPhotoSrc('static:../../etc/passwd', url), null);
   assert.strictEqual(teamPhotoSrc('static:a/b.jpg', url), null);
+  // A browser treats a backslash as a path separator in an http(s) URL, so a charset
+  // that allowed it would escape the folder just as a forward slash would.
+  assert.strictEqual(teamPhotoSrc('static:x\\y.jpg', url), null);
+  // The guard must anchor to end of input, not end of line: with the regex 'm' flag a
+  // trailing newline would let anything after it through.
+  assert.strictEqual(teamPhotoSrc('static:x.jpg\n', url), null);
 });
 
 test('teamPhotoSrc sends any other value to the bucket', () => {

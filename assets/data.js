@@ -294,11 +294,18 @@ const DataStore = (() => {
       sb.storage.from('gallery').getPublicUrl(photoPath).data.publicUrl, // sync
 
     // Team members (staff-editable, rendered on the public about page). Public
-    // listing only: a row here grants no portal access. The public page reads
-    // active rows over anon; staff methods use the authenticated policy and see
-    // hidden rows too. Uploads land in the gallery bucket under team/<uuid>.jpg;
-    // 'static:<file>' paths are repo assets and are never touched in storage.
-    getTeamMembers: () => list('team_members', 'sort'),
+    // listing only: a row here grants no portal access. The anon read policy is
+    // itself scoped to active rows (migration 0032), so hiding a member takes them
+    // out of anon reads entirely, not just out of the rendered grid: the
+    // .eq('active', true) below is a second guard rather than the only one. Staff
+    // methods use the authenticated policy, which returns hidden rows too, so the
+    // portal can manage them. Uploads land in the gallery bucket under
+    // team/<uuid>.jpg; 'static:<file>' paths are repo assets, never touched in
+    // storage. Both listings order by sort then name: sort has no unique
+    // constraint and defaults to 0, so name is what keeps ties stable.
+    getTeamMembers: async () =>
+      fromDbAll(unwrap(await sb.from('team_members').select('*')
+        .order('sort', { ascending: true }).order('name', { ascending: true }))),
     getPublicTeam: async () =>
       fromDbAll(unwrap(await sb.from('team_members').select('*')
         .eq('active', true)
