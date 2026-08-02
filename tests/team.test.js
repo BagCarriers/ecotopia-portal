@@ -41,6 +41,19 @@ test('teamPhotoSrc refuses a static: path that tries to escape the folder', () =
   assert.strictEqual(teamPhotoSrc('static:x.jpg\n', url), null);
 });
 
+test('teamPhotoSrc treats a bare-dots static: value as no photo', () => {
+  const url = (p) => 'BUCKET/' + p;
+  // '.' and '..' pass the charset guard, so without an explicit check they would
+  // resolve to 'assets/img/team/.' and 'assets/img/team/..' and render a broken image
+  // instead of the initials tile. Neither escapes the folder; this is about the
+  // documented fallback, not traversal.
+  assert.strictEqual(teamPhotoSrc('static:.', url), null);
+  assert.strictEqual(teamPhotoSrc('static:..', url), null);
+  assert.strictEqual(teamPhotoSrc('static:...', url), null);
+  // A real filename that merely starts with a dot is still a file.
+  assert.strictEqual(teamPhotoSrc('static:.hidden.jpg', url), 'assets/img/team/.hidden.jpg');
+});
+
 test('teamPhotoSrc sends any other value to the bucket', () => {
   const url = (p) => 'BUCKET/' + p;
   assert.strictEqual(teamPhotoSrc('team/abc-123.jpg', url), 'BUCKET/team/abc-123.jpg');

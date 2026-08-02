@@ -23,7 +23,13 @@
     const p = String(photoPath);
     if (p.slice(0, 7) === 'static:') {
       const file = p.slice(7);
-      return /^[A-Za-z0-9._-]+$/.test(file) ? 'assets/img/team/' + file : null;
+      if (!/^[A-Za-z0-9._-]+$/.test(file)) return null;
+      // The charset allows '.', so '.' and '..' pass the guard above. Neither escapes
+      // the folder (no '/' or '\' can get through) but both name a directory, not a
+      // file, so the src would render as a broken image instead of falling back to the
+      // initials tile. A value that is nothing but dots is not a filename.
+      if (/^\.+$/.test(file)) return null;
+      return 'assets/img/team/' + file;
     }
     return publicUrl(p);
   }

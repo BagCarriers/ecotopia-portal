@@ -29,9 +29,19 @@ New table `public.team_members`:
 
 **RLS, matching the other public-content tables:**
 
-- `tm_anon_read`: anon SELECT, `using (true)`
+- `tm_anon_read`: anon SELECT, `using (active)`
 - `tm_staff_read`: authenticated SELECT, `using (true)`
 - `tm_staff_write`: authenticated ALL, `using (is_portal_user()) with check (is_portal_user())`
+
+**Corrected after implementation.** This design originally specified `tm_anon_read` as
+`using (true)`, which is what migration 0031 shipped. That was wrong: it left a hidden
+member's name, role and photo readable by anyone holding the anon key, so the
+`.eq('active', true)` in `DataStore.getPublicTeam` was a client-side filter rather than a
+boundary, and the hide toggle did not actually hide anyone. Migration 0032 scopes the
+policy to `using (active)`, matching every sibling content table (`plant_species`,
+`plant_kits` and `merch_items` gate anon on `active`; `events` gates on `is_public`).
+`tm_staff_read` is deliberately left at `using (true)` so the portal can still list
+hidden rows for unhiding.
 
 The write gate is `is_portal_user()`, not `using (true)`. Migration 0028 shipped a settings table with the looser policy and it had to be patched in 0029; the project has an inactive auth user who would otherwise have write access to public-facing content.
 

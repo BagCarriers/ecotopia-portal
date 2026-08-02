@@ -218,11 +218,19 @@ async function removeTeamPhotoObject(path) {
 }
 
 // Sort input: a whole number 0 or more. Blank is treated as 0, the column default.
+// The upper bound is the postgres `integer` maximum: without it a long digit string
+// passes the regex, reaches the database and comes back as a raw "22003 integer out of
+// range" in the error line, which tells Jordan nothing.
+const SORT_MAX = 2147483647;
 function parseSort(raw) {
   const s = String(raw == null ? '' : raw).trim();
   if (s === '') return { value: 0 };
   if (!/^\d+$/.test(s)) return { error: 'Sort must be a whole number 0 or more.' };
-  return { value: parseInt(s, 10) };
+  const n = parseInt(s, 10);
+  if (!Number.isSafeInteger(n) || n > SORT_MAX) {
+    return { error: `Sort must be ${SORT_MAX} or less.` };
+  }
+  return { value: n };
 }
 
 // ── Member list ──────────────────────────────────────────────────────────────

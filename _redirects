@@ -1,3 +1,42 @@
+# Repo files that must not be served to the public.
+#
+# The deploy is `netlify deploy --prod --dir=.`, which uploads the whole checkout,
+# not a built subset. Verified live on 2026-08-02: /docs/OPERATIONS.md, /package.json,
+# every /supabase/migrations/*.sql, all four /supabase/functions/*/index.ts, the
+# /tests/*.js files and /scripts/verify-rls.mjs all returned 200. No secrets are in
+# them (they read credentials from the environment), but they are a detailed map of
+# the security model of a site that takes card payments, so stop serving them.
+#
+# Two things make these rules work, both checked against Netlify's docs rather than
+# assumed:
+#   1. Rules are matched top to bottom and the first match wins, so these sit above
+#      the 301s below. None of the patterns overlap today, but this is the safe order.
+#   2. A rule normally loses to a real file at the same path ("shadowing"). Every path
+#      here IS a real file, so each rule needs the `!` force marker to win. Without the
+#      `!` these lines would do nothing at all.
+#
+# KNOWN GAP, do not mistake this for airtight. Netlify matches redirect rules
+# case-sensitively but serves files case-insensitively, both verified: the live site
+# returns 200 for /DOCS/OPERATIONS.MD, and Netlify's own matcher returns no rule for
+# that path. So a case variant still reaches the file, and covering every variant would
+# take 2^n rules. This blocks the paths that are actually guessable and scanned for.
+# The complete fix is to stop uploading these files at all, which means deploying from
+# a publish directory that holds only site files instead of `--dir=.`.
+/docs/*             /404.html   404!
+/supabase/*         /404.html   404!
+/tests/*            /404.html   404!
+/scripts/*          /404.html   404!
+/package.json       /404.html   404!
+/package-lock.json  /404.html   404!
+/netlify.toml       /404.html   404!
+/node_modules/*     /404.html   404!
+# Hidden files are not uploaded by the CLI today (verified: /.gitignore and
+# /.superpowers/sdd/progress.md both 404 on the live site). That is a property of the
+# deploy tool, not a decision this site made, so pin the ones that would hurt.
+/.superpowers/*     /404.html   404!
+/.env               /404.html   404!
+/.gitignore         /404.html   404!
+
 # 301s from the old Squarespace site's indexed URLs
 /our-team            /about.html               301
 /an-ecotopian        /about.html               301

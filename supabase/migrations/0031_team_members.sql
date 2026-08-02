@@ -1,6 +1,9 @@
 -- 0031: the about.html team grid becomes portal-managed content.
 -- Public listing only: a row here grants no portal access. Logins live in
 -- portal_users and are managed on the Users page.
+--
+-- WARNING: this file is superseded by 0032. Applying 0031 alone reverts a security
+-- fix. See the block above the tm_anon_read policy below.
 
 create table if not exists public.team_members (
   id         uuid primary key default gen_random_uuid(),
@@ -15,6 +18,17 @@ create table if not exists public.team_members (
 
 alter table public.team_members enable row level security;
 
+-- !! SUPERSEDED BY 0032. DO NOT RE-APPLY THIS FILE ON ITS OWN. !!
+-- The `using (true)` below is the bug that 0032 fixes: it makes every hidden team
+-- member publicly readable over the anon key, which is the whole point of the hide
+-- toggle. 0032 drops and recreates tm_anon_read as `using (active)`.
+--
+-- Re-applying 0031 by hand silently reverts that security fix. The seed at the bottom
+-- of this file no-ops on a non-empty table, so nothing visible happens and no error is
+-- raised, but hidden members go public again. The re-apply safety discussion further
+-- down covers the SEED ONLY; it is not a statement about this policy.
+--
+-- If you ever do re-apply 0031, apply 0032 immediately afterwards.
 drop policy if exists tm_anon_read on public.team_members;
 create policy tm_anon_read on public.team_members
   for select to anon using (true);

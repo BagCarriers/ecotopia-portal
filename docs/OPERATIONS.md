@@ -1421,6 +1421,39 @@ netlify deploy --prod --dir=.
 - Netlify site: `ecotopia-portal-578`
 - Custom domain: `ecotopia.bagcarriers.dev`
 
+### `--dir=.` uploads the whole checkout
+
+That deploy command publishes the repository root, not a built subset, so every tracked
+file goes to the CDN and is reachable over HTTP unless something stops it. Verified live
+on 2026-08-02 against `ecotopianearthcare.com`: `/docs/OPERATIONS.md` (this file),
+`/package.json`, every `/supabase/migrations/*.sql`, all four
+`/supabase/functions/*/index.ts`, `/supabase/seed-dev.sql`, `/supabase/config.toml`,
+`/tests/*.js` and `/scripts/verify-rls.mjs` all returned 200. No credentials are in any
+of them (the functions read theirs from the environment), but together they are a
+detailed map of the security model of a site that takes card payments.
+
+`_redirects` now carries forced `404!` rules, above the Squarespace 301s, for `/docs/*`,
+`/supabase/*`, `/tests/*`, `/scripts/*`, `/package.json`, `/package-lock.json`,
+`/netlify.toml`, `/node_modules/*`, `/.superpowers/*`, `/.env` and `/.gitignore`. Two
+details that are easy to get wrong:
+
+- The `!` is mandatory. An unforced rule loses to a real file at the same path, and
+  every path in that list is a real file, so without the `!` the rules do nothing.
+- Rules match top to bottom, first match wins, which is why they sit above the 301s.
+
+**They are not airtight.** Netlify matches redirect rules case-sensitively but serves
+files case-insensitively. `/DOCS/OPERATIONS.MD` returned 200 on the live site, and
+Netlify's own matcher (`netlify-redirector`, the WASM engine, driven against this
+`_redirects` locally) returns no rule for that path. Covering every case variant would
+take an exponential number of rules. The rules block what is guessable and what scanners
+ask for; the complete fix is to stop uploading these files, which means deploying from a
+publish directory that contains only site files instead of `--dir=.`. Netlify CLI 26 has
+no `.netlifyignore`, so that is a layout change, not a config flag.
+
+Hidden files are not uploaded by the CLI today (`/.gitignore` and
+`/.superpowers/sdd/progress.md` both 404 live). That is a property of the deploy tool,
+not a decision this site made, hence the belt-and-braces rules for them.
+
 ## Design notes
 
 - The `complete_task` RPC is intentionally callable by the anonymous role. The QR
@@ -1501,6 +1534,15 @@ and `merch_items` on `active`; `events` on `is_public`). With the policy scoped 
 `active`, a hidden row is therefore visible to the service role and invisible over the
 anon key, which is how it was verified when `0032` went in.
 
+**Never re-apply `0031` on its own.** It still contains the original
+`create policy tm_anon_read ... using (true)` and drops the existing policy first, so
+running that file by hand reverts `0032` silently: the seed no-ops on a non-empty table,
+nothing errors, nothing looks different, and every hidden member is public again. `0031`
+now carries a warning at the top and above the policy. If it ever is re-applied, apply
+`0032` straight afterwards and confirm with
+`select polname, pg_get_expr(polqual, polrelid) from pg_policy
+where polrelid = 'public.team_members'::regclass;`
+
 Seed: `0031` inserted the eleven members from the then-hardcoded `about.html` markup in
 their existing order, `sort` 1 through 11, each `photo_path` a `static:` repo file, so
 shipping the feature changed nothing a visitor sees. The insert is guarded by
@@ -1516,7 +1558,11 @@ Photo convention (rooted at `assets/img/team/`, resolved by `EcoTeam.teamPhotoSr
 - `static:<file>` -> a repo static asset served from `assets/img/team/<file>`. The
   filename is charset-guarded (`/^[A-Za-z0-9._-]+$/`, anchored) so a crafted value
   cannot escape the folder; anything that fails the guard resolves to no photo, which
-  falls back to the initials tile. All eleven seeded photos use this form (e.g.
+  falls back to the initials tile. The charset permits `.`, so a value that is nothing
+  but dots (`static:.`, `static:..`) is rejected separately: it passes the charset test
+  and escapes nothing, but it names a directory rather than a file, and without the
+  extra check it would render a broken image instead of the initials tile.
+  All eleven seeded photos use this form (e.g.
   `static:team-jordan.jpg`). **`static:` files are never deleted from storage, because
   they are not in storage**; `removeTeamPhotoObject` returns early on them.
 - any other value -> a `gallery` bucket object served via its public URL. Staff uploads
@@ -1557,8 +1603,10 @@ name, Shown/Hidden pill, role, sort number) with up/down arrows, Edit, Hide/Show
 Delete per row. Delete is a hard delete and says so in the confirm, pointing at Hide as
 the reversible option. The Add form pre-fills `sort` with `max(existing sort) + 1`, or 1
 when the list is empty, so a new member lands at the end on their own number; the field
-is editable and accepts any whole number 0 or more, blank meaning 0. The page is in
-`robots.txt` under `Disallow`.
+is editable and accepts any whole number from 0 to 2147483647, blank meaning 0. The
+upper bound is the postgres `integer` maximum and is checked client-side so a long digit
+string produces "Sort must be 2147483647 or less." rather than a raw `22003 integer out
+of range` from the database. The page is in `robots.txt` under `Disallow`.
 
 Two things about `sort` worth knowing before someone reports a bug:
 
