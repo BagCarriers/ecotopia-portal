@@ -3,3 +3,6 @@ node_modules/
 .env
 .env.*
 .DS_Store
+
+# Deno lockfile from local edge-function type checks; not part of the deploy.
+deno.lock
