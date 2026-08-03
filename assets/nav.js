@@ -146,6 +146,17 @@ const Nav = (() => {
         background: var(--forest); z-index: 199;
         padding: 8px 0; border-top: 1px solid rgba(255,255,255,0.1);
         box-shadow: 0 -4px 20px rgba(0,0,0,0.25);
+        /* Sixteen links do not fit above the 64px bar on a phone. Without a cap the
+           drawer grows off the top of the screen and those entries cannot be reached
+           at all, because a fixed element has nothing to scroll. Cap it and let the
+           drawer itself scroll. dvh tracks Safari's collapsing URL bar; the vh line
+           above it is the fallback for browsers that lack dvh. */
+        max-height: calc(100vh - 64px - 12px);
+        max-height: calc(100dvh - 64px - 12px);
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        /* Do not chain the scroll to the page behind once the list hits its end. */
+        overscroll-behavior: contain;
       }
       #eco-more-drawer.open { display: block; }
       #eco-more-drawer a {
