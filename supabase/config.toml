@@ -220,20 +220,21 @@ verify_jwt = false
 # disabled MFA, and switched open signup back on. Do not push from a file whose
 # [auth] block you have not checked against the live project.
 #
-# !! enable_signup IS TRUE ON THE LIVE PROJECT AND THAT IS ALMOST CERTAINLY
-# !! WRONG. This portal is not self-serve; its accounts are created by an
-# !! admin. It is recorded truthfully here so a push changes nothing, and it is
-# !! flagged so the decision to close it is made deliberately. Closing it means
-# !! setting this to false and pushing on purpose.
+# Signup is CLOSED. These portals are not self-serve: every account is created by
+# an admin. Public signup was open in production until 2026-08-04, which was the
+# Supabase default never having been changed rather than a decision.
 [auth]
 enabled = true
-site_url = "http://localhost:3000"
-additional_redirect_urls = []
+site_url = "https://ecotopianearthcare.com"
+additional_redirect_urls = [
+  "https://ecotopianearthcare.com/**",
+  "http://localhost:5173/**",
+]
 jwt_expiry = 3600
 enable_refresh_token_rotation = true
 refresh_token_reuse_interval = 10
 enable_manual_linking = false
-enable_signup = true
+enable_signup = false
 enable_anonymous_sign_ins = false
 minimum_password_length = 6
 
