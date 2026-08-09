@@ -1,0 +1,66 @@
+-- Corrective migration, and the second half of the problem 0036 found.
+--
+-- 0001 created public.volunteers_public with a bare
+-- "grant select ... to anon, authenticated". That grant adds a privilege; it does
+-- not take any away, and Supabase's default privileges had already granted anon and
+-- authenticated ALL privileges on new objects in the public schema. So the view has
+-- shipped since day one with insert, update, delete, truncate, references and
+-- trigger attached for anon, not just select.
+--
+-- That matters because the view is simple enough to be auto updatable, and it runs
+-- with its owner's rights. A write through it therefore reaches public.volunteers as
+-- postgres, which owns that table and so is not subject to its RLS. An anonymous
+-- visitor holding nothing but the publishable key from assets/config.js gets a
+-- permission check that passes:
+--
+--   curl -X DELETE ".../rest/v1/volunteers_public?id=eq.<id>" -H "apikey: <anon>"
+--   -> HTTP 204
+--
+-- The rows that would be destroyed are in public.volunteers, which is the PII table
+-- the view was built in 0001 to keep away from anon in the first place. A PATCH
+-- would likewise rewrite volunteer names.
+--
+-- This is not urgent only because public.volunteers holds zero rows today. It stops
+-- being harmless the first time the volunteer board signs somebody up, which is that
+-- board's entire purpose.
+--
+-- Nothing in this repo writes through this view. The only code that touches it is
+-- getVolunteersPublic in assets/data.js, a select. Staff writes go to
+-- public.volunteers directly via addVolunteer and updateVolunteer, as authenticated,
+-- under the staff_all policy on the table, which this migration does not touch.
+
+-- revoke before grant, the same pairing 0036 uses.
+--
+-- "revoke all" rather than naming insert, update, delete, truncate, references and
+-- trigger one by one. Enumerating would avoid ever dropping select, but it silently
+-- fails to cover any privilege type added to Postgres or to Supabase's default
+-- privileges later, and this migration exists precisely because a grant that did not
+-- revoke left privileges nobody intended. "all" cannot drift out of date. The reason
+-- it is safe to revoke select and immediately grant it back is that both statements
+-- land in one transaction: the Supabase CLI wraps each migration file in one, and
+-- the Management API wraps each request body in one, verified on this project. No
+-- reader can observe the instant in between.
+--
+-- Only anon and authenticated are named, so postgres, which owns the view, and
+-- service_role keep everything. No other role legitimately writes through this view,
+-- and no role at all needs to: it is a projection of two columns for public reading.
+--
+-- Re-runnable: revoking a privilege that is not held is a no op, and granting one
+-- that is already held is too.
+revoke all on public.volunteers_public from anon, authenticated;
+grant select on public.volunteers_public to anon, authenticated;
+
+-- Pin the security semantics that this view has always relied on but never stated.
+-- The view exists so anon can read a name-only projection of a table anon cannot
+-- read at all, so owner's rights is not incidental here, it is the whole mechanism.
+-- Tested rather than assumed, with one active volunteer temporarily present and the
+-- session role set to anon: the view as it stands returned that row, an identical
+-- view with security_invoker = true returned nothing, and a direct read of
+-- public.volunteers returned nothing. Flipping this view to invoker semantics would
+-- empty the kiosk name list.
+--
+-- Setting it to its current value changes no behaviour. What it changes is that the
+-- behaviour is now written down instead of inherited from a Postgres default that is
+-- invisible in review and easy to flip by accident. Done with alter rather than by
+-- recreating the view, so the live definition is never dropped. Idempotent.
+alter view public.volunteers_public set (security_invoker = false);
