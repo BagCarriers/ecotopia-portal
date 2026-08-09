@@ -12,8 +12,8 @@ it is committed so it survives across machines and sessions.
 
 ## Migrations
 
-Migrations `0001`-`0033` were applied to the
-live database directly via the Supabase Management API
+Migrations `0001`-`0033` were applied to the live database directly via the Supabase
+Management API
 (`POST https://api.supabase.com/v1/projects/wibnryfinfwbwwgsyojr/database/query`),
 NOT via `supabase db push`. Because of that the CLI does not know any of them ran: the
 `supabase_migrations.schema_migrations` table does not exist on this project at all
@@ -516,6 +516,16 @@ exists pg_net;` then `cron.schedule(...)`): job name `grant-scan-nightly`, `0 9 
 header. The token lives in the cron job's SQL (stored in the same DB the service role
 protects; acceptable). Inspect/verify with `select * from cron.job where jobname =
 'grant-scan-nightly';`.
+
+**This job's `net._http_response` row is permanently useless, and that is worth knowing
+before anyone debugs off it.** It calls `net.http_post` without `timeout_milliseconds`, so
+pg_net gives up after the 5000 ms default and records "Timeout of 5000 ms reached" every
+night regardless of what the function returned. The scan itself is unaffected: pg_net stops
+waiting, it does not abort the function. Measured 2026-08-09, `grant_opportunities.last_seen`
+stamped 09:00:08 to 09:00:09 against a 09:00:00 dispatch. The cost is only that the real
+status is never recorded, so an HTTP error here (a token that drifted out of sync with
+`GRANT_SCAN_TOKEN`, say) looks exactly like a success. Read the function logs instead, or
+add an explicit timeout the way `0034_inat_sync_cron.sql` does.
 
 ## Garden profiles
 

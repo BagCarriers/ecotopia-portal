@@ -63,14 +63,34 @@ select cron.schedule(
 -- ---------------------------------------------------------------------------
 -- Why timeout_milliseconds is set here when grant-scan-nightly does not set it
 --
+-- Do not drop this argument. It is what makes the observability note at the
+-- bottom of this file true, and what makes the token-rotation warning above
+-- something anyone can act on.
+--
 -- net.http_post defaults to a 5000 ms timeout. inat-sync paces itself at 1100 ms
 -- per iNaturalist call to stay inside that free API's 60-per-minute limit, and a
--- resolvable species costs two calls, so roughly 2.2 seconds each. The verified
--- 50 row run took about 130 seconds. Left at the default, pg_net would abort the
--- connection about two species in, every night, forever. Whether an aborted
--- client also tears down the edge function is not something this file can
--- assert, because it has not been measured on this project; the timeout is set
--- wide enough that the question never has to be answered.
+-- resolvable species costs two calls, so roughly 2.2 seconds each; the verified
+-- 50 row run took about 130 seconds. The default therefore expires long before
+-- any real run has finished.
+--
+-- That does NOT abort the function. Measured on this project on 2026-08-09:
+-- grant-scan-nightly sets no timeout and duly logs "Timeout of 5000 ms reached"
+-- every night, yet its function carries on regardless, stamping
+-- grant_opportunities.last_seen at 09:00:08 to 09:00:09 against a 09:00:00
+-- dispatch. pg_net simply stops waiting for the response.
+--
+-- What the default costs is the response itself. pg_net writes a timeout row and
+-- never learns the real status, so at the default this job's net._http_response
+-- entry would read "timeout" every single night, identically, whether the
+-- function answered 200 with the counts, 429 for a rate limit, or 401 because
+-- the token and the INAT_SYNC_TOKEN secret had drifted apart. The rotation
+-- warning above says a mismatch produces 401s that nothing will notice; it is
+-- this argument that makes them noticeable at all. The observability note at the
+-- bottom says net._http_response is where a run's outcome is read; it is this
+-- argument that makes that true rather than aspirational.
+--
+-- 240000 comfortably exceeds the measured run, so the response row records what
+-- actually happened. Widen it if the catalogue grows. Do not remove it.
 --
 -- ---------------------------------------------------------------------------
 -- Known constraint: the run has no batch limit
@@ -97,7 +117,8 @@ select cron.schedule(
 -- immediately, so cron.job_run_details records this job as succeeded whatever
 -- the function answers, including a 401, a 429 or a timeout. Read the outcome
 -- from net._http_response or from the function logs, never from the cron
--- history:
+-- history. That table only carries a real status because timeout_milliseconds
+-- is set above; see the note there before changing it.
 --
 --   select jobname, schedule, active from cron.job order by jobname;
 --   select id, status_code, error_msg, created
