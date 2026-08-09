@@ -4,7 +4,7 @@
 
 **Goal:** Resolve all 50 plant catalogue species to iNaturalist taxa, auto-fill commercially licensed photos for the 41 species that have none, and record Pennsylvania establishment and conservation status.
 
-**Architecture:** Pure logic lives in `assets/inat.js` as a browser-and-Node global, exactly like `assets/pricing.js` and `assets/mapping.js`. A nightly edge function `inat-sync` mirrors that logic and writes to cached columns on `plant_species`. Public pages read Supabase only and never contact iNaturalist.
+**Architecture:** Pure logic lives in ONE file, `supabase/functions/_shared/inat-logic.js`, written in the same universal style as `assets/mapping.js` so the identical file loads under Deno (side-effect `import`) and under Node (`require`), both reaching it via `globalThis.EcoInat`. The edge function imports it and the tests require it, so the tests cover the code that actually runs. A nightly `inat-sync` writes to cached columns on `plant_species`. Public pages read Supabase only and never contact iNaturalist.
 
 **Tech Stack:** Static HTML, Supabase (Postgres + Storage + Edge Functions on Deno), `node --test`, no build step.
 
@@ -19,6 +19,7 @@
 - **A row with `photo_path` set and `inat_photo_id` null is Jordan's own photograph and must never be modified by the sync.**
 - **SQL is applied via the Supabase Management API using `curl`, never `python urllib`** (Cloudflare returns 403 error 1010 to urllib). Token: `security find-generic-password -s "Supabase CLI" -w`. Project ref `wibnryfinfwbwwgsyojr`. Note `supabase_migrations.schema_migrations` does not exist in this project, so `supabase db push` is not the mechanism.
 - **Supabase MCP in this session points at the wrong project** (the Cope database). Do not use it.
+- **The resolution logic has exactly one implementation**, `supabase/functions/_shared/inat-logic.js`. Do not copy any of it into `index.ts` or into `assets/`. The browser never runs this logic, so a second copy would be both dead code and an untested divergence.
 - iNaturalist requires a descriptive `User-Agent` with a contact address and rate limits to 60 requests per minute.
 
 ---
@@ -28,8 +29,10 @@
 This task carries every rule that can be tested without a network. It is deliberately first because the destructive-failure guard lives here.
 
 **Files:**
-- Create: `assets/inat.js`
+- Create: `supabase/functions/_shared/inat-logic.js`
 - Create: `tests/inat.test.js`
+
+`_shared/` is Supabase's documented convention for code imported by more than one edge function, and it keeps the file inside `supabase/functions/` where the deploy bundler can reach it. A file under `assets/` would not be bundled.
 
 **Interfaces:**
 - Consumes: nothing.
@@ -42,7 +45,7 @@ Create `tests/inat.test.js`:
 ```js
 const test = require('node:test');
 const assert = require('node:assert');
-require('../assets/inat.js');
+require('../supabase/functions/_shared/inat-logic.js');
 const E = globalThis.EcoInat;
 
 test('the licence allowlist excludes every NonCommercial variant', () => {
@@ -183,22 +186,24 @@ test('an absent establishment listing is unknown and never native', () => {
 
 - [ ] **Step 2: Run the test to verify it fails**
 
-Run: `cd ~/GitHub/ecotopia-portal && npm test`
-Expected: FAIL, `Cannot find module '../assets/inat.js'`
+Run: `npm test`
+Expected: FAIL, `Cannot find module '../supabase/functions/_shared/inat-logic.js'`
 
 - [ ] **Step 3: Write the implementation**
 
-Create `assets/inat.js`:
+Create `supabase/functions/_shared/inat-logic.js`:
 
 ```js
 /**
  * Ecotopia Portal - iNaturalist enrichment logic.
  *
- * Pure functions only: no network, no DOM, no Supabase client. The edge function
- * supabase/functions/inat-sync/index.ts mirrors PHOTO_LICENCES; tests/inat.test.js
- * scrapes that file and fails if the two copies drift.
+ * THE single implementation. supabase/functions/inat-sync/index.ts imports this
+ * file and tests/inat.test.js requires it, so the tests cover the code that runs
+ * in production. Do not copy any of it anywhere.
  *
- * Loadable in the browser (script tag) and in Node (require) for tests.
+ * Pure functions only: no network, no DOM, no Supabase client. Written in the same
+ * universal style as assets/mapping.js, so the one file loads under Deno (via a
+ * side-effect import) and under Node (via require), both reading globalThis.EcoInat.
  */
 (function (root) {
   // Commercially usable licences ONLY. Ecotopia sells plants, so every
@@ -315,8 +320,11 @@ Expected: FAIL while mutated, PASS after revert.
 
 ```bash
 cd ~/GitHub/ecotopia-portal
-git add assets/inat.js tests/inat.test.js
+git add supabase/functions/_shared/inat-logic.js tests/inat.test.js
 git commit -m "feat(inat): pure taxon resolution, licence and photo-guard logic
+
+One implementation under _shared, imported by the edge function and required by
+the tests, so the tests cover the code that actually runs.
 
 The licence allowlist excludes every NonCommercial variant because Ecotopia
 sells plants. isOwnPhoto is the guard that stops the nightly sync overwriting
@@ -347,8 +355,8 @@ Create `supabase/migrations/0033_inat_species.sql`:
 -- renderers already handle, so nothing about display changes here.
 --
 -- LOAD-BEARING: a row with photo_path set and inat_photo_id NULL is Jordan's own
--- photograph. The nightly sync must never modify one. See assets/inat.js
--- isOwnPhoto and its mutation-proven test.
+-- photograph. The nightly sync must never modify one. See isOwnPhoto in
+-- supabase/functions/_shared/inat-logic.js and its mutation-proven test.
 --
 -- inat_establishment is 'introduced', 'native', or NULL. NULL means iNaturalist
 -- has no Pennsylvania listing, which is NOT evidence of being native: measured on
@@ -378,9 +386,8 @@ alter table public.plant_species drop constraint if exists plant_species_inat_es
 alter table public.plant_species add constraint plant_species_inat_establishment_chk
   check (inat_establishment is null or inat_establishment in ('introduced', 'native'));
 
--- Partial index for the sync's working set: unresolved rows it still has to try.
-create index if not exists plant_species_inat_unresolved_idx
-  on public.plant_species (id) where inat_taxon_id is null;
+-- No index. The table holds 50 rows; a sequential scan is faster than any index
+-- lookup at this size and an index here would be pure maintenance cost.
 
 -- No new RLS policy. The existing sp_anon_read (gated on active) and sp_staff_all
 -- cover these columns, and no anonymous write path is introduced.
@@ -407,7 +414,7 @@ curl -s -X POST "https://api.supabase.com/v1/projects/wibnryfinfwbwwgsyojr/datab
   -d '{"query":"select column_name, data_type from information_schema.columns where table_name = '"'"'plant_species'"'"' and column_name like '"'"'inat%'"'"' order by column_name"}'
 ```
 
-Expected: exactly 11 rows, `inat_conservation` through `inat_taxon_id`.
+Expected: exactly 11 rows, `inat_conservation` through `inat_taxon_id`. No index is created; the table holds 50 rows.
 
 - [ ] **Step 4: Verify no existing row was disturbed**
 
@@ -440,36 +447,40 @@ No photos are written in this task. Resolution, establishment and conservation l
 **Files:**
 - Create: `supabase/functions/inat-sync/index.ts`
 - Modify: `supabase/config.toml` (add a `[functions.inat-sync]` block beside the four existing ones)
-- Modify: `tests/inat.test.js` (add the mirror test)
 
 **Interfaces:**
-- Consumes: `assets/inat.js` logic, reimplemented in TypeScript inside the function because Deno cannot require a browser global. `PHOTO_LICENCES` is the mirrored constant.
+- Consumes: `globalThis.EcoInat` from `../_shared/inat-logic.js` (Task 1), specifically `normaliseBotanical`, `isResolvableName`, `pickTaxon` and `PHOTO_LICENCES`. Import it for its side effect; it takes no arguments and returns nothing.
 - Produces: `POST /inat-sync` with body `{"action":"sync"}`, returning `{ok: true, counts: {examined, resolved, fuzzy, unresolved, enriched}}`. Authorised by an `X-Scan-Token` header matching `INAT_SYNC_TOKEN`, or a staff JWT.
 
-- [ ] **Step 1: Write the mirror test first**
+There is no mirror test in this task. The mirror it would have guarded no longer exists, because there is now one copy of the logic.
 
-Append to `tests/inat.test.js`:
+- [ ] **Step 1: Write the no-duplication guard first**
+
+Append to `tests/inat.test.js`. This replaces the mirror test the earlier draft
+called for: with one implementation there is nothing to mirror, so the test now
+enforces that no second copy ever appears.
 
 ```js
-test('the edge function mirrors the licence allowlist exactly', () => {
-  // The browser decides what to show credit for and the edge function decides
-  // what to download. If the two copies drift, a NonCommercial photo reaches a
-  // storefront. Fail loudly instead. Same guard shape as the CARD_UPLIFT mirror
-  // test in tests/pricing.test.js.
+test('the edge function does not reimplement the shared logic', () => {
+  // There is exactly one implementation, in _shared/inat-logic.js. A second copy
+  // inside index.ts would be dead code that the tests do not cover and that can
+  // silently diverge from what actually runs.
   const fs = require('node:fs');
   const path = require('node:path');
   const src = fs.readFileSync(
     path.join(__dirname, '..', 'supabase', 'functions', 'inat-sync', 'index.ts'), 'utf8');
-  const m = src.match(/^const PHOTO_LICENCES = \[([^\]]+)\];$/m);
-  assert.ok(m, 'inat-sync/index.ts must declare `const PHOTO_LICENCES = [...];` on one line');
-  const edge = m[1].split(',').map((s) => s.trim().replace(/^'|'$/g, ''));
-  assert.deepStrictEqual(edge, E.PHOTO_LICENCES);
+  assert.match(src, /import '\.\.\/_shared\/inat-logic\.js'/,
+    'index.ts must import the shared logic for its side effect');
+  for (const name of ['function levenshtein', 'function pickTaxon', 'function pickPhoto',
+                      'const PHOTO_LICENCES']) {
+    assert.ok(!src.includes(name), `index.ts must not redeclare ${name}`);
+  }
 });
 ```
 
 - [ ] **Step 2: Run it to verify it fails**
 
-Run: `cd ~/GitHub/ecotopia-portal && npm test`
+Run: `npm test`
 Expected: FAIL, `ENOENT ... supabase/functions/inat-sync/index.ts`
 
 - [ ] **Step 3: Write the edge function**
@@ -497,9 +508,12 @@ function admin() {
   );
 }
 
-// MIRRORED from assets/inat.js. tests/inat.test.js scrapes this exact line and
-// fails on drift. Keep it on one line, single quotes, no trailing comma.
-const PHOTO_LICENCES = ['cc0', 'cc-by', 'cc-by-sa', 'pd'];
+// THE single implementation of the resolution logic. Importing it for its side
+// effect populates globalThis.EcoInat, exactly as the browser does with
+// assets/mapping.js. tests/inat.test.js requires the same file, so the tests
+// cover this code rather than a copy of it. Do not redeclare any of it here.
+import '../_shared/inat-logic.js';
+const { normaliseBotanical, isResolvableName, pickTaxon } = (globalThis as any).EcoInat;
 
 const PA_PLACE_ID = 42;
 const UA = 'EcotopianEarthCare/1.0 (https://ecotopianearthcare.com; frank.lechner@bagcarriers.com)';
@@ -510,49 +524,7 @@ const API = 'https://api.inaturalist.org/v1';
 const PACE_MS = 1100;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-const normaliseBotanical = (name: string) =>
-  String(name || '').replace(/[‘’]/g, "'").replace(/\s+/g, ' ').trim();
-
-const isResolvableName = (name: string) =>
-  /^[A-Z][a-z]+ [a-z][a-z-]+$/.test(normaliseBotanical(name));
-
-function levenshtein(a: string, b: string): number {
-  const m = a.length, n = b.length;
-  if (!m) return n;
-  if (!n) return m;
-  let prev: number[] = Array.from({ length: n + 1 }, (_, j) => j);
-  for (let i = 1; i <= m; i++) {
-    const cur = [i];
-    for (let j = 1; j <= n; j++) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
-    }
-    prev = cur;
-  }
-  return prev[n];
-}
-
 type Pick = { taxonId: number | null; match: string; matchedName: string | null };
-const NO_MATCH: Pick = { taxonId: null, match: 'none', matchedName: null };
-
-function pickTaxon(botanical: string, results: any[]): Pick {
-  const norm = normaliseBotanical(botanical);
-  if (!isResolvableName(norm)) return { ...NO_MATCH };
-  const rows = (results || []).filter((r) => r && r.name);
-
-  const exact = rows.find((r) => String(r.name).toLowerCase() === norm.toLowerCase());
-  if (exact) return { taxonId: exact.id, match: 'exact', matchedName: exact.name };
-
-  const [genus, epithet] = norm.toLowerCase().split(' ');
-  const near = rows.filter((r) => {
-    const parts = String(r.name).toLowerCase().split(' ');
-    return parts.length === 2 && parts[0] === genus && levenshtein(parts[1], epithet) <= 2;
-  });
-  if (near.length === 1) {
-    return { taxonId: near[0].id, match: 'fuzzy', matchedName: near[0].name };
-  }
-  return { ...NO_MATCH };
-}
 
 async function inat(pathAndQuery: string): Promise<any> {
   const res = await fetch(API + pathAndQuery, { headers: { 'User-Agent': UA } });
@@ -753,8 +725,9 @@ git add supabase/functions/inat-sync/index.ts supabase/config.toml tests/inat.te
 git commit -m "feat(inat): inat-sync resolves taxa and records PA establishment
 
 48 of 50 botanical names resolve exactly, one spelling variant resolves fuzzily,
-and the two-species Mountain Mint row is refused without an API call. The licence
-allowlist is mirror-tested against assets/inat.js."
+and the two-species Mountain Mint row is refused without an API call. The
+function imports the shared logic rather than reimplementing it, guarded by a
+test that fails if a second copy ever appears."
 ```
 
 ---
@@ -774,29 +747,19 @@ The destructive-risk surface, isolated so it gets its own review gate.
 
 Insert into `supabase/functions/inat-sync/index.ts`, above `authorize`:
 
+Extend the existing destructure at the top of the file to pull in `pickPhoto`
+as well, so it reads:
+
+```ts
+const { normaliseBotanical, isResolvableName, pickTaxon, pickPhoto } = (globalThis as any).EcoInat;
+```
+
+Then add, above `authorize`:
+
 ```ts
 type PhotoPick = {
   photoId: number; licence: string; attribution: string; mediumUrl: string; sourceUrl: string;
 } | null;
-
-const isUsableLicence = (code: unknown) =>
-  PHOTO_LICENCES.indexOf(String(code || '').toLowerCase()) !== -1;
-
-function pickPhoto(taxon: any): PhotoPick {
-  const t = taxon || {};
-  const candidates = [t.default_photo]
-    .concat((t.taxon_photos || []).map((tp: any) => tp && tp.photo))
-    .filter(Boolean);
-  const hit = candidates.find((p: any) => isUsableLicence(p.license_code));
-  if (!hit) return null;
-  return {
-    photoId: hit.id,
-    licence: String(hit.license_code).toLowerCase(),
-    attribution: hit.attribution || '',
-    mediumUrl: hit.medium_url || '',
-    sourceUrl: 'https://www.inaturalist.org/photos/' + hit.id,
-  };
-}
 
 async function fillPhotos(sb: ReturnType<typeof admin>) {
   // ONLY rows with no photo at all. A photo_path with a NULL inat_photo_id is
