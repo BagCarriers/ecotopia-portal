@@ -147,9 +147,15 @@ function gardenPhotoSrc(photoPath) {
 // load and "wild columbine" on the next. planted_on is a date and a planting day
 // is entered in batches, so id breaks the tie (created_at is deliberately not in
 // the view).
-const sb = () => window.ecoSupabase;
+//
+// The whole table is read in one request. That is right at nine gardens and a
+// handful of planting days, and it is the shape assets/data.js already uses, but
+// it has no upper bound: PostgREST's max-rows cap truncates a large result
+// silently rather than erroring, so a page or two of growth from here would quietly
+// under-report. A .limit() would not help, since it truncates just as silently. The
+// fix, when it is needed, is an aggregate on the database side.
 async function loadPlantings() {
-  const { data, error } = await sb().from('garden_plantings_public').select('*')
+  const { data, error } = await window.ecoSupabase.from('garden_plantings_public').select('*')
     .order('planted_on', { ascending: false })
     .order('id', { ascending: true });
   if (error) throw new Error(error.message);
@@ -175,9 +181,17 @@ function gardenCardInner(g, plantingRows) {
   // Gating on the breakdown rather than on rows.length keeps the headline and the
   // list in step: both skip a blank-labelled row, so a set of rows with nothing to
   // list also has nothing to total.
-  const rows = Array.isArray(plantingRows) ? plantingRows : [];
-  const breakdown = EcoPlantings.speciesBreakdown(rows);
-  const summary = breakdown.length ? EcoPlantings.summarise(rows) : null;
+  //
+  // EcoPlantings comes from assets/plantings.js, the one hard dependency this card
+  // builder has on a per-feature asset. If that script ever fails to load, a card
+  // must lose its summary, not the page its gardens: an unguarded call throws on
+  // every card, and loadGardens's outer catch would replace the entire list with
+  // the fallback line. loadGardens warns once when the asset is missing; warning
+  // here would repeat it per card.
+  const EP = window.EcoPlantings;
+  const rows = (EP && Array.isArray(plantingRows)) ? plantingRows : [];
+  const breakdown = rows.length ? EP.speciesBreakdown(rows) : [];
+  const summary = breakdown.length ? EP.summarise(rows) : null;
   const plantWord = (n) => n.toLocaleString() + (n === 1 ? ' native plant' : ' native plants');
   const text =
     '<h3>' + esc(g.name) + '</h3>' +
@@ -239,14 +253,22 @@ async function loadGardens() {
     // failing read is indistinguishable from gardens with nothing planted yet,
     // and a silent one would stay that way for good.
     let rowsByGarden = {};
-    try {
-      (await loadPlantings()).forEach(r => {
-        if (!r.gardenId) return;
-        (rowsByGarden[r.gardenId] = rowsByGarden[r.gardenId] || []).push(r);
-      });
-    } catch (err) {
-      rowsByGarden = {};
-      console.warn('Planting summaries unavailable:', (err && err.message) || err);
+    if (!window.EcoPlantings) {
+      // assets/plantings.js did not load, so there is nothing to summarise with and
+      // no point fetching. Said out loud, because a missing asset would otherwise
+      // look exactly like an empty table, which is the failure this whole feature
+      // was built to avoid. The cards themselves are guarded too.
+      console.warn('Planting summaries unavailable: assets/plantings.js did not load.');
+    } else {
+      try {
+        (await loadPlantings()).forEach(r => {
+          if (!r.gardenId) return;
+          (rowsByGarden[r.gardenId] = rowsByGarden[r.gardenId] || []).push(r);
+        });
+      } catch (err) {
+        rowsByGarden = {};
+        console.warn('Planting summaries unavailable:', (err && err.message) || err);
+      }
     }
 
     // Pawpaw Pathways leads as a featured, full-width card (sign photo + map + form).
