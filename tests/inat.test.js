@@ -212,16 +212,35 @@ test('the edge function does not reimplement the shared logic', () => {
 // so showsInatPhoto is a licence gate, not a cosmetic one. It lives inline in
 // plants.html because that page loads no data.js, so the test reads it back out of
 // the file the browser runs, the same way the PLANT_SIZES drift test does.
-function loadShowsInatPhoto() {
+function plantsSource() {
   const fs = require('node:fs');
   const path = require('node:path');
-  const src = fs.readFileSync(path.join(__dirname, '..', 'plants.html'), 'utf8');
-  const m = src.match(/function showsInatPhoto\(p, src\) \{[\s\S]*?\n  \}/);
-  assert.ok(m, 'showsInatPhoto not found in plants.html');
+  return fs.readFileSync(path.join(__dirname, '..', 'plants.html'), 'utf8');
+}
+function extractFn(name) {
+  const m = plantsSource().match(new RegExp('function ' + name + '\\([\\s\\S]*?\\n  \\}'));
+  assert.ok(m, name + ' not found in plants.html');
+  return m[0];
+}
+function loadShowsInatPhoto() {
   // eval, deliberately: the input is a function declaration read out of a file in
   // this repo, never user or network input, and the point is to exercise exactly
   // what the browser evaluates.
-  return eval('(' + m[0].replace('function showsInatPhoto', 'function') + ')');
+  return eval('(' + extractFn('showsInatPhoto').replace('function showsInatPhoto', 'function') + ')');
+}
+// new Function, deliberately, for the same reason as the eval above: the body is a
+// function declaration read out of a file in this repo, never user or network input,
+// and evaluating what the browser evaluates is the whole point of the test.
+// The renderer, wired to the same two things the page wires it to: EcoSite.esc,
+// which plants.html aliases as `esc` at line 444, and showsInatPhoto. Running the
+// real escaper rather than a copy is the point, since the copy could be right while
+// the one that ships is not.
+function loadPhotoCreditHtml() {
+  const path = require('node:path');
+  const esc = require(path.join(__dirname, '..', 'assets', 'site.js')).EcoSite.esc;
+  return new Function('esc',
+    extractFn('showsInatPhoto') + '\n' + extractFn('photoCreditHtml') +
+    '\nreturn photoCreditHtml;')(esc);
 }
 
 test('a rejected row shows no credit even though it keeps every credit field', () => {
@@ -256,15 +275,79 @@ test('a credit is shown only when an iNaturalist photograph is on screen', () =>
     'https://x/plants/jordan.jpg'), false);
 });
 
-test('the credit escapes the attribution and is not hidden', () => {
-  const fs = require('node:fs');
-  const path = require('node:path');
-  const src = fs.readFileSync(path.join(__dirname, '..', 'plants.html'), 'utf8');
-  assert.match(src, /photo-credit[^]{0,80}esc\(p\.inatPhotoAttribution\)/,
-    'the attribution must be esc()d before it reaches innerHTML');
-  // Visible, per the licence. A credit nobody can read discharges nothing.
-  const css = src.match(/\.photo-credit \{[\s\S]*?\}/);
+test('the rendered credit escapes the attribution, which is third-party text', () => {
+  // Run the renderer, do not regex for esc(). A test that only greps the source
+  // passes on a page that greps clean and still injects.
+  const credit = loadPhotoCreditHtml();
+  const html = credit({
+    photoPath: 'plants/abc.jpg', inatPhotoId: 99, inatPhotoStatus: 'auto',
+    inatPhotoAttribution: '<img src=x onerror=alert(1)> "q" & \'a\'',
+  }, 'https://x/plants/abc.jpg');
+  assert.ok(!/<img/.test(html), 'the attribution must not produce an element');
+  assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt; &quot;q&quot; &amp; &#39;a&#39;/);
+});
+
+test('the credit renders nothing at all when there is nothing to credit', () => {
+  const credit = loadPhotoCreditHtml();
+  // The rejected shape: every credit field present, no photograph.
+  assert.strictEqual(credit({
+    photoPath: null, inatPhotoId: 99, inatPhotoStatus: 'rejected',
+    inatPhotoAttribution: '(c) Somebody, some rights reserved (CC BY)',
+  }, null), '');
+  // An iNaturalist photo with no attribution recorded. inat-sync refuses to store
+  // one, so this should be unreachable, but an empty credit line is worse than none.
+  assert.strictEqual(credit({
+    photoPath: 'plants/abc.jpg', inatPhotoId: 99, inatPhotoStatus: 'auto',
+    inatPhotoAttribution: null,
+  }, 'https://x/plants/abc.jpg'), '');
+});
+
+test('the credit links the source photo, and only over https', () => {
+  // CC BY 4.0 3(a)(1) asks for a link to the licensed material where practicable.
+  const credit = loadPhotoCreditHtml();
+  const row = (url) => ({
+    photoPath: 'plants/abc.jpg', inatPhotoId: 99, inatPhotoStatus: 'auto',
+    inatPhotoAttribution: '(c) A Photographer, some rights reserved (CC BY)',
+    inatPhotoSourceUrl: url,
+  });
+  const src = 'https://x/plants/abc.jpg';
+  assert.match(credit(row('https://www.inaturalist.org/photos/99'), src),
+    /<a href="https:\/\/www\.inaturalist\.org\/photos\/99" target="_blank" rel="noopener noreferrer">/);
+  // Anything that is not plainly https falls back to text, so a stored value can
+  // never become an executable href.
+  for (const bad of ['javascript:alert(1)', 'http://x/1', 'data:text/html,x', '', null]) {
+    const html = credit(row(bad), src);
+    assert.ok(!/<a /.test(html), 'must not link ' + String(bad));
+    assert.match(html, /^<p class="photo-credit">\(c\) A Photographer/);
+  }
+});
+
+test('renderPlants actually puts the credit on the card', () => {
+  // THE wiring test. Every other test here exercises the credit in isolation, so
+  // deleting the call from the card template used to leave the suite green while
+  // shipping exactly the failure this feature exists to prevent: an iNaturalist
+  // photograph on the storefront with no credit under it.
+  const body = plantsSource().match(/function renderPlants\(\) \{[\s\S]*?\n  \}/);
+  assert.ok(body, 'renderPlants not found in plants.html');
+  assert.match(body[0], /photoCreditHtml\(p, src\)/,
+    'the card template must call photoCreditHtml, or photos ship uncredited');
+  // Under the photo, before the name, so the credit reads as belonging to the image.
+  const img = body[0].indexOf('img class="plant-photo"');
+  const cred = body[0].indexOf('photoCreditHtml(p, src)');
+  assert.ok(img !== -1 && cred > img, 'the credit must follow the image it belongs to');
+});
+
+test('the credit is styled visibly, per the licence', () => {
+  const css = plantsSource().match(/\.photo-credit \{[\s\S]*?\}/);
   assert.ok(css, '.photo-credit must be styled');
-  assert.ok(!/display:\s*none|opacity:\s*0(?!\.[1-9])|position:\s*absolute/.test(css[0]),
-    'the credit must not be hidden');
+  // A credit nobody can read discharges nothing. This is a floor, not a substitute
+  // for looking at the page: a later override elsewhere would still pass.
+  const hidden = [
+    /display:\s*none/, /visibility:\s*hidden/,
+    /opacity:\s*0(?![.\d])/, /font-size:\s*0(?![.\d])/,
+    /position:\s*(absolute|fixed)/,
+  ];
+  for (const rx of hidden) {
+    assert.ok(!rx.test(css[0]), 'the credit must not be hidden: ' + rx);
+  }
 });
