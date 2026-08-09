@@ -26,9 +26,10 @@ drop policy if exists gpl_anon_read on public.garden_plantings;
 
 -- Step 2: the public view.
 --
--- Columns are every column of the table except note, and the names are copied
--- verbatim so the existing snake_case to camelCase mapper in assets/data.js handles
--- the view with no special casing.
+-- Columns are the six the public pages need. The names are copied verbatim from the
+-- table so the existing snake_case to camelCase mapper in assets/data.js handles the
+-- view with no special casing. note is the column this migration exists to withhold;
+-- created_at and updated_at are withheld too, for the reason below.
 --
 -- created_at and updated_at are deliberately excluded. They are staff workflow
 -- metadata, not facts about the planting: they record when somebody typed the row
@@ -75,8 +76,7 @@ create view public.garden_plantings_public with (security_invoker = false) as
 --        -H "apikey: <anon>" -d '{"quantity":777}'   ->  200, quantity now 777
 --
 -- Note this is a property of granting anon anything on a security definer view, not
--- of this migration. public.volunteers_public from 0001 has the same exposure today
--- and is not fixed here, because it is a different table and the account owner
--- should decide. It is written up in the task report.
+-- of this migration. public.volunteers_public from 0001 had the same exposure, found
+-- while testing this file and fixed in 0037.
 revoke all on public.garden_plantings_public from anon, authenticated;
 grant select on public.garden_plantings_public to anon, authenticated;

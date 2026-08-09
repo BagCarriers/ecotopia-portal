@@ -637,7 +637,7 @@ Serve the repo locally (`python3 -m http.server` from the repo root) and open `g
 
 **This browser check is mandatory.** This repo has form: a whole feature branch once shipped having never been rendered in a browser, and it has caused two live outages from schema-ahead-of-code drift.
 
-**Clean up after yourself.** Delete every test planting you create. Verify with a count query that `garden_plantings` is empty before committing, because these rows are anon-readable and the next task makes them public.
+**Clean up after yourself.** Delete every test planting you create. Verify with a count query that `garden_plantings` is empty before committing, because the next task makes these rows public. (Since 0036 the table itself is staff only and the public reads `garden_plantings_public`, which withholds `note`. Every column a test row puts in the other six is still published.)
 
 - [ ] **Step 6: Run the checks and commit**
 
@@ -747,10 +747,17 @@ Add beside the page's existing asset scripts:
 `community-gardens.html` uses `EcoSite`, not `DataStore`. Add a loader beside `loadGardens` at line 174:
 
 ```js
-// Public read over the anon key. gp_anon_read allows it. A failure here must not
-// break the garden list, so the caller falls back to an empty rollup.
+// Public read over the anon key, through the view, NOT the table. The table is
+// staff only: it carries a free-text note column, so 0036 removed its anon policy
+// and exposed public.garden_plantings_public instead. Reading the table here would
+// not error, it would return 200 with [], and every card would render an empty
+// rollup that looks exactly like "no plantings recorded here".
+//
+// The view's column names match the table's, so fromDbAll needs no special casing.
+// A failure here must not break the garden list, so the caller falls back to an
+// empty rollup.
 async function loadPlantings() {
-  const res = await sb().from('garden_plantings').select('*');
+  const res = await sb().from('garden_plantings_public').select('*');
   if (res.error) throw new Error(res.error.message);
   return window.EcoMapping.fromDbAll(res.data);
 }

@@ -68,17 +68,24 @@ create index if not exists garden_plantings_garden_idx
 
 alter table public.garden_plantings enable row level security;
 
--- Same shape as every sibling content table: the public reads, staff write.
+-- Staff only. The note column is staff authored free text, so this table follows
+-- planting_suggestions, observations, checkins, jobs and clients and gives anon no
+-- select policy at all. The public reads six columns of it through
+-- public.garden_plantings_public, the view added in 0036; RLS is row level, so a
+-- policy here could not have withheld a single column.
+--
+-- An earlier revision of this file created gpl_anon_read ... using (true), which
+-- published the note. It is dropped rather than merely deleted from the source,
+-- because this file advertises itself as re-runnable and would otherwise put the
+-- policy back on any database that already has it.
+--
 -- Prefixed gpl_ rather than gp_, which gallery_photos already uses for
 -- gp_staff_all in 0009, so a diagnostic query filtering on policyname alone does
 -- not return rows from two unrelated tables. The gp_ drops below clear the names
 -- an earlier revision of this migration created.
 drop policy if exists gp_anon_read on public.garden_plantings;
 drop policy if exists gp_staff_all on public.garden_plantings;
-
 drop policy if exists gpl_anon_read on public.garden_plantings;
-create policy gpl_anon_read on public.garden_plantings
-  for select to anon using (true);
 
 drop policy if exists gpl_staff_all on public.garden_plantings;
 create policy gpl_staff_all on public.garden_plantings
