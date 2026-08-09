@@ -260,6 +260,22 @@ const DataStore = (() => {
       unwrap(await sb.from('planting_suggestions').delete().eq('id', id));
     },
 
+    // Planting records: what the team actually put in the ground. Distinct from
+    // planting_suggestions above, which is the public "suggest a site" form.
+    // species_label is always written, even when a catalogue species is chosen, so
+    // the record survives that species being deleted from the shop.
+    getPlantingsByGarden: async (gId) =>
+      fromDbAll(unwrap(await sb.from('garden_plantings').select('*')
+        .eq('garden_id', gId).order('planted_on', { ascending: false }))),
+    getAllPlantings: async () =>
+      fromDbAll(unwrap(await sb.from('garden_plantings').select('*')
+        .order('planted_on', { ascending: false }))),
+    addPlanting: (r) => insert('garden_plantings', r),
+    updatePlanting: (id, ch) => update('garden_plantings', id, ch),
+    deletePlanting: async (id) => {
+      unwrap(await sb.from('garden_plantings').delete().eq('id', id));
+    },
+
     // Plant catalog (staff-editable species + habitat kits). The public
     // plants.html reads active rows directly over anon (RLS scopes it); these
     // staff methods use the authenticated policy, which returns inactive rows
