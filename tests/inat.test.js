@@ -152,6 +152,34 @@ test('an absent establishment listing is unknown and never native', () => {
   assert.strictEqual(E.establishmentLabel('native'), 'native');
 });
 
+test('pickPhoto can return a usable licence with no attribution at all', () => {
+  // iNaturalist does return this shape. CC-BY and CC-BY-SA both require visible
+  // credit, so the photo pass must refuse it rather than put an uncreditable
+  // image on the storefront. pickPhoto reports the fact; the caller decides.
+  const taxon = {
+    default_photo: { id: 7, license_code: 'cc-by', attribution: '', medium_url: 'https://x/7.jpg' },
+  };
+  assert.strictEqual(E.pickPhoto(taxon).attribution, '');
+  assert.strictEqual(E.pickPhoto({
+    default_photo: { id: 8, license_code: 'cc0', medium_url: 'https://x/8.jpg' },
+  }).attribution, '');
+});
+
+test('the photo pass gates on the shared guard and on attribution', () => {
+  // Both of these have been got wrong once. An inline photo_path test is weaker
+  // than canAutoFill, because it lets through a row carrying a bare
+  // inat_photo_id left behind by a staff rejection; and a non-null pickPhoto
+  // result is not on its own enough to store.
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const src = fs.readFileSync(
+    path.join(__dirname, '..', 'supabase', 'functions', 'inat-sync', 'index.ts'), 'utf8');
+  assert.match(src, /canAutoFill/, 'the photo pass must call the shared eligibility guard');
+  assert.ok(!/inat_photo_status === 'rejected'/.test(src),
+    'index.ts must not restate the eligibility rule inline');
+  assert.match(src, /noAttribution/, 'a photo with no attribution must be counted and refused');
+});
+
 test('the edge function does not reimplement the shared logic', () => {
   // There is exactly one implementation, in _shared/inat-logic.js. A second copy
   // inside index.ts would be dead code that the tests do not cover and that can
