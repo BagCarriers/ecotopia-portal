@@ -36,11 +36,41 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 type Pick = { taxonId: number | null; match: string; matchedName: string | null };
 
+type Counts = {
+  examined: number; resolved: number; fuzzy: number;
+  unresolved: number; enriched: number; failed: number;
+};
+
+// A rate limit is not a per-row problem. iNaturalist is telling the whole run to
+// stop, so this is thrown past the per-row handlers and answered with a 429
+// carrying the partial counts. A nightly cron must be able to tell a run that was
+// cut short from a run that finished, and an ok:true with zero resolutions cannot
+// be told apart from success.
+class RateLimited extends Error {
+  counts: Counts;
+  constructor(counts: Counts) {
+    super('rate_limited');
+    this.counts = counts;
+  }
+}
+
+const isRateLimit = (e: unknown) => e instanceof Error && e.message === 'rate_limited';
+const errorMessage = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
+// The pace lives in a finally so it applies to every request, not only the ones
+// that succeed. Pacing on success alone bursts hardest exactly when iNaturalist
+// has asked us to slow down: a run of failures would fire one request per row
+// with no gap at all. Keeping it here rather than at the call sites means a new
+// caller cannot forget it.
 async function inat(pathAndQuery: string): Promise<any> {
-  const res = await fetch(API + pathAndQuery, { headers: { 'User-Agent': UA } });
-  if (res.status === 429) throw new Error('rate_limited');
-  if (!res.ok) throw new Error('inat_http_' + res.status);
-  return await res.json();
+  try {
+    const res = await fetch(API + pathAndQuery, { headers: { 'User-Agent': UA } });
+    if (res.status === 429) throw new Error('rate_limited');
+    if (!res.ok) throw new Error('inat_http_' + res.status);
+    return await res.json();
+  } finally {
+    await sleep(PACE_MS);
+  }
 }
 
 // Pennsylvania establishment plus PA conservation status, from one call.
@@ -68,7 +98,9 @@ async function resolveAndEnrich(sb: ReturnType<typeof admin>) {
     .or('inat_match.is.null,inat_match.neq.manual');
   if (error) throw new Error(error.message);
 
-  const counts = { examined: 0, resolved: 0, fuzzy: 0, unresolved: 0, enriched: 0 };
+  const counts: Counts = {
+    examined: 0, resolved: 0, fuzzy: 0, unresolved: 0, enriched: 0, failed: 0,
+  };
 
   for (const row of rows || []) {
     counts.examined++;
@@ -87,11 +119,15 @@ async function resolveAndEnrich(sb: ReturnType<typeof admin>) {
     try {
       const search = await inat('/taxa?q=' + encodeURIComponent(norm) + '&per_page=3');
       pick = pickTaxon(norm, search.results || []);
-    } catch (_e) {
-      // One bad species never aborts the run. It is simply retried tomorrow.
+    } catch (e) {
+      if (isRateLimit(e)) throw new RateLimited(counts);
+      // One bad species never aborts the run. It is simply retried tomorrow. The
+      // log line is the only diagnostic a nightly cron leaves behind, and counts
+      // .failed is what stops examined silently exceeding the other totals.
+      console.error('inat-sync: taxon search failed for', row.botanical, errorMessage(e));
+      counts.failed++;
       continue;
     }
-    await sleep(PACE_MS);
 
     if (!pick.taxonId) {
       await sb.from('plant_species')
@@ -102,14 +138,18 @@ async function resolveAndEnrich(sb: ReturnType<typeof admin>) {
     }
 
     let facts = { establishment: null as string | null, conservation: null as string | null };
+    let stopped: RateLimited | null = null;
     try {
       const detail = await inat('/taxa/' + pick.taxonId + '?place_id=' + PA_PLACE_ID);
       facts = readPaFacts((detail.results || [])[0] || {});
       counts.enriched++;
-    } catch (_e) {
-      // Enrichment is optional; the taxon link is the valuable part.
+    } catch (e) {
+      // Enrichment is optional; the taxon link is the valuable part, so the row is
+      // written below either way. A rate limit still ends the run, but only after
+      // this row's link is saved: the plan keeps partial progress.
+      if (isRateLimit(e)) stopped = new RateLimited(counts);
+      else console.error('inat-sync: enrichment failed for', row.botanical, errorMessage(e));
     }
-    await sleep(PACE_MS);
 
     await sb.from('plant_species').update({
       inat_taxon_id: pick.taxonId,
@@ -122,6 +162,8 @@ async function resolveAndEnrich(sb: ReturnType<typeof admin>) {
 
     if (pick.match === 'fuzzy') counts.fuzzy++;
     else counts.resolved++;
+
+    if (stopped) throw stopped;
   }
 
   return counts;
@@ -157,8 +199,11 @@ Deno.serve(async (req) => {
     const counts = await resolveAndEnrich(sb);
     return json({ ok: true, counts }, 200);
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    if (msg === 'rate_limited') return json({ error: 'Rate limited, resume later.' }, 429);
+    if (e instanceof RateLimited) {
+      console.error('inat-sync: stopped by iNaturalist rate limiting', JSON.stringify(e.counts));
+      return json({ error: 'Rate limited, resume later.', counts: e.counts }, 429);
+    }
+    console.error('inat-sync: unexpected error', errorMessage(e));
     return json({ error: 'Unexpected error.' }, 500);
   }
 });
