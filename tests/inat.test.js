@@ -206,3 +206,65 @@ test('the edge function does not reimplement the shared logic', () => {
     assert.ok(!src.includes(name), `index.ts must not redeclare ${name}`);
   }
 });
+
+// ── Public photo credit (plants.html) ──────────────────────────────────────
+// CC-BY and CC-BY-SA require the credit to be visible wherever the photograph is,
+// so showsInatPhoto is a licence gate, not a cosmetic one. It lives inline in
+// plants.html because that page loads no data.js, so the test reads it back out of
+// the file the browser runs, the same way the PLANT_SIZES drift test does.
+function loadShowsInatPhoto() {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const src = fs.readFileSync(path.join(__dirname, '..', 'plants.html'), 'utf8');
+  const m = src.match(/function showsInatPhoto\(p, src\) \{[\s\S]*?\n  \}/);
+  assert.ok(m, 'showsInatPhoto not found in plants.html');
+  // eval, deliberately: the input is a function declaration read out of a file in
+  // this repo, never user or network input, and the point is to exercise exactly
+  // what the browser evaluates.
+  return eval('(' + m[0].replace('function showsInatPhoto', 'function') + ')');
+}
+
+test('a rejected row shows no credit even though it keeps every credit field', () => {
+  // THE case this gate exists for. rejectInatPhoto clears photo_path and keeps
+  // inat_photo_id, inat_photo_attribution and inat_photo_source_url so the sync
+  // never proposes that photo again. A credit keyed off the iNaturalist columns
+  // alone would print a photographer's name under a card with no photograph, and,
+  // once staff upload a replacement, under somebody else's work.
+  const shows = loadShowsInatPhoto();
+  const rejected = { photoPath: null, inatPhotoId: 99, inatPhotoStatus: 'rejected',
+                     inatPhotoAttribution: '(c) A Stranger, some rights reserved (CC BY)' };
+  assert.strictEqual(shows(rejected, null), false);
+  // The same row after staff uploaded their own replacement photograph.
+  assert.strictEqual(
+    shows({ ...rejected, photoPath: 'plants/staff.jpg' }, 'https://x/plants/staff.jpg'), false);
+});
+
+test('a credit is shown only when an iNaturalist photograph is on screen', () => {
+  const shows = loadShowsInatPhoto();
+  const inat = { photoPath: 'plants/abc.jpg', inatPhotoId: 99, inatPhotoStatus: 'auto' };
+  assert.strictEqual(shows(inat, 'https://x/plants/abc.jpg'), true);
+  assert.strictEqual(shows({ ...inat, inatPhotoStatus: 'approved' }, 'https://x/plants/abc.jpg'), true);
+  // No src: the card renders no image, so there is nothing to credit. This also
+  // covers a photo_path that plantPhotoSrc refused.
+  assert.strictEqual(shows(inat, null), false);
+  // Jordan's own work, in both of its forms.
+  assert.strictEqual(shows(
+    { photoPath: 'static:wild-columbine.jpg', inatPhotoId: null, inatPhotoStatus: null },
+    'assets/img/plants/wild-columbine.jpg'), false);
+  assert.strictEqual(shows(
+    { photoPath: 'plants/jordan.jpg', inatPhotoId: null, inatPhotoStatus: null },
+    'https://x/plants/jordan.jpg'), false);
+});
+
+test('the credit escapes the attribution and is not hidden', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const src = fs.readFileSync(path.join(__dirname, '..', 'plants.html'), 'utf8');
+  assert.match(src, /photo-credit[^]{0,80}esc\(p\.inatPhotoAttribution\)/,
+    'the attribution must be esc()d before it reaches innerHTML');
+  // Visible, per the licence. A credit nobody can read discharges nothing.
+  const css = src.match(/\.photo-credit \{[\s\S]*?\}/);
+  assert.ok(css, '.photo-credit must be styled');
+  assert.ok(!/display:\s*none|opacity:\s*0(?!\.[1-9])|position:\s*absolute/.test(css[0]),
+    'the credit must not be hidden');
+});
