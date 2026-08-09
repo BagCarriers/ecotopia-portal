@@ -1681,6 +1681,10 @@ on `plants.html` must be deployed and confirmed on the live page before the phot
 allowed to run at all**, whether by cron or by hand. This is not theoretical: an early run
 put 33 uncredited CC photos on the live shop and they had to be rolled back the same day.
 
+The rule is now enforced by the `INAT_PHOTO_FILL` switch rather than by whoever last read
+this page. It defaults to off, and the photo pass does nothing at all until it is set to
+`on` (see below).
+
 ### Manual invocation
 
 ```
@@ -1712,6 +1716,34 @@ supabase functions deploy inat-sync --no-verify-jwt --project-ref wibnryfinfwbww
 `supabase/config.toml` pins `[functions.inat-sync] verify_jwt = false` so a redeploy keeps
 the token path working.
 
+### `INAT_PHOTO_FILL`: the photo-fill kill switch
+
+`INAT_PHOTO_FILL` (function secret) decides whether the photo pass runs at all. **It
+defaults to off.** The fill runs only when the value is exactly `on`; absent, empty,
+`true`, `1`, `ON` or anything else all mean off. It is not currently set, so the fill is
+off today.
+
+When it is off, `fillPhotos` returns immediately with zeroed counts and `disabled: true`,
+before a single iNaturalist request, storage upload or database write. The `disabled`
+marker is always present in the response, so a caller can tell a fill that was switched off
+from one that ran and found nothing eligible; "Sync now" in `manage-plants.html` says
+"Photo fill is switched off" rather than "0 photos filled". **The resolution and enrichment
+pass is unaffected** and runs normally either way: it writes no `photo_path` and therefore
+publishes nothing.
+
+This exists because the ordering rule above (the credit line live before any photo is
+written) was enforced only by a human reading this runbook. That held while every run was a
+person pressing a button; the nightly cron makes the pass permanent and unattended, and a
+cron job cannot read a runbook. Turn it on deliberately, for the deliberate re-run, once the
+credit line is confirmed on the live page:
+
+```
+supabase secrets set --project-ref wibnryfinfwbwwgsyojr INAT_PHOTO_FILL=on
+```
+
+To switch the fill back off, set it to anything else (`INAT_PHOTO_FILL=off`) or unset it.
+Changing the secret takes effect without a redeploy, on the next invocation.
+
 Rate limiting is a whole-run condition, not a per-row one: a 429 from iNaturalist stops the
 run and comes back as a `429` carrying the partial counts, so a truncated run can never be
 mistaken for a quiet successful one. The run is resumable by design (each row is its own
@@ -1723,7 +1755,9 @@ run is to run it again later.
 `supabase/migrations/0034_inat_sync_cron.sql` schedules `inat-sync-nightly` at `0 10 * * *`
 (10:00 UTC, an hour after `grant-scan-nightly`) via `pg_cron` + `pg_net`, on the same
 `X-Scan-Token` pattern the grant scan uses, with the token embedded in the cron command.
-**It has not been applied**, and must not be until the credit line above is live. The file
+**It has not been applied**, and must not be until the credit line above is live. With
+`INAT_PHOTO_FILL` unset, an applied cron would run the resolution pass only and publish
+nothing, but that is a second lock, not a reason to weaken the first one. The file
 carries the full precondition, the token placeholder to substitute, and two constraints
 worth reading first: the run has no batch limit (linear in the backlog, so a much larger
 catalogue would outlast the edge function's wall clock), and `net.http_post` is
@@ -1736,14 +1770,18 @@ out. Read `net._http_response` and the function logs instead.
 taxon and photo picking, the licence allowlist, `isOwnPhoto` / `canAutoFill`) and runs
 under `npm test`.
 
-`tests/deno/inat-sync.test.ts` covers the write path itself, with `fetch` and the Supabase
-client stubbed so nothing leaves the machine. **`npm test` does not run it**: that script
-is `node --test tests/*.js`, whose glob neither matches nor understands this file. Run it
-separately:
+`tests/deno/inat-sync.test.ts` covers the write path itself (including the
+`INAT_PHOTO_FILL` switch), with `fetch` and the Supabase client stubbed so nothing leaves
+the machine. **`npm test` does not run it**: that script is `node --test tests/*.js`, whose
+glob neither matches nor understands this file. It has a script of its own:
 
 ```
-deno test -A --config tests/deno/deno.json tests/deno/
+npm run test:deno
 ```
 
-Both suites are expected green (55 under Node, 11 under Deno as of 2026-08-08). Run both
+which is exactly `deno test -A --config tests/deno/deno.json tests/deno/`. Keep the script
+in `package.json` and this line in step: for months the only way to run these tests was to
+copy a command out of this document, so nothing ran them.
+
+Both suites are expected green (56 under Node, 13 under Deno as of 2026-08-09). Run both
 before touching the sync.

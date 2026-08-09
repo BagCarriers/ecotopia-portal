@@ -8,10 +8,11 @@
  * way, because reproducing it for real means a staff upload landing inside a
  * window a few milliseconds wide.
  *
- *   deno test -A --config tests/deno/deno.json tests/deno/
+ *   npm run test:deno
+ *   (which is: deno test -A --config tests/deno/deno.json tests/deno/)
  *
- * It is deliberately not part of `npm test`, which runs `node --test tests/*.js`
- * and neither sees nor understands this file.
+ * It is not part of `npm test`, which runs `node --test tests/*.js` and neither
+ * sees nor understands this file, so it has a script of its own.
  */
 import { assertEquals, assertMatch, assertRejects } from 'jsr:@std/assert@1';
 
@@ -25,6 +26,12 @@ const mod = await import('../../supabase/functions/inat-sync/index.ts');
 (Deno as any).serve = realServe;
 
 const { fillPhotos, imageKind } = mod;
+
+// The photo fill ships switched OFF: fillPhotos does nothing at all unless
+// INAT_PHOTO_FILL is exactly 'on'. Every test below except the two that own the
+// switch is about what the fill does when it is allowed to run, so it is turned
+// on here rather than repeated in each one.
+Deno.env.set('INAT_PHOTO_FILL', 'on');
 
 const PHOTO = {
   id: 7,
@@ -287,6 +294,51 @@ Deno.test('a failed upload never writes the row', async () => {
   assertEquals(counts.failed, 1);
   assertEquals(counts.filled, 0);
   assertEquals(log.updates.length, 0, 'a row must never point at an object that was not stored');
+});
+
+Deno.test('the fill does nothing at all unless INAT_PHOTO_FILL is exactly "on"', async () => {
+  // The ordering rule (the credit line live before any photo is written) used to
+  // be a sentence in a runbook, which an unattended cron cannot read. It is now
+  // a switch that defaults to off, and "off" has to mean no API call, no storage
+  // write and no database write, not merely no fill.
+  const before = Deno.env.get('INAT_PHOTO_FILL');
+  try {
+    for (const value of [null, '', 'true', '1', 'yes', 'ON', 'off']) {
+      if (value === null) Deno.env.delete('INAT_PHOTO_FILL');
+      else Deno.env.set('INAT_PHOTO_FILL', value);
+      const label = value === null ? 'unset' : JSON.stringify(value);
+
+      const { counts, log, fetched } = await run({ rows: [eligible()] });
+
+      assertEquals(counts.disabled, true, label + ' must leave the fill switched off');
+      assertEquals(counts.considered, 0, label);
+      assertEquals(counts.filled, 0, label);
+      assertEquals(fetched.length, 0, label + ': a disabled fill must not call iNaturalist');
+      assertEquals(log.selects.length, 0, label + ': a disabled fill must not even read the table');
+      assertEquals(log.updates.length, 0, label + ': a disabled fill must never write a row');
+      assertEquals(log.uploads.length, 0, label + ': a disabled fill must not touch storage');
+    }
+  } finally {
+    if (before === undefined) Deno.env.delete('INAT_PHOTO_FILL');
+    else Deno.env.set('INAT_PHOTO_FILL', before);
+  }
+});
+
+Deno.test('"on" re-enables the fill, and disabled is distinguishable from nothing to do', async () => {
+  Deno.env.set('INAT_PHOTO_FILL', 'on');
+
+  const enabled = await run({ rows: [eligible()] });
+  assertEquals(enabled.counts.disabled, false, 'a run that did work is not disabled');
+  assertEquals(enabled.counts.filled, 1);
+  assertEquals(enabled.log.updates.length, 1);
+
+  // Zeroed counts on their own say nothing. An eligible-but-empty run reports the
+  // same zeros as a switched-off one, so disabled is the only thing that tells a
+  // caller which of the two happened.
+  const empty = await run({ rows: [] });
+  assertEquals(empty.counts.disabled, false, 'an empty run is not a disabled run');
+  assertEquals(empty.counts.considered, 0);
+  assertEquals(empty.log.selects.length, 1, 'an enabled run reads the table even when empty');
 });
 
 Deno.test('imageKind trusts the served content type, then the URL, then jpeg', () => {

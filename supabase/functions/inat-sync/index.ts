@@ -49,7 +49,31 @@ type PhotoPick = {
 type PhotoCounts = {
   considered: number; filled: number; noUsableLicence: number; noAttribution: number;
   skippedOwn: number; skippedDecided: number; skippedRaced: number; failed: number;
+  // Always present, so a caller reading zeros can tell a fill that was switched
+  // off from one that ran and found nothing to do. See photoFillEnabled below.
+  disabled: boolean;
 };
+
+const zeroPhotoCounts = (): PhotoCounts => ({
+  considered: 0, filled: 0, noUsableLicence: 0, noAttribution: 0,
+  skippedOwn: 0, skippedDecided: 0, skippedRaced: 0, failed: 0, disabled: false,
+});
+
+// THE kill switch for the photo pass. Off unless INAT_PHOTO_FILL is exactly
+// 'on'; absent, empty, 'true', '1' and anything else all mean off.
+//
+// Writing photo_path publishes. plants.html reads plant_species live over the
+// anon key, so the row write IS the publication, worldwide and immediately, and
+// the credit line must be live on the public page before a single CC photo is
+// written. That ordering rule has so far been enforced only by a human reading
+// the runbook, which held while every run was a person pressing a button. The
+// nightly cron makes the pass permanent and unattended, and a cron job cannot
+// read a runbook, so the rule becomes a switch that defaults to off. An early
+// run put 33 uncredited photos on the live shop; this is what makes a repeat
+// take a deliberate act rather than an oversight.
+//
+// The resolution pass is unaffected: it writes no photo and publishes nothing.
+const photoFillEnabled = () => Deno.env.get('INAT_PHOTO_FILL') === 'on';
 
 // iNaturalist's medium_url is usually a .jpg but is sometimes a .png. Storing a
 // PNG under a .jpg name with a jpeg content type serves it mislabelled out of a
@@ -147,9 +171,21 @@ async function resolveAndEnrich(sb: ReturnType<typeof admin>) {
 
     if (!isResolvableName(norm)) {
       // 'Pycnanthemum virginicum & muticum' lands here. No API call, no guess.
-      await sb.from('plant_species')
+      //
+      // The error is checked for the same reason the photo pass checks it:
+      // discarding a PostgREST result makes a write that did not happen
+      // indistinguishable from one that did, and these counts are the only
+      // evidence a nightly cron leaves behind. .select() is not needed here (the
+      // predicate is .eq('id', ...) on a row just read, so a zero-row match is
+      // near-impossible); an unnoticed error is the real risk.
+      const { error: updErr } = await sb.from('plant_species')
         .update({ inat_match: 'none', inat_synced_at: new Date().toISOString() })
         .eq('id', row.id);
+      if (updErr) {
+        console.error('inat-sync: write failed for', row.botanical, updErr.message);
+        counts.failed++;
+        continue;
+      }
       counts.unresolved++;
       continue;
     }
@@ -169,9 +205,14 @@ async function resolveAndEnrich(sb: ReturnType<typeof admin>) {
     }
 
     if (!pick.taxonId) {
-      await sb.from('plant_species')
+      const { error: updErr } = await sb.from('plant_species')
         .update({ inat_match: 'none', inat_synced_at: new Date().toISOString() })
         .eq('id', row.id);
+      if (updErr) {
+        console.error('inat-sync: write failed for', row.botanical, updErr.message);
+        counts.failed++;
+        continue;
+      }
       counts.unresolved++;
       continue;
     }
@@ -190,7 +231,7 @@ async function resolveAndEnrich(sb: ReturnType<typeof admin>) {
       else console.error('inat-sync: enrichment failed for', row.botanical, errorMessage(e));
     }
 
-    await sb.from('plant_species').update({
+    const { error: updErr } = await sb.from('plant_species').update({
       inat_taxon_id: pick.taxonId,
       inat_match: pick.match,
       inat_matched_name: pick.matchedName,
@@ -199,9 +240,18 @@ async function resolveAndEnrich(sb: ReturnType<typeof admin>) {
       inat_synced_at: new Date().toISOString(),
     }).eq('id', row.id);
 
-    if (pick.match === 'fuzzy') counts.fuzzy++;
-    else counts.resolved++;
+    if (updErr) {
+      // A link that was not saved is not a resolution. Counting it as one would
+      // report progress the next run has to make all over again.
+      console.error('inat-sync: write failed for', row.botanical, updErr.message);
+      counts.failed++;
+    } else if (pick.match === 'fuzzy') {
+      counts.fuzzy++;
+    } else {
+      counts.resolved++;
+    }
 
+    // A rate limit still ends the run whether or not this row's write landed.
     if (stopped) throw stopped;
   }
 
@@ -222,6 +272,13 @@ async function resolveAndEnrich(sb: ReturnType<typeof admin>) {
 //      bare inat_photo_id, which is exactly the shape a staff rejection leaves
 //      behind.
 export async function fillPhotos(sb: ReturnType<typeof admin>) {
+  // The switch is read before anything else, so a disabled run makes no iNat
+  // request, no storage write and no database write. Not even the SELECT.
+  if (!photoFillEnabled()) {
+    console.error('inat-sync: photo fill is switched off (INAT_PHOTO_FILL is not "on")');
+    return { ...zeroPhotoCounts(), disabled: true };
+  }
+
   const { data: rows, error } = await sb
     .from('plant_species')
     .select('id, common, inat_taxon_id, photo_path, inat_photo_id, inat_photo_status')
@@ -229,10 +286,7 @@ export async function fillPhotos(sb: ReturnType<typeof admin>) {
     .is('photo_path', null);
   if (error) throw new Error(error.message);
 
-  const counts: PhotoCounts = {
-    considered: 0, filled: 0, noUsableLicence: 0, noAttribution: 0,
-    skippedOwn: 0, skippedDecided: 0, skippedRaced: 0, failed: 0,
-  };
+  const counts: PhotoCounts = zeroPhotoCounts();
 
   for (const row of rows || []) {
     const candidate = {

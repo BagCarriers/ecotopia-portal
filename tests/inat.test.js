@@ -71,8 +71,15 @@ test('a two species row is refused without ever calling the API', () => {
   assert.strictEqual(E.isResolvableName('Pycnanthemum'), false);
 });
 
-test('an exact botanical match wins', () => {
-  const results = [{ id: 47912, name: 'Asclepias tuberosa' }, { id: 1, name: 'Asclepias tuberosa interior' }];
+test('an exact botanical match wins wherever it sits in the results', () => {
+  // The exact hit is deliberately NOT results[0]. iNaturalist orders by its own
+  // relevance, and with the hit first this test would also pass for an
+  // implementation that just returned the first row and called it exact.
+  const results = [
+    { id: 1, name: 'Asclepias tuberosa interior' },
+    { id: 2, name: 'Asclepias tuberosana' },
+    { id: 47912, name: 'Asclepias tuberosa' },
+  ];
   assert.deepStrictEqual(E.pickTaxon('Asclepias tuberosa', results), {
     taxonId: 47912, match: 'exact', matchedName: 'Asclepias tuberosa',
   });
@@ -300,6 +307,33 @@ test('the credit renders nothing at all when there is nothing to credit', () => 
     photoPath: 'plants/abc.jpg', inatPhotoId: 99, inatPhotoStatus: 'auto',
     inatPhotoAttribution: null,
   }, 'https://x/plants/abc.jpg'), '');
+});
+
+test('replacing a species photo clears the iNaturalist credit along with it', () => {
+  // The staff edit form is the only path on the site that can produce an
+  // affirmatively FALSE attribution: it writes photo_path and, left alone, keeps
+  // the inat_photo_* group, so showsInatPhoto above is satisfied and the shop
+  // prints a stranger's name and link under Ecotopia's own photograph. The clear
+  // also drops the row out of the review grid, whose "Reject" would otherwise
+  // delete the object the staff member just uploaded.
+  //
+  // This reads the file the browser runs, like the plants.html tests above: the
+  // logic sits inside a submit handler and cannot be imported.
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const src = fs.readFileSync(path.join(__dirname, '..', 'manage-plants.html'), 'utf8');
+  const start = src.indexOf('changes.photoPath = newPath;');
+  const end = src.indexOf('speciesSaveBtn', start);
+  assert.ok(start > 0 && end > start, 'the species photo-change block moved; update this test');
+  const block = src.slice(start, end);
+  for (const key of ['inatPhotoId', 'inatPhotoStatus', 'inatPhotoLicense',
+    'inatPhotoAttribution', 'inatPhotoSourceUrl']) {
+    assert.match(block, new RegExp(key + '\\s*[:=]\\s*null'),
+      'a photo change must clear ' + key + ', or the card credits the wrong photographer');
+  }
+  // Removal counts as a change, not only replacement.
+  assert.match(block, /hasOwnProperty\.call\(changes, 'photoPath'\)/,
+    'the clear must fire on any photoPath change, removal included');
 });
 
 test('the credit links the source photo, and only over https', () => {

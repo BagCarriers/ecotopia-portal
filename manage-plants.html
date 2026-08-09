@@ -791,10 +791,30 @@ async function runInatSync() {
     if (!res.ok) throw new Error(payload.error || 'Sync failed.');
     const c = payload.counts || {};
     const ph = c.photos || {};
+    // The figures have to add up to the rows examined, or they invite a re-run.
+    // counts.resolved excludes fuzzy matches (the function increments one or the
+    // other), so a line quoting resolved and unresolved alone silently loses
+    // every close match. Failures are named only when there are any, so the
+    // ordinary line stays short.
+    const fuzzy = c.fuzzy || 0;
+    const filled = ph.filled || 0;
+    // The photo pass ships switched off (INAT_PHOTO_FILL). Reporting that as
+    // "0 photos filled" would read as "nothing to do" and hide the reason.
+    const photoPart = ph.disabled
+      ? ' Photo fill is switched off, so no photos were fetched.'
+      : ` ${filled} photo${filled === 1 ? '' : 's'} filled for review.`;
     resEl.textContent =
-      `Synced. ${c.resolved || 0} resolved, ${c.unresolved || 0} still unmatched, ` +
-      `${ph.filled || 0} photo${(ph.filled || 0) === 1 ? '' : 's'} filled for review.`;
-    await loadSpecies();
+      `Synced. ${c.resolved || 0} resolved, ${fuzzy} close match${fuzzy === 1 ? '' : 'es'} ` +
+      `to check, ${c.unresolved || 0} still unmatched.` + photoPart +
+      (c.failed ? ` ${c.failed} row${c.failed === 1 ? '' : 's'} errored and will be retried.` : '');
+    try {
+      // The sync itself succeeded. A reload failure must not be reported as
+      // "Sync failed", which would send an operator to re-run a pass that
+      // publishes photographs the moment it writes a row.
+      await loadSpecies();
+    } catch (err) {
+      errEl.textContent = 'Synced, but the list could not be reloaded. ' + err.message;
+    }
   } catch (err) {
     resEl.style.display = 'none';
     resEl.textContent = '';
@@ -892,6 +912,26 @@ document.getElementById('speciesForm').addEventListener('submit', async function
     changes.photoPath = newPath;
   } else if (spPhotoRemove) {
     changes.photoPath = null;
+  }
+  // The credit belongs to the iNaturalist photograph, not to the row. Replacing
+  // that photograph with Jordan's own upload (or removing it) while leaving the
+  // inat_photo_* group behind makes showsInatPhoto in plants.html print a
+  // stranger's name and a link to a stranger's photo underneath Ecotopia's own
+  // photography: an affirmatively false attribution on a commerce page, which is
+  // the exact legal problem the credit work exists to solve.
+  //
+  // Removal clears the group for the same reason a replacement does, and it also
+  // takes the row out of renderInatReview(): a row left at status 'auto' after a
+  // staff upload would offer a "Reject" button that deletes the gallery object
+  // the staff member just uploaded.
+  const editedRow = spEditId ? speciesById(spEditId) : null;
+  if (Object.prototype.hasOwnProperty.call(changes, 'photoPath')
+      && editedRow && editedRow.inatPhotoId) {
+    changes.inatPhotoId = null;
+    changes.inatPhotoStatus = null;
+    changes.inatPhotoLicense = null;
+    changes.inatPhotoAttribution = null;
+    changes.inatPhotoSourceUrl = null;
   }
   const btn = document.getElementById('speciesSaveBtn');
   btn.disabled = true;
