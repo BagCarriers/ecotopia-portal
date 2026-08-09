@@ -174,10 +174,21 @@ test('the photo pass gates on the shared guard and on attribution', () => {
   const path = require('node:path');
   const src = fs.readFileSync(
     path.join(__dirname, '..', 'supabase', 'functions', 'inat-sync', 'index.ts'), 'utf8');
-  assert.match(src, /canAutoFill/, 'the photo pass must call the shared eligibility guard');
-  assert.ok(!/inat_photo_status === 'rejected'/.test(src),
+  // Matching the bare name would be satisfied by the destructure line alone, so
+  // the gate could be deleted and the test would still pass. Match the call in
+  // its refusing position instead.
+  assert.match(src, /if \(!canAutoFill\(/,
+    'the photo pass must refuse a row by calling the shared eligibility guard');
+  // Any restatement of the rule, however it is spelled. A loose equals, a
+  // double equals or extra spacing all evade a check for one exact string.
+  assert.ok(!/inat_photo_status\s*={2,3}\s*'rejected'/.test(src),
     'index.ts must not restate the eligibility rule inline');
   assert.match(src, /noAttribution/, 'a photo with no attribution must be counted and refused');
+  // A refused UPDATE reports error: null, so the rows must be asked for or a
+  // write the database guard rejected is counted as a fill.
+  assert.match(src, /\.is\('photo_path', null\)\.is\('inat_photo_id', null\)\.select\(/,
+    'the UPDATE must mirror canAutoFill at the database and return the rows it wrote');
+  assert.match(src, /skippedRaced/, 'a refused UPDATE must be counted apart from a fill');
 });
 
 test('the edge function does not reimplement the shared logic', () => {

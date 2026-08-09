@@ -48,8 +48,34 @@ type PhotoPick = {
 
 type PhotoCounts = {
   considered: number; filled: number; noUsableLicence: number; noAttribution: number;
-  skippedOwn: number; skippedDecided: number; failed: number;
+  skippedOwn: number; skippedDecided: number; skippedRaced: number; failed: number;
 };
+
+// iNaturalist's medium_url is usually a .jpg but is sometimes a .png. Storing a
+// PNG under a .jpg name with a jpeg content type serves it mislabelled out of a
+// public bucket, so both the extension and the content type are taken from what
+// was actually downloaded. The header is preferred over the URL because it is
+// what the server says the bytes are; the URL is the fallback for a server that
+// answers application/octet-stream, and jpeg is the fallback for both.
+const IMAGE_EXT_BY_MIME: Record<string, string> = {
+  'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif', 'image/webp': 'webp',
+};
+const IMAGE_MIME_BY_EXT: Record<string, string> = {
+  jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp',
+};
+
+export function imageKind(url: string, contentType: string | null): { ext: string; mime: string } {
+  const header = String(contentType || '').split(';')[0].trim().toLowerCase();
+  if (IMAGE_EXT_BY_MIME[header]) return { ext: IMAGE_EXT_BY_MIME[header], mime: header };
+
+  const bare = String(url || '').split('?')[0].split('#')[0];
+  const m = /\.([A-Za-z0-9]+)$/.exec(bare);
+  const ext = m ? m[1].toLowerCase() : '';
+  if (IMAGE_MIME_BY_EXT[ext]) {
+    return { ext: ext === 'jpeg' ? 'jpg' : ext, mime: IMAGE_MIME_BY_EXT[ext] };
+  }
+  return { ext: 'jpg', mime: 'image/jpeg' };
+}
 
 // A rate limit is not a per-row problem. iNaturalist is telling the whole run to
 // stop, so this is thrown past the per-row handlers and answered with a 429
@@ -195,7 +221,7 @@ async function resolveAndEnrich(sb: ReturnType<typeof admin>) {
 //      weaker: a hand-written photo_path check does not refuse a row carrying a
 //      bare inat_photo_id, which is exactly the shape a staff rejection leaves
 //      behind.
-async function fillPhotos(sb: ReturnType<typeof admin>) {
+export async function fillPhotos(sb: ReturnType<typeof admin>) {
   const { data: rows, error } = await sb
     .from('plant_species')
     .select('id, common, inat_taxon_id, photo_path, inat_photo_id, inat_photo_status')
@@ -205,7 +231,7 @@ async function fillPhotos(sb: ReturnType<typeof admin>) {
 
   const counts: PhotoCounts = {
     considered: 0, filled: 0, noUsableLicence: 0, noAttribution: 0,
-    skippedOwn: 0, skippedDecided: 0, failed: 0,
+    skippedOwn: 0, skippedDecided: 0, skippedRaced: 0, failed: 0,
   };
 
   for (const row of rows || []) {
@@ -255,9 +281,11 @@ async function fillPhotos(sb: ReturnType<typeof admin>) {
     }
 
     let bytes: ArrayBuffer;
+    let kind: { ext: string; mime: string };
     try {
       const img = await fetch(pick.mediumUrl, { headers: { 'User-Agent': UA } });
       if (!img.ok) throw new Error('photo_http_' + img.status);
+      kind = imageKind(pick.mediumUrl, img.headers.get('content-type'));
       bytes = await img.arrayBuffer();
     } catch (e) {
       console.error('inat-sync: photo download failed for', row.common, errorMessage(e));
@@ -265,9 +293,9 @@ async function fillPhotos(sb: ReturnType<typeof admin>) {
       continue;
     }
 
-    const objectPath = 'plants/' + crypto.randomUUID() + '.jpg';
+    const objectPath = 'plants/' + crypto.randomUUID() + '.' + kind.ext;
     const up = await sb.storage.from('gallery')
-      .upload(objectPath, bytes, { contentType: 'image/jpeg', upsert: false });
+      .upload(objectPath, bytes, { contentType: kind.mime, upsert: false });
     if (up.error) {
       console.error('inat-sync: storage upload failed for', row.common, up.error.message);
       counts.failed++;
@@ -276,7 +304,19 @@ async function fillPhotos(sb: ReturnType<typeof admin>) {
 
     // Storage first, row second. If the update fails we leak one orphan object,
     // which is harmless. The reverse order would point a row at a missing image.
-    const { error: updErr } = await sb.from('plant_species').update({
+    //
+    // The two IS NULL conditions mirror canAutoFill at the database, so the two
+    // layers refuse the same rows: photo_path catches a staff upload and
+    // inat_photo_id catches a staff rejection, either of which can land in the
+    // window between the SELECT above and this write, when the in-memory guard
+    // is working from stale data.
+    //
+    // .select('id') is not decoration. PostgREST returns error: null when the
+    // predicate matches no rows, so without asking for the rows back an UPDATE
+    // the guard REFUSED is indistinguishable from one that wrote, and the run
+    // would report a fill that never happened. The counts are the only evidence
+    // a nightly cron leaves behind.
+    const { data: updated, error: updErr } = await sb.from('plant_species').update({
       photo_path: objectPath,
       inat_photo_id: pick.photoId,
       inat_photo_license: pick.licence,
@@ -284,10 +324,17 @@ async function fillPhotos(sb: ReturnType<typeof admin>) {
       inat_photo_source_url: pick.sourceUrl,
       inat_photo_status: 'auto',
       inat_synced_at: new Date().toISOString(),
-    }).eq('id', row.id).is('photo_path', null);
+    }).eq('id', row.id).is('photo_path', null).is('inat_photo_id', null).select('id');
     if (updErr) {
       console.error('inat-sync: row update failed for', row.common, updErr.message);
       counts.failed++;
+      continue;
+    }
+    if (!updated || updated.length === 0) {
+      // Staff got there first. Nothing is corrupted and the uploaded object is
+      // left orphaned, which is harmless, but this is emphatically not a fill.
+      console.error('inat-sync: photo write refused by the row guard for', row.common);
+      counts.skippedRaced++;
       continue;
     }
     counts.filled++;
