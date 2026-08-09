@@ -31,8 +31,22 @@ test('a photograph of Jordan is never eligible for auto fill', () => {
 test('only a species with no photo at all is eligible', () => {
   assert.strictEqual(E.canAutoFill({ photoPath: null, inatPhotoId: null, inatPhotoStatus: null }), true);
   assert.strictEqual(E.canAutoFill({ photoPath: '', inatPhotoId: null, inatPhotoStatus: null }), true);
-  // Already carries an approved iNaturalist photo: leave it alone.
+  // Already carries an approved iNaturalist photo: leave it alone. photoPath is null
+  // here, so the prior decision and not the path is what refuses the row.
+  assert.strictEqual(E.canAutoFill({ photoPath: null, inatPhotoId: 99, inatPhotoStatus: 'approved' }), false);
+  // The same row once the photo pass has also written its path.
   assert.strictEqual(E.canAutoFill({ photoPath: 'plants/x.jpg', inatPhotoId: 99, inatPhotoStatus: 'approved' }), false);
+});
+
+test('any prior iNaturalist decision makes a row ineligible, not only a rejection', () => {
+  // An inat_photo_id means this row has already been through the pipeline. Only a
+  // row with no photo and no prior decision is eligible, so the guard cannot rely
+  // on some later pass happening to write photo_path at the same time.
+  assert.strictEqual(E.canAutoFill({ photoPath: null, inatPhotoId: 99, inatPhotoStatus: 'approved' }), false);
+  assert.strictEqual(E.canAutoFill({ photoPath: null, inatPhotoId: 99, inatPhotoStatus: 'pending' }), false);
+  assert.strictEqual(E.canAutoFill({ photoPath: null, inatPhotoId: 99, inatPhotoStatus: null }), false);
+  // A rejection with no id is still refused, so neither field alone carries the guard.
+  assert.strictEqual(E.canAutoFill({ photoPath: null, inatPhotoId: null, inatPhotoStatus: 'rejected' }), false);
 });
 
 test('a rejected photo is never proposed again', () => {

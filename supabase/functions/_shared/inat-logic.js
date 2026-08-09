@@ -89,9 +89,17 @@
   // never modify one. This is the guard whose failure is destructive and silent.
   const isOwnPhoto = (row) => !!(row && row.photoPath && !row.inatPhotoId);
 
+  // Eligible means no photograph of Jordan's and no prior iNaturalist decision of any
+  // kind. It delegates to isOwnPhoto instead of re-reading photoPath, so the two can
+  // never drift and the mutation-proven guard is the one standing on the write path.
+  // An inatPhotoId means the row has already been through the pipeline whatever its
+  // status, so the sync must not propose a second photo for it. Checking the id here
+  // rather than trusting a later pass to write photoPath keeps this guard standing on
+  // its own, not on an invariant enforced in another file.
   const canAutoFill = (row) => {
     const r = row || {};
-    if (r.photoPath) return false;
+    if (isOwnPhoto(r)) return false;
+    if (r.inatPhotoId) return false;
     if (r.inatPhotoStatus === 'rejected') return false;
     return true;
   };
