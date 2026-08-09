@@ -10,6 +10,31 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-08-inaturalist-species-enrichment-design.md`
 
+## CORRECTION, added 2026-08-09 after this plan caused an incident
+
+**The task order below is WRONG and was not followed. Do not follow it.**
+
+Task 4 fills photos and Task 6 renders the legally required CC-BY credit. This plan puts
+the fill first. That is backwards, because on this site **writing a content row IS
+publishing**: the deployed page reads Supabase live over the anon key, so there is no
+separate deploy step to gate on. Running Task 4 put 33 photos on the live storefront the
+instant the rows were written, 27 of them requiring visible credit that did not yet exist.
+They had to be rolled back and the storage objects deleted.
+
+The plan even states the rule ("the attribution line must ship before any iNaturalist photo
+is publicly visible") and then orders the tasks against it. It guards the nightly cron in
+Task 7 and leaves the one-shot fill in Task 4 unguarded.
+
+**Correct order: 1, 2, 3, 5, 6, then 4's fill, then 7.** Task 4's CODE may be written at any
+point; it is only its EXECUTION that must wait until the credit line is live.
+
+As shipped, this is now also enforced in code rather than by discipline: `fillPhotos`
+returns zeroed counts with `disabled: true` unless `INAT_PHOTO_FILL` is exactly `on`, and
+it does so before any network, storage or database access.
+
+Generalised in memory as `live-data-publishes-instantly`, because every BagCarriers portal
+built as static HTML over the anon key has this property.
+
 ## Global Constraints
 
 - **No em dashes anywhere**, in code, comments, copy, or commit messages. Repo-wide rule.
@@ -285,9 +310,17 @@ Create `supabase/functions/_shared/inat-logic.js`:
   // never modify one. This is the guard whose failure is destructive and silent.
   const isOwnPhoto = (row) => !!(row && row.photoPath && !row.inatPhotoId);
 
+  // Eligible means no photograph of Jordan's and no prior iNaturalist decision of any
+  // kind. It delegates to isOwnPhoto instead of re-reading photoPath, so the two can
+  // never drift and the mutation-proven guard is the one standing on the write path.
+  // An inatPhotoId means the row has already been through the pipeline whatever its
+  // status, so the sync must not propose a second photo for it. Checking the id here
+  // rather than trusting a later pass to write photoPath keeps this guard standing on
+  // its own, not on an invariant enforced in another file.
   const canAutoFill = (row) => {
     const r = row || {};
-    if (r.photoPath) return false;
+    if (isOwnPhoto(r)) return false;
+    if (r.inatPhotoId) return false;
     if (r.inatPhotoStatus === 'rejected') return false;
     return true;
   };
