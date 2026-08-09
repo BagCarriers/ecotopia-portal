@@ -23,6 +23,7 @@
 <script src="assets/config.js"></script>
 <script src="assets/supabase-client.js"></script>
 <script src="assets/mapping.js"></script>
+<script src="assets/plantings.js"></script>
 <script src="assets/site.js"></script>
 </head>
 <body>
@@ -129,8 +130,37 @@ function gardenPhotoSrc(photoPath) {
   return EcoSite.gardenPhotoUrl(photoPath);
 }
 
+// Planting records for the public cards, read over the anon key.
+//
+// This reads the VIEW, garden_plantings_public, and never the table. The table
+// carries a staff-authored note column ("donor asked us not to publicize this
+// one"), so migration 0036 dropped the anon read policy on it and exposed the
+// view with only the six columns a public page needs. Reading the table here
+// would not raise an error: with RLS on and no policy for anon, PostgREST answers
+// 200 with an empty array, so every card would quietly show nothing and look
+// exactly like a garden with nothing planted yet. The view's column names are
+// copied verbatim from the table, so the existing camelCase mapper needs no
+// special casing.
+//
+// The order clause is not cosmetic. speciesBreakdown keeps the first spelling it
+// sees for a species, so an unordered result could render "Wild Columbine" on one
+// load and "wild columbine" on the next. planted_on is a date and a planting day
+// is entered in batches, so id breaks the tie (created_at is deliberately not in
+// the view).
+const sb = () => window.ecoSupabase;
+async function loadPlantings() {
+  const { data, error } = await sb().from('garden_plantings_public').select('*')
+    .order('planted_on', { ascending: false })
+    .order('id', { ascending: true });
+  if (error) throw new Error(error.message);
+  return EcoMapping.fromDbAll(data);
+}
+
 // Build the inner content of a garden card (shared by featured + grouped cards).
-function gardenCardInner(g) {
+// plantingRows is that garden's planting rows, and defaults to none. Handing the
+// card its rows rather than a precomputed summary means the headline count and
+// the expanded list are derived from one source and cannot disagree.
+function gardenCardInner(g, plantingRows) {
   const esc = EcoSite.esc;
   // Only embed a map when map_mid passes the id guard (iframe src safety).
   const mid = EcoSite.validMapMid(g.mapMid) ? encodeURIComponent(g.mapMid) : null;
@@ -139,10 +169,32 @@ function gardenCardInner(g) {
   // Site-local page name (works on any domain) or an absolute https URL.
   const formUrl = (typeof g.formUrl === 'string' &&
     (/^[A-Za-z0-9._-]+\.html$/.test(g.formUrl) || /^https:\/\//i.test(g.formUrl))) ? g.formUrl : null;
+  // A garden with nothing recorded renders no summary at all, not a zero. The
+  // record is silent about most of these gardens rather than zero for them, and
+  // "0 native plants" repeated down the page would advertise an unused feature.
+  // Gating on the breakdown rather than on rows.length keeps the headline and the
+  // list in step: both skip a blank-labelled row, so a set of rows with nothing to
+  // list also has nothing to total.
+  const rows = Array.isArray(plantingRows) ? plantingRows : [];
+  const breakdown = EcoPlantings.speciesBreakdown(rows);
+  const summary = breakdown.length ? EcoPlantings.summarise(rows) : null;
+  const plantWord = (n) => n.toLocaleString() + (n === 1 ? ' native plant' : ' native plants');
   const text =
     '<h3>' + esc(g.name) + '</h3>' +
     (g.address ? '<p class="addr">📍 ' + esc(g.address) + '</p>' : '') +
     (g.sqft ? '<p class="sqft">' + esc(g.sqft) + ' sq ft</p>' : '') +
+    // <details> gives the disclosure with no JavaScript. species_label is
+    // staff-typed free text, so it is escaped like every other database string
+    // that reaches this page.
+    (summary
+      ? '<details class="garden-plantings"><summary>' +
+          esc(plantWord(summary.plants)) + ', ' + esc(String(summary.species)) +
+          ' species planted here</summary><ul>' +
+          breakdown.map(b =>
+            '<li>' + esc(b.label) + ' <span class="qty">' + esc(b.plants.toLocaleString()) +
+            '</span></li>').join('') +
+        '</ul></details>'
+      : '') +
     (g.description ? '<p class="garden-desc">' + esc(g.description) + '</p>' : '') +
     (mid
       ? '<div class="garden-map"><iframe src="https://www.google.com/maps/d/embed?mid=' + mid +
@@ -180,6 +232,23 @@ async function loadGardens() {
       el.innerHTML = '<p class="empty-line">Community garden listings are coming soon. In the meantime, join us at an <a href="happenings.html">upcoming event</a>.</p>';
       return;
     }
+    // Group the plantings by garden once, then hand each card its own rows. A
+    // failure here must never break the garden list, which is this page's actual
+    // job, so it falls back to an empty rollup and every card renders as it did
+    // before. It is logged rather than swallowed: on the page a permanently
+    // failing read is indistinguishable from gardens with nothing planted yet,
+    // and a silent one would stay that way for good.
+    let rowsByGarden = {};
+    try {
+      (await loadPlantings()).forEach(r => {
+        if (!r.gardenId) return;
+        (rowsByGarden[r.gardenId] = rowsByGarden[r.gardenId] || []).push(r);
+      });
+    } catch (err) {
+      rowsByGarden = {};
+      console.warn('Planting summaries unavailable:', (err && err.message) || err);
+    }
+
     // Pawpaw Pathways leads as a featured, full-width card (sign photo + map + form).
     const isFeatured = g => /pawpaw pathways/i.test(g.name || '');
     const featured = gardens.filter(isFeatured);
@@ -187,7 +256,7 @@ async function loadGardens() {
 
     let html = '';
     featured.forEach(g => {
-      const c = gardenCardInner(g);
+      const c = gardenCardInner(g, rowsByGarden[g.id]);
       html += '<div class="garden-card featured reveal' + (c.hasPhoto ? ' has-photo' : '') + '">' +
         '<div class="garden-featured-text">' + c.text + '</div>' + c.photoHtml + '</div>';
     });
@@ -201,7 +270,7 @@ async function loadGardens() {
       if (!list || !list.length) return;
       html += '<h3 class="garden-town">' + esc(town) + '</h3><div class="garden-grid">' +
         list.map(g => {
-          const c = gardenCardInner(g);
+          const c = gardenCardInner(g, rowsByGarden[g.id]);
           return '<div class="garden-card reveal">' + c.photoHtml + c.text + '</div>';
         }).join('') + '</div>';
     });
