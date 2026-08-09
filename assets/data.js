@@ -264,12 +264,21 @@ const DataStore = (() => {
     // planting_suggestions above, which is the public "suggest a site" form.
     // species_label is always written, even when a catalogue species is chosen, so
     // the record survives that species being deleted from the shop.
+    //
+    // planted_on is a date, not a timestamp, and the team plants in batches, so a
+    // whole planting day shares one value and ties are the common case, not an edge.
+    // created_at breaks the tie so two loads cannot return the same day's rows in a
+    // different order. It matters more than cosmetics: the moment anything here
+    // grows a .limit() or .range(), an unstable sort makes rows repeat on one page
+    // and vanish from another.
     getPlantingsByGarden: async (gId) =>
       fromDbAll(unwrap(await sb.from('garden_plantings').select('*')
-        .eq('garden_id', gId).order('planted_on', { ascending: false }))),
+        .eq('garden_id', gId).order('planted_on', { ascending: false })
+        .order('created_at', { ascending: false }))),
     getAllPlantings: async () =>
       fromDbAll(unwrap(await sb.from('garden_plantings').select('*')
-        .order('planted_on', { ascending: false }))),
+        .order('planted_on', { ascending: false })
+        .order('created_at', { ascending: false }))),
     addPlanting: (r) => insert('garden_plantings', r),
     updatePlanting: (id, ch) => update('garden_plantings', id, ch),
     deletePlanting: async (id) => {
