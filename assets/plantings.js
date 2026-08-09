@@ -28,14 +28,21 @@
     return label || 'Unnamed planting';
   };
 
+  // Skips a blank-labelled row entirely, exactly as speciesBreakdown does below.
+  // Counting its quantity here while the breakdown drops it would print a headline
+  // total larger than the list of species under it, which reads as a rendering bug
+  // on a public page. The database rejects a blank label, so this should be
+  // unreachable, but the two functions now agree by construction rather than by
+  // trusting a constraint in another system.
   function summarise(rows) {
     const list = Array.isArray(rows) ? rows : [];
     const species = new Set();
     let plants = 0;
     for (const r of list) {
-      plants += qty(r && r.quantity);
       const k = key(r && r.speciesLabel);
-      if (k) species.add(k);
+      if (!k) continue;
+      plants += qty(r && r.quantity);
+      species.add(k);
     }
     return { plants, species: species.size };
   }

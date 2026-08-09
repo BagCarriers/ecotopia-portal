@@ -83,6 +83,29 @@ test('plantingLabel returns the stored label and never invents one', () => {
   assert.strictEqual(P.plantingLabel({}), 'Unnamed planting');
 });
 
+test('the headline total always equals the sum of the species list', () => {
+  // The invariant a reader can see: summarise().plants is the number printed above
+  // the breakdown, so it must equal the breakdown's own total or the page contradicts
+  // itself. Every row below except the first is blank to JavaScript's .trim(), which
+  // strips all 25 Unicode whitespace codepoints, not just the ASCII space Postgres
+  // trim() strips. The tab, the non-breaking space and the U+FEFF are the three that
+  // a plain `length(trim(x)) > 0` check in the database would have let through.
+  const rows = [
+    { gardenId: 'g1', speciesLabel: 'Wild Columbine', quantity: 10, plantedOn: '2026-05-04' },
+    { gardenId: 'g1', speciesLabel: '',       quantity: 5, plantedOn: '2026-05-04' },
+    { gardenId: 'g1', speciesLabel: '   ',    quantity: 5, plantedOn: '2026-05-04' },
+    { gardenId: 'g1', speciesLabel: '\t',     quantity: 5, plantedOn: '2026-05-04' },
+    { gardenId: 'g1', speciesLabel: '\u00A0', quantity: 5, plantedOn: '2026-05-04' },
+    { gardenId: 'g1', speciesLabel: '\uFEFF', quantity: 5, plantedOn: '2026-05-04' },
+  ];
+  const headline = P.summarise(rows).plants;
+  const listed = P.speciesBreakdown(rows).reduce((n, s) => n + s.plants, 0);
+  assert.strictEqual(headline, listed);
+  // Pin the value too, so the test cannot pass by both sides collapsing to zero.
+  assert.strictEqual(headline, 10);
+  assert.strictEqual(P.summarise(rows).species, 1);
+});
+
 test('a non-numeric or negative quantity contributes nothing rather than NaN', () => {
   // The negative row is the one that matters. Task 2's check (quantity > 0) stops
   // a negative reaching the table, but a staff form summarises draft rows before
