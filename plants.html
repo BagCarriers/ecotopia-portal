@@ -54,6 +54,23 @@
   height: 190px; object-fit: cover;
 }
 .plant-photo { width: calc(100% + 40px); margin: -20px -20px 14px; height: 150px; }
+/* Photographer's credit, shown under an iNaturalist photograph. CC-BY and CC-BY-SA
+   require the credit to be VISIBLE, so this is quiet but genuinely readable: small
+   type in the same soft ink the rest of the card's secondary text uses, never
+   display:none, never zero opacity, never moved off screen. The attribution is one
+   sentence of third-party text inside a 268px card, so it wraps rather than
+   overflowing, and it pulls up into the photo's own bottom margin so a credited card
+   is barely taller than an uncredited one. */
+.photo-credit {
+  font-family: var(--font-util); font-size: 0.7rem; line-height: 1.35;
+  color: var(--ink-soft); margin: -10px 0 10px;
+  overflow-wrap: break-word; word-break: break-word;
+}
+/* The credit links to the iNaturalist photo page. It stays part of the quiet line
+   rather than becoming a call to action: same size, same ink, underlined only so it
+   reads as a link at all. */
+.photo-credit a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
+.photo-credit a:hover { color: var(--green-dark); }
 .kit-card h3 {
   font-family: var(--font-util); font-weight: 700; font-size: 1.32rem;
   color: var(--green-dark); margin: 0 0 10px;
@@ -535,6 +552,51 @@
     return sb().storage.from('gallery').getPublicUrl(photoPath).data.publicUrl;
   }
 
+  // ── Photo credit ─────────────────────────────────────────────────
+  // CC-BY and CC-BY-SA oblige us to show the photographer's credit wherever the
+  // photograph itself is shown, so this decides per card whether a credit belongs.
+  //
+  // It keys off the photograph ACTUALLY ON SCREEN, never off the iNaturalist columns
+  // on their own. Rejecting a photo (DataStore.rejectInatPhoto) clears photo_path but
+  // deliberately KEEPS inat_photo_id, inat_photo_attribution and inat_photo_source_url
+  // so the sync never proposes that photo again, so a rejected row carries a full set
+  // of credit fields and no photograph. Testing the credit fields alone would print a
+  // photographer's name under a card showing no photograph at all.
+  //
+  // The four conditions, and the row each one exists for:
+  //   src            an image is really rendered (this also catches a 'static:' name
+  //                  that failed plantPhotoSrc's charset guard, which renders nothing)
+  //   not 'static:'  repo assets under assets/img/plants/ are Jordan's own work
+  //   inatPhotoId    the row has been through the iNaturalist pipeline at all
+  //   not 'rejected' the photo on screen is not the iNaturalist one: rejection drops
+  //                  the object, so any photo a rejected row shows is a later staff
+  //                  upload, which must not carry a stranger's credit
+  function showsInatPhoto(p, src) {
+    if (!src) return false;
+    if (String(p.photoPath).slice(0, 7) === 'static:') return false;
+    if (!p.inatPhotoId) return false;
+    return p.inatPhotoStatus !== 'rejected';
+  }
+  // The attribution is third-party text carrying real people's names and punctuation,
+  // so it is esc()'d like every other DB string on this page.
+  //
+  // CC BY 4.0 3(a)(1) asks for a URI or hyperlink to the licensed material as well as
+  // the creator's name, "to the extent reasonably practicable". On a web page that
+  // holds inat_photo_source_url already, it plainly is, so the credit links back to
+  // the iNaturalist photo page, which is also where the exact licence is stated.
+  // Only an https:// value is ever turned into a link, the same structural guard the
+  // staff review grid uses: a hostile or malformed stored URL renders as plain text
+  // rather than becoming a javascript: href.
+  function photoCreditHtml(p, src) {
+    if (!showsInatPhoto(p, src) || !p.inatPhotoAttribution) return '';
+    var text = esc(p.inatPhotoAttribution);
+    var url = String(p.inatPhotoSourceUrl || '');
+    var body = url.slice(0, 8) === 'https://'
+      ? '<a href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">' + text + '</a>'
+      : text;
+    return '<p class="photo-credit">' + body + '</p>';
+  }
+
   async function loadKits() {
     var res = await sb().from('plant_kits').select('*')
       .order('sort', { ascending: true }).order('name', { ascending: true });
@@ -712,6 +774,7 @@
       var src = plantPhotoSrc(p.photoPath);
       return '<article class="plant-card" data-id="' + esc(p.id) + '">' +
         (src ? '<img class="plant-photo" src="' + esc(src) + '" alt="' + esc(p.common) + '" loading="lazy" width="640" height="480">' : '') +
+        photoCreditHtml(p, src) +
         '<h3>' + esc(p.common) + '</h3>' +
         '<p class="botanical"><em>' + esc(p.botanical) + '</em></p>' +
         '<div class="plant-meta">' +

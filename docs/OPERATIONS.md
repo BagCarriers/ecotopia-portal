@@ -12,8 +12,8 @@ it is committed so it survives across machines and sessions.
 
 ## Migrations
 
-Migrations `0001`-`0032` (every migration in `supabase/migrations/`) were applied to the
-live database directly via the Supabase Management API
+Migrations `0001`-`0033` were applied to the live database directly via the Supabase
+Management API
 (`POST https://api.supabase.com/v1/projects/wibnryfinfwbwwgsyojr/database/query`),
 NOT via `supabase db push`. Because of that the CLI does not know any of them ran: the
 `supabase_migrations.schema_migrations` table does not exist on this project at all
@@ -24,12 +24,17 @@ Before ever running `supabase db push` against this project, first register the
 already-applied migrations so the CLI does not try to re-run them:
 
 ```
-for n in $(seq -w 1 32); do supabase migration repair --status applied 00$n; done
+for n in $(seq -w 1 33); do supabase migration repair --status applied 00$n; done
 ```
 
 (equivalently, one `supabase migration repair --status applied <NNNN>` per file, `0001`
-through `0032`). Keep this range current: every new migration in this project is applied
+through `0033`). Keep this range current: every new migration in this project is applied
 by hand through the Management API, so every new migration extends it.
+
+**`0034_inat_sync_cron.sql` is committed but deliberately NOT applied**, so it is not in
+that range and must not be repaired as applied. It schedules the nightly iNaturalist sync,
+and scheduling that job publishes Creative Commons photographs to the live shop. See
+"iNaturalist species enrichment" below for the precondition that has to be true first.
 
 To apply a new migration by hand via the Management API, get the token with
 `security find-generic-password -s "Supabase CLI" -w` and POST `{"query": "<sql>"}`
@@ -511,6 +516,16 @@ exists pg_net;` then `cron.schedule(...)`): job name `grant-scan-nightly`, `0 9 
 header. The token lives in the cron job's SQL (stored in the same DB the service role
 protects; acceptable). Inspect/verify with `select * from cron.job where jobname =
 'grant-scan-nightly';`.
+
+**This job's `net._http_response` row is permanently useless, and that is worth knowing
+before anyone debugs off it.** It calls `net.http_post` without `timeout_milliseconds`, so
+pg_net gives up after the 5000 ms default and records "Timeout of 5000 ms reached" every
+night regardless of what the function returned. The scan itself is unaffected: pg_net stops
+waiting, it does not abort the function. Measured 2026-08-09, `grant_opportunities.last_seen`
+stamped 09:00:08 to 09:00:09 against a 09:00:00 dispatch. The cost is only that the real
+status is never recorded, so an HTTP error here (a token that drifted out of sync with
+`GRANT_SCAN_TOKEN`, say) looks exactly like a success. Read the function logs instead, or
+add an explicit timeout the way `0034_inat_sync_cron.sql` does.
 
 ## Garden profiles
 
@@ -1622,3 +1637,151 @@ Data helpers (`assets/data.js`): `getTeamMembers` (staff read, hidden rows inclu
 `addTeamMember` / `updateTeamMember` / `removeTeamMember(id)`; plus `teamPhotoUrl` for
 gallery-bucket paths. Note `removeTeamMember` takes only the id and does not touch
 storage: the caller removes the object.
+
+## iNaturalist species enrichment (2026-08-08)
+
+Migration `0033_inat_species.sql` (applied; register it with
+`supabase migration repair --status applied 0033` before any `supabase db push`) adds
+eleven `inat_*` columns to `public.plant_species`. The `inat-sync` edge function fills
+them from the public iNaturalist API.
+
+### What it does, in two passes
+
+One POST runs both passes in order and returns the counts from each.
+
+1. **Resolution and enrichment.** Every species with `inat_taxon_id` null (and
+   `inat_match` not `manual`, so a hand-set override is never re-guessed) is looked up by
+   its normalised botanical name. A hit writes `inat_taxon_id`, `inat_match`
+   (`exact`/`fuzzy`), `inat_matched_name`, plus Pennsylvania `inat_establishment` and
+   `inat_conservation` from a second call. A name that cannot be resolved, or that is not
+   a single resolvable binomial (`Pycnanthemum virginicum & muticum`), is written
+   `inat_match = 'none'` with no API guess.
+2. **Photo fill.** Every resolved species with `photo_path` null gets one licence-clean
+   photograph copied into the `gallery` bucket under `plants/<uuid>.<ext>`, along with
+   `inat_photo_id`, `inat_photo_license`, `inat_photo_attribution`,
+   `inat_photo_source_url` and `inat_photo_status = 'auto'`. The usable set is exactly
+   `cc0`, `pd`, `cc-by`, `cc-by-sa` (the `PHOTO_LICENCES` const); Ecotopia sells plants, so
+   a NonCommercial licence is refused. A usable licence with no attribution string is
+   refused on the same footing, because an image we cannot credit is not publishable
+   either.
+
+**Jordan's own photographs are never touched.** A row with `photo_path` set and
+`inat_photo_id` null is his. The rule lives once, in `canAutoFill` / `isOwnPhoto` in
+`supabase/functions/_shared/inat-logic.js`, and is enforced twice: in memory before the
+work, and again as `.is('photo_path', null).is('inat_photo_id', null)` on the UPDATE
+itself, so a staff upload landing mid-run cannot be clobbered. A refused UPDATE is counted
+as `skippedRaced`, not as a fill.
+
+### The ordering rule: credit before photos
+
+**Writing `photo_path` publishes.** `plants.html` reads `plant_species` live over the anon
+key, so there is no separate publish step: the row write is the publication, worldwide,
+immediately. CC-BY and CC-BY-SA both require the credit to be shown, so **the credit line
+on `plants.html` must be deployed and confirmed on the live page before the photo pass is
+allowed to run at all**, whether by cron or by hand. This is not theoretical: an early run
+put 33 uncredited CC photos on the live shop and they had to be rolled back the same day.
+
+The rule is now enforced by the `INAT_PHOTO_FILL` switch rather than by whoever last read
+this page. It defaults to off, and the photo pass does nothing at all until it is set to
+`on` (see below).
+
+### Manual invocation
+
+```
+curl -s -X POST "https://wibnryfinfwbwwgsyojr.supabase.co/functions/v1/inat-sync" \
+  -H "Content-Type: application/json" -H "X-Scan-Token: $INAT_SYNC_TOKEN" \
+  -d '{"action":"sync"}'
+```
+
+Staff can also run it from `manage-plants.html` ("Sync now"), which authenticates with the
+caller's own JWT instead of the token. Auth is either the `X-Scan-Token` header matching
+the `INAT_SYNC_TOKEN` function secret, or a valid staff JWT backed by an active
+`portal_users` row; anything else is a 401. The token is a shared secret, not a user
+identity, so the header path bypasses the portal entirely: treat it accordingly.
+
+`INAT_SYNC_TOKEN` (function secret) holds the live value. It is already set on this
+project. Rotate with:
+
+```
+supabase secrets set --project-ref wibnryfinfwbwwgsyojr INAT_SYNC_TOKEN=<random hex>
+```
+
+and re-run the cron schedule with the same new value (below); the two must stay in sync,
+exactly like `GRANT_SCAN_TOKEN`. Deploy:
+
+```
+supabase functions deploy inat-sync --no-verify-jwt --project-ref wibnryfinfwbwwgsyojr
+```
+
+`supabase/config.toml` pins `[functions.inat-sync] verify_jwt = false` so a redeploy keeps
+the token path working.
+
+### `INAT_PHOTO_FILL`: the photo-fill kill switch
+
+`INAT_PHOTO_FILL` (function secret) decides whether the photo pass runs at all. **It
+defaults to off.** The fill runs only when the value is exactly `on`; absent, empty,
+`true`, `1`, `ON` or anything else all mean off. It is not currently set, so the fill is
+off today.
+
+When it is off, `fillPhotos` returns immediately with zeroed counts and `disabled: true`,
+before a single iNaturalist request, storage upload or database write. The `disabled`
+marker is always present in the response, so a caller can tell a fill that was switched off
+from one that ran and found nothing eligible; "Sync now" in `manage-plants.html` says
+"Photo fill is switched off" rather than "0 photos filled". **The resolution and enrichment
+pass is unaffected** and runs normally either way: it writes no `photo_path` and therefore
+publishes nothing.
+
+This exists because the ordering rule above (the credit line live before any photo is
+written) was enforced only by a human reading this runbook. That held while every run was a
+person pressing a button; the nightly cron makes the pass permanent and unattended, and a
+cron job cannot read a runbook. Turn it on deliberately, for the deliberate re-run, once the
+credit line is confirmed on the live page:
+
+```
+supabase secrets set --project-ref wibnryfinfwbwwgsyojr INAT_PHOTO_FILL=on
+```
+
+To switch the fill back off, set it to anything else (`INAT_PHOTO_FILL=off`) or unset it.
+Changing the secret takes effect without a redeploy, on the next invocation.
+
+Rate limiting is a whole-run condition, not a per-row one: a 429 from iNaturalist stops the
+run and comes back as a `429` carrying the partial counts, so a truncated run can never be
+mistaken for a quiet successful one. The run is resumable by design (each row is its own
+committed UPDATE, selection is driven by `inat_taxon_id is null`), so the fix for a stopped
+run is to run it again later.
+
+### Nightly cron: written, NOT scheduled
+
+`supabase/migrations/0034_inat_sync_cron.sql` schedules `inat-sync-nightly` at `0 10 * * *`
+(10:00 UTC, an hour after `grant-scan-nightly`) via `pg_cron` + `pg_net`, on the same
+`X-Scan-Token` pattern the grant scan uses, with the token embedded in the cron command.
+**It has not been applied**, and must not be until the credit line above is live. With
+`INAT_PHOTO_FILL` unset, an applied cron would run the resolution pass only and publish
+nothing, but that is a second lock, not a reason to weaken the first one. The file
+carries the full precondition, the token placeholder to substitute, and two constraints
+worth reading first: the run has no batch limit (linear in the backlog, so a much larger
+catalogue would outlast the edge function's wall clock), and `net.http_post` is
+asynchronous, so `cron.job_run_details` reports success even when the call 401s or times
+out. Read `net._http_response` and the function logs instead.
+
+### Tests
+
+`tests/inat.test.js` covers the pure logic in `_shared/inat-logic.js` (name normalisation,
+taxon and photo picking, the licence allowlist, `isOwnPhoto` / `canAutoFill`) and runs
+under `npm test`.
+
+`tests/deno/inat-sync.test.ts` covers the write path itself (including the
+`INAT_PHOTO_FILL` switch), with `fetch` and the Supabase client stubbed so nothing leaves
+the machine. **`npm test` does not run it**: that script is `node --test tests/*.js`, whose
+glob neither matches nor understands this file. It has a script of its own:
+
+```
+npm run test:deno
+```
+
+which is exactly `deno test -A --config tests/deno/deno.json tests/deno/`. Keep the script
+in `package.json` and this line in step: for months the only way to run these tests was to
+copy a command out of this document, so nothing ran them.
+
+Both suites are expected green (56 under Node, 13 under Deno as of 2026-08-09). Run both
+before touching the sync.

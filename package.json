@@ -1,5 +1,8 @@
 {
   "name": "ecotopia-portal",
   "private": true,
-  "scripts": { "test": "node --test tests/*.js" }
+  "scripts": {
+    "test": "node --test tests/*.js",
+    "test:deno": "deno test -A --config tests/deno/deno.json tests/deno/"
+  }
 }

@@ -6,3 +6,12 @@ node_modules/
 
 # Deno lockfile from local edge-function type checks; not part of the deploy.
 deno.lock
+
+# Agent scratch: implementation ledgers, task briefs, review packages. These can
+# hold secrets (a deploy token pasted into a report), so they must never be
+# committable. Not part of the site.
+.superpowers/
+
+# Worktrees created by the harness. Their contents are a second checkout of this
+# same repo and must never be committed into it.
+.claude/worktrees/

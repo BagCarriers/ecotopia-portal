@@ -277,6 +277,42 @@ const DataStore = (() => {
       }
       unwrap(await sb.from('plant_species').delete().eq('id', id));
     },
+    // iNaturalist enrichment. Approving keeps the photo and marks it reviewed.
+    // Rejecting removes the stored object, clears photo_path so the card falls
+    // back to no image, and keeps inat_photo_id so the sync never proposes that
+    // same photo again (canAutoFill refuses any row carrying one).
+    approveInatPhoto: (id) => update('plant_species', id, { inat_photo_status: 'approved' }),
+    rejectInatPhoto: async (id, photoPath) => {
+      // Row first, object second. If the delete fails we leak one orphan object,
+      // which is harmless. The reverse order leaves a live plant card pointing at
+      // an object that no longer exists, because plants.html reads the row over
+      // anon and renders photo_path immediately. Same reasoning as the photo pass
+      // in supabase/functions/inat-sync/index.ts.
+      const row = await update('plant_species', id,
+        { photo_path: null, inat_photo_status: 'rejected' });
+      if (photoPath && String(photoPath).slice(0, 7) !== 'static:') {
+        try { await sb.storage.from('gallery').remove([photoPath]); } catch (e) { /* ignore */ }
+      }
+      return row;
+    },
+    // A hand-entered taxon id is permanent: the sync never revisits a 'manual' row.
+    // resolveAndEnrich selects on .is('inat_taxon_id', null), so a row that has one
+    // is out of the pass entirely and will not be re-enriched from the new taxon.
+    //
+    // That is why the badge columns are cleared here. On a 'fuzzy' row the staff
+    // member is overriding a match the system got wrong, and inat_matched_name,
+    // inat_establishment and inat_conservation all describe the taxon they just
+    // rejected. Left in place, inatBadges() would show "PA native" or a
+    // conservation rank derived from a taxon a human explicitly said was
+    // incorrect. No badge is honest; a badge from the wrong plant is not.
+    setInatTaxon: (id, taxonId) =>
+      update('plant_species', id, {
+        inat_taxon_id: taxonId,
+        inat_match: 'manual',
+        inat_matched_name: null,
+        inat_establishment: null,
+        inat_conservation: null,
+      }),
     getPlantKits: async () =>
       fromDbAll(unwrap(await sb.from('plant_kits').select('*')
         .order('sort', { ascending: true }).order('name', { ascending: true }))),
