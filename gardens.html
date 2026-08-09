@@ -13,6 +13,7 @@
 <script src="assets/config.js"></script>
 <script src="assets/supabase-client.js"></script>
 <script src="assets/mapping.js"></script>
+<script src="assets/plantings.js"></script>
 <script src="assets/auth.js"></script>
 <script>if (!AuthManager.hasCachedSession()) location.replace('login.html');</script>
 <script src="assets/data.js"></script>
@@ -74,6 +75,10 @@
   .due-dot.green { background: var(--forest-light); }
 
   .empty { padding: 20px; color: var(--text-dim); font-size: 0.875rem; text-align: center; }
+
+  /* All-gardens planting totals. Empty until there is something to say. */
+  .plant-total { color: var(--text-dim); font-size: 0.875rem; margin-bottom: 16px; }
+  .plant-total:empty { margin-bottom: 0; }
 
   /* Page header + Add Garden */
   .page-header { display: flex; align-items: center; justify-content: space-between;
@@ -155,6 +160,7 @@
       <button class="btn-sm" onclick="addGarden()">Add Garden</button>
     </div>
   </div>
+  <p class="plant-total" id="plantingTotals"></p>
   <div class="garden-grid" id="gardenGrid"></div>
 </div>
 
@@ -216,6 +222,35 @@ function renderGardens(gardens, tasks) {
   if (!gardens.length) el.innerHTML = '<div class="empty">No gardens yet. Use the + Add Garden button to create your first one.</div>';
 }
 
+// The sentence a grant application needs, across every garden at once. Deriving
+// it by hand from a list is exactly the friction that stops it being written.
+//
+// Two rules hold this line together. It renders nothing at all when there are no
+// plantings, because "0 native plants" on a page Jordan opens every day
+// advertises an unused feature rather than reporting a fact. And it swallows its
+// own failures: this is a supporting figure on a page whose job is listing
+// gardens, so a bad read leaves the line blank and the list untouched.
+//
+// Only computed numbers reach the page, and via textContent, so there is no
+// database string here to escape.
+async function renderPlantingTotals() {
+  const el = document.getElementById('plantingTotals');
+  if (!el) return;
+  try {
+    const rows = await DataStore.getAllPlantings();
+    if (!rows || !rows.length) { el.textContent = ''; return; }
+    const all = EcoPlantings.summarise(rows);
+    const year = new Date().getFullYear();
+    const thisYear = EcoPlantings.summariseForYear(rows, year);
+    const plants = (n) => n.toLocaleString() + (n === 1 ? ' native plant' : ' native plants');
+    el.textContent =
+      plants(all.plants) + ', ' + all.species + ' species, planted across our gardens. ' +
+      thisYear.plants.toLocaleString() + ' of them in ' + year + '.';
+  } catch (err) {
+    el.textContent = '';
+  }
+}
+
 function toggleAddGarden() {
   document.getElementById('addGardenForm').classList.toggle('open');
 }
@@ -269,6 +304,9 @@ async function addGarden() {
     Nav.render();
     const [gardens, tasks] = await Promise.all([DataStore.getGardens(), DataStore.getTasks()]);
     renderGardens(gardens, tasks);
+    // After the list is on the page, and deliberately not inside the Promise.all
+    // above: a failed planting read must not take the garden list down with it.
+    await renderPlantingTotals();
   } catch (err) {
     document.getElementById('gardenGrid').innerHTML =
       '<div class="empty">Could not load data (' + esc(err.message) + '). <a href="javascript:location.reload()">Retry</a></div>';
