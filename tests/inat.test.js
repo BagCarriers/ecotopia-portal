@@ -151,3 +151,19 @@ test('an absent establishment listing is unknown and never native', () => {
   assert.strictEqual(E.establishmentLabel('introduced'), 'introduced');
   assert.strictEqual(E.establishmentLabel('native'), 'native');
 });
+
+test('the edge function does not reimplement the shared logic', () => {
+  // There is exactly one implementation, in _shared/inat-logic.js. A second copy
+  // inside index.ts would be dead code that the tests do not cover and that can
+  // silently diverge from what actually runs.
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const src = fs.readFileSync(
+    path.join(__dirname, '..', 'supabase', 'functions', 'inat-sync', 'index.ts'), 'utf8');
+  assert.match(src, /import '\.\.\/_shared\/inat-logic\.js'/,
+    'index.ts must import the shared logic for its side effect');
+  for (const name of ['function levenshtein', 'function pickTaxon', 'function pickPhoto',
+                      'const PHOTO_LICENCES']) {
+    assert.ok(!src.includes(name), `index.ts must not redeclare ${name}`);
+  }
+});
