@@ -155,7 +155,44 @@
   .kit-plant-row .kp-remove:hover { color: #b3261e; background: var(--cream); }
   .kit-add-plant { margin-top: 8px; }
 
+  /* iNaturalist enrichment: the photo review grid, the needs-attention list and
+     the small pills that ride along the species rows. */
+  .inat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+    gap: 14px; padding: 16px; }
+  .inat-cell { display: flex; flex-direction: column; background: var(--cream);
+    border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .inat-cell img { display: block; width: 100%; height: 150px; object-fit: cover;
+    background: var(--cream-dim); }
+  .inat-cell figcaption { flex: 1; display: flex; flex-direction: column; gap: 3px;
+    padding: 9px 11px 6px; }
+  .inat-cell figcaption strong { font-size: 0.88rem; color: var(--forest); }
+  .inat-cell figcaption em { font-size: 0.78rem; color: var(--text-dim); }
+  .inat-cell .credit { font-size: 0.68rem; color: var(--text-dim); line-height: 1.45;
+    overflow-wrap: anywhere; }
+  .inat-actions { display: flex; gap: 6px; padding: 0 11px 11px; }
+  .inat-actions button { flex: 1; }
+
+  .pill { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 0.68rem;
+    font-weight: 700; letter-spacing: 0.02em; font-style: normal; vertical-align: middle;
+    background: var(--sage); color: var(--forest); }
+  .pill.warn { background: var(--amber-bg); color: var(--amber); }
+  .pill.neutral { background: var(--cream-dim); color: var(--text-dim); }
+
+  .inat-list { list-style: none; }
+  .inat-list li { display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    padding: 13px 16px; border-bottom: 1px solid var(--border); }
+  .inat-list li:last-child { border-bottom: none; }
+  .stuck-main { flex: 1; min-width: 200px; }
+  .stuck-name { font-weight: 600; color: var(--forest); font-size: 0.95rem; }
+  .stuck-name em { font-weight: 400; color: var(--text-dim); font-size: 0.85rem; }
+  .stuck-note { font-size: 0.8rem; color: var(--text-dim); margin-top: 3px; line-height: 1.5; }
+  .inat-list input { width: 128px; padding: 8px 10px; border-radius: 7px;
+    border: 1.5px solid var(--border); font-size: 0.875rem; font-family: 'DM Sans', sans-serif; }
+  .inat-list input:focus { outline: none; border-color: var(--forest-light); }
+
   @media (max-width: 700px) {
+    /* 16px stops iOS zooming the page when the taxon-id field takes focus. */
+    .inat-list input { font-size: 16px; }
     .page { padding: 20px 16px; }
     .row { flex-wrap: wrap; }
     .form-row { grid-template-columns: 1fr; }
@@ -172,6 +209,7 @@
 <div class="page">
   <div class="page-header">
     <h1>Plants</h1>
+    <button class="btn-sm" id="inat_sync_btn" onclick="runInatSync()">Sync iNaturalist</button>
   </div>
   <p class="page-intro">Edit the native plant shop shown on the public
     <a href="plants.html" target="_blank" rel="noopener">Native Plants</a> page: which sizes are in
@@ -185,6 +223,7 @@
   </div>
 
   <div class="modal-error" id="pageError"></div>
+  <p class="section-note" id="inat_sync_result" style="display:none"></p>
 
   <!-- Species tab -->
   <div id="speciesPane">
@@ -194,6 +233,24 @@
       only orderable in a size when the season below is Active and that species is marked as grown in
       that size.</p>
     <div class="card" id="sizesCard"><div class="empty">Loading…</div></div>
+
+    <!-- iNaturalist photo review. Hidden entirely while nothing is awaiting a
+         decision, which is the normal state between syncs. -->
+    <div id="inat_review_card" style="display:none">
+      <h2 class="section-h spaced">iNaturalist photos awaiting review</h2>
+      <p class="section-note">Auto-filled from iNaturalist and already live on the public page.
+        Keep the ones that look like a plant a customer would recognise, reject the rest.
+        A rejected photo is never offered again.</p>
+      <div class="card"><div id="inat_review_grid" class="inat-grid"></div></div>
+    </div>
+
+    <!-- Rows the sync could not resolve on its own. -->
+    <div id="inat_attention_card" style="display:none">
+      <h2 class="section-h spaced">Species iNaturalist could not match</h2>
+      <p class="section-note">Look the plant up on iNaturalist and paste its taxon id (the number
+        in the URL). A hand-entered id is permanent and the nightly sync will not overwrite it.</p>
+      <div class="card"><ul id="inat_attention_list" class="inat-list"></ul></div>
+    </div>
 
     <h2 class="section-h spaced">Species</h2>
     <div class="toolbar">
@@ -508,7 +565,7 @@ function renderSpecies() {
         <div class="row-main">
           <div class="row-title">${esc(p.common)} ${pill}</div>
           <div class="row-sub"><em>${esc(p.botanical || 'no botanical name')}</em></div>
-          <div class="row-sub2">${esc(p.bloom || '')}</div>
+          <div class="row-sub2">${esc(p.bloom || '')}${inatBadges(p)}</div>
         </div>
         <div class="row-actions">
           <button class="btn-sm" onclick="openSpeciesModal('${esc(p.id)}')">Edit</button>
@@ -564,6 +621,187 @@ async function deleteSpecies(id) {
     await loadSpecies();
   } catch (err) {
     errEl.textContent = 'Could not delete. ' + err.message;
+  }
+}
+
+// ── iNaturalist enrichment ───────────────────────────────────────────────────
+const SYNC_URL = 'https://wibnryfinfwbwwgsyojr.supabase.co/functions/v1/inat-sync';
+
+// Pills that ride along a species row.
+//
+// Establishment: only the two explicit values render anything. NULL means
+// iNaturalist has no Pennsylvania listing for the taxon, which is NOT evidence
+// of being native (measured on the live API, white oak and black-eyed Susan both
+// come back with nothing), so a null renders no badge at all rather than "native".
+//
+// Conservation: the live column mixes two vocabularies, NatureServe ranks
+// ('S5', 'S4', 'S3') and worded statuses ('Endangered', 'Threatened', 'E').
+// The value is shown exactly as received under a label that only claims
+// iNaturalist reported it; nothing here tries to translate a code.
+function inatBadges(p) {
+  let out = '';
+  if (p.inatEstablishment === 'introduced') {
+    out += ' <span class="pill warn">introduced in PA</span>';
+  } else if (p.inatEstablishment === 'native') {
+    out += ' <span class="pill">PA native</span>';
+  }
+  if (p.inatConservation) {
+    out += ' <span class="pill neutral" title="Conservation status as reported by iNaturalist,' +
+      ' shown exactly as received. It may be a NatureServe rank or a worded status.">' +
+      'iNaturalist conservation: ' + esc(p.inatConservation) + '</span>';
+  }
+  return out;
+}
+
+// Auto-filled photos land here for a single scan-and-reject pass rather than
+// making Jordan open every species one at a time. The card hides itself when
+// nothing is pending, which is the normal state between syncs.
+function renderInatReview() {
+  const pending = species.filter(p => p.inatPhotoStatus === 'auto');
+  document.getElementById('inat_review_card').style.display = pending.length ? '' : 'none';
+  if (!pending.length) { document.getElementById('inat_review_grid').innerHTML = ''; return; }
+  document.getElementById('inat_review_grid').innerHTML = pending.map(p => {
+    const src = catalogPhotoSrc(p.photoPath);
+    const img = src
+      ? `<img src="${esc(src)}" alt="" loading="lazy">`
+      : `<div class="row-thumb placeholder" style="width:100%;height:150px;border-radius:0">🌼</div>`;
+    // Only an https link is ever rendered, so a stored value cannot become a
+    // javascript: href.
+    const url = String(p.inatPhotoSourceUrl || '');
+    const source = url.slice(0, 8) === 'https://'
+      ? ` <a href="${esc(url)}" target="_blank" rel="noopener noreferrer">see it on iNaturalist</a>`
+      : '';
+    return `
+      <figure class="inat-cell">
+        ${img}
+        <figcaption>
+          <strong>${esc(p.common)}</strong>
+          <em>${esc(p.botanical || 'no botanical name')}</em>
+          <span class="credit">${esc(p.inatPhotoAttribution || 'no attribution recorded')}${source}</span>
+        </figcaption>
+        <div class="inat-actions">
+          <button class="btn-sm" onclick="approveInat('${esc(p.id)}')">Keep</button>
+          <button class="btn-sm btn-danger" onclick="rejectInat('${esc(p.id)}')">Reject</button>
+        </div>
+      </figure>`;
+  }).join('');
+}
+
+async function approveInat(id) {
+  const errEl = document.getElementById('pageError');
+  errEl.textContent = '';
+  try {
+    await DataStore.approveInatPhoto(id);
+    await loadSpecies();
+  } catch (err) {
+    errEl.textContent = 'Could not keep that photo. ' + err.message;
+  }
+}
+
+async function rejectInat(id) {
+  const p = speciesById(id);
+  if (!p) return;
+  if (!confirm(`Reject this photo for "${p.common}"? It will not be offered again.`)) return;
+  const errEl = document.getElementById('pageError');
+  errEl.textContent = '';
+  try {
+    await DataStore.rejectInatPhoto(id, p.photoPath);
+    await loadSpecies();
+  } catch (err) {
+    errEl.textContent = 'Could not reject that photo. ' + err.message;
+  }
+}
+
+// Rows the sync could not resolve on its own. A 'none' row must read as a stated
+// failure rather than a blank cell: isResolvableName also refuses trinomials,
+// hybrids, cultivars and bare genera, and the live catalogue holds a
+// 'Pycnanthemum virginicum & muticum' row that is two species in one and can
+// never resolve on its own.
+function renderInatAttention() {
+  const stuck = species.filter(p => p.inatMatch === 'none' || p.inatMatch === 'fuzzy');
+  document.getElementById('inat_attention_card').style.display = stuck.length ? '' : 'none';
+  if (!stuck.length) { document.getElementById('inat_attention_list').innerHTML = ''; return; }
+  document.getElementById('inat_attention_list').innerHTML = stuck.map(p => {
+    const note = p.inatMatch === 'fuzzy'
+      ? `<span class="pill warn">close match only</span>
+         iNaturalist matched this to <strong>${esc(p.inatMatchedName || 'a different name')}</strong>.
+         Confirm that is the same plant, or set the right taxon id below.`
+      : `<span class="pill warn">iNaturalist could not match this</span>
+         The botanical name did not resolve to a single species. Names covering two
+         species, hybrids, cultivars and bare genera never resolve on their own, so
+         this row needs a taxon id by hand (or splitting into one row per species).`;
+    return `
+      <li>
+        <div class="stuck-main">
+          <div class="stuck-name">${esc(p.common)}
+            <em>${esc(p.botanical || 'no botanical name')}</em></div>
+          <div class="stuck-note">${note}</div>
+        </div>
+        <input type="number" min="1" step="1" placeholder="taxon id" id="tx_${esc(p.id)}">
+        <button class="btn-sm" onclick="saveInatTaxon('${esc(p.id)}')">Set</button>
+      </li>`;
+  }).join('');
+}
+
+async function saveInatTaxon(id) {
+  const errEl = document.getElementById('pageError');
+  errEl.textContent = '';
+  const field = document.getElementById('tx_' + id);
+  if (!field) return;
+  const raw = field.value.trim();
+  const n = Number(raw);
+  if (!raw || !Number.isInteger(n) || n <= 0) {
+    errEl.textContent = 'Enter a whole iNaturalist taxon id (the number in the URL).';
+    return;
+  }
+  try {
+    await DataStore.setInatTaxon(id, n);
+    await loadSpecies();
+  } catch (err) {
+    errEl.textContent = 'Could not save that taxon id. ' + err.message;
+  }
+}
+
+// Mirrors the "Scan now" call in grant-finder.html, apikey header included: the
+// function's CORS allowlist expects it. Browser fetch has no timeout and a full
+// sync takes minutes, so the button stays disabled and says so for the duration.
+async function runInatSync() {
+  const btn = document.getElementById('inat_sync_btn');
+  const resEl = document.getElementById('inat_sync_result');
+  const errEl = document.getElementById('pageError');
+  errEl.textContent = '';
+  resEl.style.display = '';
+  resEl.textContent = 'Syncing with iNaturalist. This takes a few minutes.';
+  btn.disabled = true;
+  btn.textContent = 'Syncing, this takes a few minutes';
+  try {
+    const { data } = await window.ecoSupabase.auth.getSession();
+    const token = data && data.session ? data.session.access_token : null;
+    if (!token) throw new Error('Not signed in.');
+    const res = await fetch(SYNC_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + token,
+        'apikey': window.ECO_CONFIG.SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({ action: 'sync' }),
+    });
+    const payload = await res.json();
+    if (!res.ok) throw new Error(payload.error || 'Sync failed.');
+    const c = payload.counts || {};
+    const ph = c.photos || {};
+    resEl.textContent =
+      `Synced. ${c.resolved || 0} resolved, ${c.unresolved || 0} still unmatched, ` +
+      `${ph.filled || 0} photo${(ph.filled || 0) === 1 ? '' : 's'} filled for review.`;
+    await loadSpecies();
+  } catch (err) {
+    resEl.style.display = 'none';
+    resEl.textContent = '';
+    errEl.textContent = 'Sync failed. ' + err.message;
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Sync iNaturalist';
   }
 }
 
@@ -888,7 +1126,14 @@ document.addEventListener('keydown', function (e) {
 });
 
 // ── Load / render ────────────────────────────────────────────────────────────
-async function loadSpecies() { species = await DataStore.getPlantSpecies(); renderSpecies(); }
+// One loader for all three species-backed sections, so every caller (reorder,
+// deactivate, delete, approve, reject, set taxon, sync) refreshes the lot.
+async function loadSpecies() {
+  species = await DataStore.getPlantSpecies();
+  renderSpecies();
+  renderInatReview();
+  renderInatAttention();
+}
 async function loadKits() { kits = await DataStore.getPlantKits(); renderKits(); }
 async function loadSizes() { sizes = await DataStore.getPlantSizeSettings(); renderSizes(); }
 

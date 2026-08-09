@@ -277,6 +277,20 @@ const DataStore = (() => {
       }
       unwrap(await sb.from('plant_species').delete().eq('id', id));
     },
+    // iNaturalist enrichment. Approving keeps the photo and marks it reviewed.
+    // Rejecting removes the stored object, clears photo_path so the card falls
+    // back to no image, and keeps inat_photo_id so the sync never proposes that
+    // same photo again (canAutoFill refuses any row carrying one).
+    approveInatPhoto: (id) => update('plant_species', id, { inat_photo_status: 'approved' }),
+    rejectInatPhoto: async (id, photoPath) => {
+      if (photoPath && String(photoPath).slice(0, 7) !== 'static:') {
+        try { await sb.storage.from('gallery').remove([photoPath]); } catch (e) { /* ignore */ }
+      }
+      return update('plant_species', id, { photo_path: null, inat_photo_status: 'rejected' });
+    },
+    // A hand-entered taxon id is permanent: the sync never revisits a 'manual' row.
+    setInatTaxon: (id, taxonId) =>
+      update('plant_species', id, { inat_taxon_id: taxonId, inat_match: 'manual' }),
     getPlantKits: async () =>
       fromDbAll(unwrap(await sb.from('plant_kits').select('*')
         .order('sort', { ascending: true }).order('name', { ascending: true }))),

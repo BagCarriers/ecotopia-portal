@@ -195,13 +195,13 @@ try {
   document.getElementById('dateSubtitle').textContent =
     now.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric', year:'numeric' });
 
-  const [gardens, jobs, invoices, unpaidInvoicesList, jordanTasksList, openTasksList, recentCheckins, upcomingEventsList, observations, plantingSuggestions, questionsList, ordersList, reviewsList] =
+  const [gardens, jobs, invoices, unpaidInvoicesList, jordanTasksList, openTasksList, recentCheckins, upcomingEventsList, observations, plantingSuggestions, questionsList, ordersList, reviewsList, plantSpeciesList] =
     await Promise.all([
       DataStore.getGardens(), DataStore.getJobs(), DataStore.getInvoices(),
       DataStore.getUnpaidInvoices(), DataStore.getJordanTasks(), DataStore.getOpenTasks(),
       DataStore.getRecentCheckins(5), DataStore.getUpcomingEvents(), DataStore.getObservations(),
       DataStore.getPlantingSuggestions(), DataStore.getQuestions(), DataStore.getOrders(),
-      DataStore.getReviews(),
+      DataStore.getReviews(), DataStore.getPlantSpecies(),
     ]);
 
   // Stats
@@ -359,6 +359,16 @@ if (pendingReviews.length > 0) {
     badge: 'amber', label: 'Review',
     text: `${pendingReviews.length} pending review${pendingReviews.length > 1 ? 's' : ''}`,
     link: 'review-inbox.html', linkText: 'Moderate →'
+  });
+}
+// Auto-filled iNaturalist photos are live on the public plants page the moment
+// they land, so an unreviewed one is something Jordan needs to see today.
+const pendingPhotos = plantSpeciesList.filter(p => p.inatPhotoStatus === 'auto');
+if (pendingPhotos.length > 0) {
+  attentionItems.push({
+    badge: 'amber', label: 'Photos',
+    text: `${pendingPhotos.length} plant photo${pendingPhotos.length > 1 ? 's' : ''} awaiting review`,
+    link: 'manage-plants.html', linkText: 'Review →'
   });
 }
 
