@@ -23,6 +23,15 @@
     return Number.isFinite(n) && n > 0 ? n : 0;
   };
 
+  // The public-facing wording for a plant count: "1 native plant", "2,400 native
+  // plants". It lives here beside the arithmetic rather than in a page, because the
+  // portal totals line and the public garden card both print it and two copies of a
+  // label are two chances for the public wording to drift.
+  const plantWord = (n) => {
+    const count = Number(n) || 0;
+    return count.toLocaleString() + (count === 1 ? ' native plant' : ' native plants');
+  };
+
   const plantingLabel = (row) => {
     const label = String((row && row.speciesLabel) || '').trim();
     return label || 'Unnamed planting';
@@ -72,6 +81,6 @@
   }
 
   root.EcoPlantings = {
-    plantingLabel, summarise, summariseForYear, speciesBreakdown,
+    plantingLabel, plantWord, summarise, summariseForYear, speciesBreakdown,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

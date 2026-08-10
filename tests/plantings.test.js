@@ -1,7 +1,11 @@
 const test = require('node:test');
 const assert = require('node:assert');
+const fs = require('node:fs');
+const path = require('node:path');
 require('../assets/plantings.js');
 const P = globalThis.EcoPlantings;
+
+const ROOT = path.join(__dirname, '..');
 
 // Deliberately arranged so that first-appearance order (Foam Flower, Wild
 // Columbine, Butterfly Weed, American Plum) is NOT descending quantity order
@@ -118,4 +122,38 @@ test('a non-numeric or negative quantity contributes nothing rather than NaN', (
     { gardenId: 'g1', speciesLabel: 'D', quantity: 'not a number', plantedOn: '2026-01-01' },
   ];
   assert.strictEqual(P.summarise(rows).plants, 5);
+});
+
+test('plantWord pluralises the public label and separates thousands', () => {
+  // The public-facing wording for a count. It reads "1 native plant" exactly once,
+  // at one, and "native plants" everywhere else including zero.
+  assert.strictEqual(P.plantWord(1), '1 native plant');
+  assert.strictEqual(P.plantWord(0), '0 native plants');
+  assert.strictEqual(P.plantWord(2), '2 native plants');
+  assert.strictEqual(P.plantWord(2400), '2,400 native plants');
+});
+
+test('plantWord degrades a junk count to zero rather than printing NaN', () => {
+  // Nothing legitimately passes a non-number, but "NaN native plants" on a public
+  // garden card is a worse outcome than "0 native plants".
+  assert.strictEqual(P.plantWord(null), '0 native plants');
+  assert.strictEqual(P.plantWord(undefined), '0 native plants');
+  assert.strictEqual(P.plantWord('not a number'), '0 native plants');
+});
+
+test('neither page keeps its own copy of the native-plant label', () => {
+  // The label was defined byte-identically in two pages. It is the public-facing
+  // wording for arithmetic that deliberately lives in one file, so it lives in that
+  // file too, and a re-introduced local copy fails here rather than drifting quietly.
+  for (const page of ['community-gardens.html', 'gardens.html']) {
+    const html = fs.readFileSync(path.join(ROOT, page), 'utf8');
+    assert.ok(
+      !/\?\s*' native plant'\s*:\s*' native plants'/.test(html),
+      page + ' redefines the native plant pluralisation; use EcoPlantings.plantWord'
+    );
+    assert.ok(
+      html.includes('plantWord'),
+      page + ' no longer references plantWord at all'
+    );
+  }
 });

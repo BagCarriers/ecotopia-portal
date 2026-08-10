@@ -233,21 +233,35 @@ function renderGardens(gardens, tasks) {
 //
 // Only computed numbers reach the page, and via textContent, so there is no
 // database string here to escape.
+//
+// Every way this line can fail says so in the console, because blank is also its
+// correct empty-table rendering and the table is empty today. A permanently failing
+// read would otherwise look exactly like "nothing planted yet", for good, with
+// nothing to find it by. The message shape matches community-gardens.html so both
+// pages' failures grep together.
 async function renderPlantingTotals() {
   const el = document.getElementById('plantingTotals');
   if (!el) return;
+  // assets/plantings.js is a per-feature asset. If it fails to load, the totals
+  // line goes and the garden list stays: an unguarded call throws a ReferenceError
+  // that this function's own catch would turn into a blank line with no trace.
+  if (!window.EcoPlantings) {
+    el.textContent = '';
+    console.warn('Planting summaries unavailable: assets/plantings.js did not load.');
+    return;
+  }
   try {
     const rows = await DataStore.getAllPlantings();
     if (!rows || !rows.length) { el.textContent = ''; return; }
     const all = EcoPlantings.summarise(rows);
     const year = new Date().getFullYear();
     const thisYear = EcoPlantings.summariseForYear(rows, year);
-    const plants = (n) => n.toLocaleString() + (n === 1 ? ' native plant' : ' native plants');
     el.textContent =
-      plants(all.plants) + ', ' + all.species + ' species, planted across our gardens. ' +
+      EcoPlantings.plantWord(all.plants) + ', ' + all.species + ' species, planted across our gardens. ' +
       thisYear.plants.toLocaleString() + ' of them in ' + year + '.';
   } catch (err) {
     el.textContent = '';
+    console.warn('Planting summaries unavailable:', (err && err.message) || err);
   }
 }
 

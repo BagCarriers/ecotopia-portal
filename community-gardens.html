@@ -192,7 +192,10 @@ function gardenCardInner(g, plantingRows) {
   const rows = (EP && Array.isArray(plantingRows)) ? plantingRows : [];
   const breakdown = rows.length ? EP.speciesBreakdown(rows) : [];
   const summary = breakdown.length ? EP.summarise(rows) : null;
-  const plantWord = (n) => n.toLocaleString() + (n === 1 ? ' native plant' : ' native plants');
+  // The wording lives in assets/plantings.js beside the arithmetic it labels, so the
+  // portal totals line and this card cannot drift apart. Only reachable when EP is
+  // present, because summary is null without it.
+  const plantWord = (n) => EP.plantWord(n);
   const text =
     '<h3>' + esc(g.name) + '</h3>' +
     (g.address ? '<p class="addr">📍 ' + esc(g.address) + '</p>' : '') +

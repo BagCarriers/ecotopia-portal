@@ -379,6 +379,30 @@ let plantings = [];
 let plantSpeciesForPicker = [];
 let qrInstance = null;
 
+// assets/plantings.js is a per-feature asset, and this page is a staff console with
+// tasks, check-ins, observations and the QR code on it. If that one file fails to
+// load, an unguarded EcoPlantings call throws a ReferenceError out of renderPage()
+// into init()'s catch, which replaces the ENTIRE page with "Could not load data".
+// A missing asset must cost the planting figures, nothing else. Named by path and
+// warned once, so a missing file is never mistaken for an empty table.
+let plantingsAssetWarned = false;
+function plantingsLib() {
+  const EP = window.EcoPlantings;
+  if (!EP && !plantingsAssetWarned) {
+    plantingsAssetWarned = true;
+    console.warn('Planting summaries unavailable: assets/plantings.js did not load.');
+  }
+  return EP || null;
+}
+
+// The row label, degraded. With the asset present this is EcoPlantings.plantingLabel;
+// without it the row still renders its own stored label rather than disappearing.
+function plantingLabelOf(p) {
+  const EP = plantingsLib();
+  if (EP) return EP.plantingLabel(p);
+  return String((p && p.speciesLabel) || '').trim() || 'Unnamed planting';
+}
+
 function dueCls(d) { return d === null ? 'green' : d <= 0 ? 'due-red' : d <= 3 ? 'due-amber' : 'due-green'; }
 function dueLabel(d) {
   if (d === null) return '-';
@@ -403,8 +427,10 @@ function renderPage() {
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   // Rows arrive newest planting day first, tie-broken by created_at, so they are
   // rendered in the order the query returned them. The headline totals come from
-  // the shared arithmetic, which the public summary will reuse.
-  const plantingTotals = EcoPlantings.summarise(plantings);
+  // the shared arithmetic, which the public summary will reuse. Null when
+  // assets/plantings.js is missing: the list still renders, the totals line does not.
+  const plantingsLibrary = plantingsLib();
+  const plantingTotals = plantingsLibrary ? plantingsLibrary.summarise(plantings) : null;
 
   el.innerHTML = `
     <!-- Header -->
@@ -530,7 +556,9 @@ function renderPage() {
       </div>
       ${plantings.length === 0
         ? '<p style="color:var(--text-dim);font-size:0.875rem;">No plantings recorded here yet.</p>'
-        : `<p class="plant-total">${plantingTotals.plants} plants, ${plantingTotals.species} species recorded here.</p>
+        : `${plantingTotals
+            ? `<p class="plant-total">${plantingTotals.plants} plants, ${plantingTotals.species} species recorded here.</p>`
+            : ''}
           <div class="plant-list">${plantings.map(p => plantingRow(p)).join('')}</div>`}
     </div>
 
@@ -698,7 +726,7 @@ function plantingRow(p) {
   return `
     <div class="plant-item">
       <div style="flex:1">
-        <div class="plant-name">${esc(EcoPlantings.plantingLabel(p))}</div>
+        <div class="plant-name">${esc(plantingLabelOf(p))}</div>
         <div class="plant-meta">${esc(String(p.quantity))} planted on ${esc(when)}</div>
         ${p.note ? `<div class="plant-note">${esc(p.note)}</div>` : ''}
       </div>
@@ -729,7 +757,11 @@ async function addPlanting() {
   if (!date) { errEl.textContent = 'Pick the date it was planted.'; return; }
 
   // Link to the shop when the label matches a catalogue species, so a later public
-  // card can link through. The label is stored either way and is what gets rendered.
+  // card can link through. The match is case insensitive, and what gets STORED on a
+  // match is the catalogue's own spelling, not the staff member's: species_label is
+  // what renders on the public garden card, so "wild columbine" typed in a hurry
+  // would otherwise be published in lower case for good. Off-catalogue text is
+  // stored exactly as typed, because there is nothing more canonical to use.
   const match = plantSpeciesForPicker
     .find(s => String(s.common).trim().toLowerCase() === label.toLowerCase());
 
@@ -737,7 +769,7 @@ async function addPlanting() {
     await DataStore.addPlanting({
       gardenId: garden.id,
       speciesId: match ? match.id : null,
-      speciesLabel: label,
+      speciesLabel: match ? String(match.common).trim() : label,
       quantity: qty,
       plantedOn: date,
       note: document.getElementById('ap_note').value.trim() || null,
@@ -752,7 +784,7 @@ async function addPlanting() {
 async function removePlanting(id) {
   const p = plantings.find(x => x.id === id);
   if (!p) return;
-  if (!confirm('Delete the record of ' + p.quantity + ' ' + EcoPlantings.plantingLabel(p) + '?')) return;
+  if (!confirm('Delete the record of ' + p.quantity + ' ' + plantingLabelOf(p) + '?')) return;
   try {
     await DataStore.deletePlanting(id);
     plantings = await DataStore.getPlantingsByGarden(garden.id);

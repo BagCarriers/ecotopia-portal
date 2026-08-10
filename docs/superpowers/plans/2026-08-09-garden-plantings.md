@@ -253,6 +253,18 @@ tell the two apart."
 
 - [ ] **Step 1: Write the migration**
 
+> ## STOP. THE SQL LISTING BELOW IS SUPERSEDED. DO NOT RUN IT.
+>
+> It contains `create policy gp_anon_read ... for select to anon using (true)`, which
+> published the staff-only `note` column to anonymous readers. **Migration 0036 exists
+> specifically to drop that policy**, replacing it with the view
+> `public.garden_plantings_public`, which excludes `note`. Re-running this listing
+> re-opens staff notes to the internet.
+>
+> The listing is kept as the historical record of what 0035 originally did. The
+> statements that are actually live are whatever is in
+> `supabase/migrations/0035_garden_plantings.sql` **as amended by 0036 and 0037**.
+
 Create `supabase/migrations/0035_garden_plantings.sql`:
 
 ```sql
@@ -293,6 +305,19 @@ create index if not exists garden_plantings_garden_idx
 
 alter table public.garden_plantings enable row level security;
 
+-- ###########################################################################
+-- ##  SUPERSEDED. DO NOT RUN THE gp_anon_read POLICY BELOW.                ##
+-- ##                                                                       ##
+-- ##  It granted anon SELECT on the whole table, which published the       ##
+-- ##  staff-only `note` column to the internet. Migration 0036 DROPS this  ##
+-- ##  policy and replaces it with the view public.garden_plantings_public, ##
+-- ##  which exposes every column except `note`. The public pages read      ##
+-- ##  that view.                                                           ##
+-- ##                                                                       ##
+-- ##  Running this statement again re-opens staff notes to anonymous       ##
+-- ##  readers. It is kept here only as the record of what 0035 originally  ##
+-- ##  did, and why 0036 exists.                                            ##
+-- ###########################################################################
 -- Same shape as every sibling content table: the public reads, staff write.
 create policy gp_anon_read on public.garden_plantings
   for select to anon using (true);
@@ -642,7 +667,17 @@ Serve the repo locally (`python3 -m http.server` from the repo root) and open `g
 - [ ] **Step 6: Run the checks and commit**
 
 Run: `cd ~/GitHub/ecotopia-portal && npm test`
-Expected: PASS, including the repo's `node --check` over extracted inline scripts.
+Expected: PASS.
+
+> **Correction.** Earlier revisions of this plan said this step also ran "the repo's
+> `node --check` over extracted inline scripts". That was untrue when written: `npm test`
+> ran `node --test tests/*.js` and no test opened an HTML file, so no branch in this repo
+> ever had its inline scripts syntax checked. The same false claim appears in four other
+> plan and spec documents under `docs/superpowers/`.
+>
+> It is true as of this branch: `tests/inline-scripts.test.js` extracts every inline
+> `<script>` from all 46 HTML pages and parses each one, so `npm test` now genuinely
+> covers it.
 
 ```bash
 cd ~/GitHub/ecotopia-portal
