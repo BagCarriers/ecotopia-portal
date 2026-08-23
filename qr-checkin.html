@@ -39,6 +39,11 @@
   }
   .garden-header h1 { font-family: 'Fraunces', serif; font-size: 1.5rem; margin-bottom: 6px; }
   .garden-header .date { font-size: 0.9rem; opacity: 0.8; }
+  .garden-chapter {
+    display: inline-flex; align-items: center; gap: 6px; margin-top: 10px;
+    font-size: 0.78rem; color: rgba(255,255,255,0.88); text-decoration: none;
+  }
+  .garden-chapter img { height: 18px; width: auto; }
 
   /* Path selection */
   .path-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; }
@@ -192,6 +197,10 @@ function renderMain() {
     <div class="garden-header">
       <h1>${esc(garden.name)}</h1>
       <div class="date">${todayStr}</div>
+      <a class="garden-chapter" href="https://join.wildones.org/?chapter=2751" target="_blank" rel="noopener">
+        <img src="assets/img/wildones-chapter.png" alt="" onerror="this.style.display='none'">
+        <span>A Wild Ones PA Ridge and Valley garden</span>
+      </a>
     </div>
 
     <!-- Path selection -->

@@ -489,16 +489,10 @@
       }).join('');
       header.innerHTML =
         '<a class="announce-bar" href="https://join.wildones.org/?chapter=2751" target="_blank" rel="noopener">' +
-          'Our gardens and volunteer days are Wild Ones PA Ridge and Valley work. Join the chapter <span class="announce-arrow" aria-hidden="true">&rarr;</span>' +
+          'Support our nonprofit: join Wild Ones PA Ridge and Valley <span class="announce-arrow" aria-hidden="true">&rarr;</span>' +
         '</a>' +
         '<div class="nav-inner">' +
-          '<div class="brand-lockup">' +
-            '<a class="brand" href="index.html"><span class="leaf" aria-hidden="true">❀</span>Ecotopian EarthCare</a>' +
-            '<a class="brand-chapter" href="' + WILDONES.join + '" target="_blank" rel="noopener">' +
-              wildOnesMark('brand-chapter-mark') +
-              '<span>In partnership with ' + esc(WILDONES.shortName) + '</span>' +
-            '</a>' +
-          '</div>' +
+          '<a class="brand" href="index.html"><span class="leaf" aria-hidden="true">❀</span>Ecotopian EarthCare</a>' +
           '<button class="nav-toggle" id="navToggle" aria-label="Menu" aria-expanded="false" aria-controls="navLinks">' +
             '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>' +
           '</button>' +
