@@ -13,6 +13,7 @@
 <script src="assets/config.js"></script>
 <script src="assets/supabase-client.js"></script>
 <script src="assets/mapping.js"></script>
+<script src="assets/pipeline.js"></script>
 <script src="assets/auth.js"></script>
 <script>if (!AuthManager.hasCachedSession()) location.replace('login.html');</script>
 <script src="assets/data.js"></script>
@@ -205,7 +206,8 @@ try {
     ]);
 
   // Stats
-  const activeJobs = jobs.filter(j => j.status === 'active').length;
+  const payingJobs = EcoPipeline.splitLanes(jobs).paying;
+  const activeJobs = payingJobs.filter(j => j.status === 'active').length;
   const openTasks = openTasksList.length;
   const upcomingEvents = upcomingEventsList.length;
   const unpaidInvoices = unpaidInvoicesList.length;
@@ -320,12 +322,21 @@ if (flaggedObs.length > 0) {
     link: 'gardens.html', linkText: 'Review →'
   });
 }
-const pendingJobs = jobs.filter(j => j.status === 'inquiry');
+const pendingJobs = payingJobs.filter(j => j.status === 'inquiry');
 if (pendingJobs.length > 0) {
   attentionItems.push({
     badge: 'blue', label: 'New Inquiry',
     // Irregular plural, so this cannot use the `+ 's'` shape the other rows use.
     text: `${pendingJobs.length} job ${pendingJobs.length > 1 ? 'inquiries' : 'inquiry'} waiting for follow-up`,
+    link: 'jobs.html', linkText: 'View →'
+  });
+}
+const grantInquiries = EcoPipeline.splitLanes(jobs).grant.filter(j => j.status === 'inquiry');
+if (grantInquiries.length > 0) {
+  attentionItems.push({
+    badge: 'amber', label: 'Lawn to Meadow',
+    // Irregular plural, same reason as the row above.
+    text: `${grantInquiries.length} lawn to meadow ${grantInquiries.length > 1 ? 'inquiries' : 'inquiry'} waiting on grant funding`,
     link: 'jobs.html', linkText: 'View →'
   });
 }

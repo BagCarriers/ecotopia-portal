@@ -13,6 +13,7 @@
 <script src="assets/config.js"></script>
 <script src="assets/supabase-client.js"></script>
 <script src="assets/mapping.js"></script>
+<script src="assets/pipeline.js"></script>
 <script src="assets/auth.js"></script>
 <script>if (!AuthManager.hasCachedSession()) location.replace('login.html');</script>
 <script src="assets/data.js"></script>
@@ -93,6 +94,12 @@
   .actions-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
 
   /* Status pill */
+  .reserved-box {
+    background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 12px;
+    padding: 14px 16px; margin-bottom: 16px;
+  }
+  .reserved-box h3 { font-size: 0.95rem; color: #5b21b6; margin-bottom: 4px; }
+  .reserved-box p { font-size: 0.85rem; color: var(--text-dim); line-height: 1.5; }
   .status-pill { padding: 4px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 600;
     display: inline-flex; align-items: center; gap: 4px; }
   .pill-inquiry { background: var(--cream-dim); color: var(--text-dim); }
@@ -146,6 +153,24 @@
 </div>
 
 <!-- Edit Job Modal -->
+<div class="modal-overlay" id="reserveModal">
+  <div class="modal">
+    <h2>Reserve for a future season</h2>
+    <form id="reserveForm" novalidate>
+      <p style="font-size:0.875rem;color:var(--text-dim);line-height:1.5;margin-bottom:12px;">
+        Parks the job out of the active pipeline. It stays on the board in the Reserved column.
+      </p>
+      <div class="form-group"><label>Reserved for *</label>
+        <input type="text" id="rs_when" placeholder="e.g. Spring 2027" required></div>
+      <div class="modal-error" id="reserveError"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" onclick="closeReserve()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Reserve job</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <div class="modal-overlay" id="editJobModal">
   <div class="modal edit-modal">
     <h2>Edit Job</h2>
@@ -153,24 +178,13 @@
       <div class="form-group"><label>Title *</label>
         <input type="text" id="ej_title" placeholder="Job title" required></div>
       <div class="form-group"><label>Job Type</label>
-        <select id="ej_type">
-          <option value="lawn_to_meadow">Lawn to Meadow</option>
-          <option value="ecological_design">Ecological Design</option>
-          <option value="invasive_removal">Invasive Removal</option>
-          <option value="willow_structure">Willow Structure</option>
-          <option value="maintenance">Maintenance</option>
-          <option value="community_garden">Community Garden</option>
-          <option value="grant_project">Grant Project</option>
-          <option value="nursery_sale">Nursery Sale</option>
-          <option value="rain_garden">Rain Garden</option>
-          <option value="ecological_landscaping">Ecological Landscaping</option>
-          <option value="herb_garden">Herb Garden</option>
-          <option value="other">Other</option>
-        </select></div>
+        <select id="ej_type"></select></div>
       <div class="form-group"><label>Address</label>
         <input type="text" id="ej_address" placeholder="Street address"></div>
       <div class="form-group"><label>Square Footage</label>
         <input type="text" id="ej_sqft" placeholder="e.g. 640 sqft"></div>
+      <div class="form-group" id="ej_deferred_wrap" hidden><label>Reserved for</label>
+        <input type="text" id="ej_deferred" placeholder="e.g. Spring 2027"></div>
       <div class="form-group"><label>Notes</label>
         <textarea id="ej_notes" rows="3" placeholder="Job notes…"></textarea></div>
       <div class="form-group">
@@ -216,10 +230,8 @@ let job = null;
 let client = null;
 
 const STATUS_ORDER = ['inquiry', 'site_visit', 'proposal', 'active', 'complete'];
-const STATUS_LABELS = {
-  inquiry: 'Inquiry', site_visit: 'Site Visit', proposal: 'Proposal',
-  active: 'Active', complete: 'Complete'
-};
+const STATUS_LABELS = EcoPipeline.STATUSES.reduce((m, st) => (m[st.key] = st.label, m), {});
+
 
 function render() {
   const el = document.getElementById('jobContent');
@@ -228,8 +240,11 @@ function render() {
     return;
   }
   document.title = `${job.title} - Ecotopia`;
-  const currentIdx = STATUS_ORDER.indexOf(job.status);
-  const nextStatus = STATUS_ORDER[currentIdx + 1];
+  const reserved = job.status === 'deferred';
+  // A reserved job sits off the linear flow, so it has no current step and no
+  // "next" step to advance to. Clicking any stage in the stepper brings it back.
+  const currentIdx = reserved ? -1 : STATUS_ORDER.indexOf(job.status);
+  const nextStatus = reserved ? null : STATUS_ORDER[currentIdx + 1];
 
   el.innerHTML = `
     <h1>${esc(job.title)}</h1>
@@ -242,12 +257,19 @@ function render() {
              onclick="moveToStatus('${s}')">${STATUS_LABELS[s]}</div>`).join('')}
     </div>
 
+    ${reserved ? `
+    <div class="reserved-box">
+      <h3>📅 ${esc(EcoPipeline.reservedLabel(job))}</h3>
+      <p>This job is parked and is not counted in the active pipeline. Choose a stage above to bring it back.</p>
+    </div>` : ''}
+
     <!-- Actions -->
     <div class="actions-row">
       ${nextStatus ? `<button class="btn btn-primary" onclick="moveToStatus('${nextStatus}')">Move to ${STATUS_LABELS[nextStatus]}</button>` : ''}
       <a class="btn btn-outline" href="quotes.html?job=${encodeURIComponent(job.id)}">📄 Generate Quote</a>
       <button class="btn btn-outline" onclick="openInvoiceModal()">💵 Create Invoice</button>
       <button class="btn btn-outline" onclick="openEditJob()">✏️ Edit Job</button>
+      ${reserved ? '' : '<button class="btn btn-outline" onclick="openReserve()">📅 Reserve for a future season</button>'}
     </div>
     <div class="modal-error" id="statusError"></div>
 
@@ -273,8 +295,9 @@ function render() {
       <!-- Job Details -->
       <div class="card">
         <h2>Job Details</h2>
-        <div class="info-row"><span class="info-label">Type</span><span class="info-value">${esc(job.type?.replace(/_/g,' '))}</span></div>
+        <div class="info-row"><span class="info-label">Type</span><span class="info-value">${esc(EcoPipeline.typeInfo(job.type).label)}</span></div>
         <div class="info-row"><span class="info-label">Status</span><span class="info-value"><span class="status-pill pill-${esc(job.status)}">${esc(STATUS_LABELS[job.status] || job.status)}</span></span></div>
+        ${job.deferredTo ? `<div class="info-row"><span class="info-label">Reserved for</span><span class="info-value">${esc(job.deferredTo)}</span></div>` : ''}
         ${job.sqft ? `<div class="info-row"><span class="info-label">Size</span><span class="info-value">${esc(job.sqft)}</span></div>` : ''}
         ${job.price ? `<div class="info-row"><span class="info-label">Price</span><span class="info-value">$${job.price.toLocaleString()}</span></div>` : ''}
         <div class="info-row"><span class="info-label">Created</span><span class="info-value">${DataStore.formatDate(job.createdAt)}</span></div>
@@ -306,11 +329,58 @@ function render() {
   `;
 }
 
+// Built from assets/pipeline.js so this select can never again offer a type
+// nothing else in the app writes, or silently fall back to its first option.
+(function populateEditType() {
+  const sel = document.getElementById('ej_type');
+  sel.innerHTML = Object.keys(EcoPipeline.TYPE_MAP)
+    .map(k => `<option value="${k}">${esc(EcoPipeline.TYPE_MAP[k].label)}</option>`).join('');
+})();
+
+function openReserve() {
+  document.getElementById('rs_when').value = job.deferredTo || '';
+  document.getElementById('reserveError').textContent = '';
+  document.getElementById('reserveModal').classList.add('open');
+}
+function closeReserve() {
+  document.getElementById('reserveModal').classList.remove('open');
+}
+document.getElementById('reserveModal').addEventListener('click', function(e) {
+  if (e.target === this) closeReserve();
+});
+document.getElementById('reserveForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const when = document.getElementById('rs_when').value.trim();
+  const errEl = document.getElementById('reserveError');
+  errEl.textContent = '';
+  if (!when) { errEl.textContent = 'Say which season it is reserved for.'; return; }
+  try {
+    await DataStore.updateJob(job.id, { status: 'deferred', deferredTo: when });
+    await DataStore.addJobNote(job.id, 'Reserved for ' + when + '.');
+    job.status = 'deferred';
+    job.deferredTo = when;
+    closeReserve();
+    render();
+  } catch (err) {
+    errEl.textContent = 'Could not reserve the job. ' + err.message;
+  }
+});
+
 function openEditJob() {
   if (!job) return;
   document.getElementById('editJobError').textContent = '';
   document.getElementById('ej_title').value = job.title || '';
-  document.getElementById('ej_type').value = job.type || 'other';
+  // A type the select does not list would silently become the first option and
+  // reclassify the job on save, so add it rather than let it fall back.
+  const typeSel = document.getElementById('ej_type');
+  const t = job.type || 'other';
+  if (!Array.from(typeSel.options).some(o => o.value === t)) {
+    typeSel.insertAdjacentHTML('beforeend',
+      `<option value="${esc(t)}">${esc(EcoPipeline.typeInfo(t).label)}</option>`);
+  }
+  typeSel.value = t;
+  document.getElementById('ej_deferred_wrap').hidden = job.status !== 'deferred';
+  document.getElementById('ej_deferred').value = job.deferredTo || '';
   document.getElementById('ej_address').value = job.address || '';
   document.getElementById('ej_sqft').value = job.sqft || '';
   document.getElementById('ej_notes').value = job.notes || '';
@@ -344,6 +414,9 @@ document.getElementById('editJobForm').addEventListener('submit', async function
       type: document.getElementById('ej_type').value,
       address: document.getElementById('ej_address').value.trim(),
       sqft: document.getElementById('ej_sqft').value.trim(),
+      deferredTo: job.status === 'deferred'
+        ? (document.getElementById('ej_deferred').value.trim() || null)
+        : (job.deferredTo || null),
       notes: document.getElementById('ej_notes').value.trim(),
       grantFunded,
       grantName: grantFunded ? document.getElementById('ej_grant_source').value.trim() : null,

@@ -13,6 +13,7 @@
 <script src="assets/config.js"></script>
 <script src="assets/supabase-client.js"></script>
 <script src="assets/mapping.js"></script>
+<script src="assets/pipeline.js"></script>
 <script src="assets/auth.js"></script>
 <script>if (!AuthManager.hasCachedSession()) location.replace('login.html');</script>
 <script src="assets/data.js"></script>
@@ -83,7 +84,28 @@
   .pill-eco { background: #d8f3dc; color: #1b4332; }
   .pill-invasive { background: #fee2e2; color: #991b1b; }
   .pill-herb { background: #fef3c7; color: #92400e; }
+  .pill-pollinator { background: #fce7f3; color: #9d174d; }
+  .pill-willow { background: #ecfccb; color: #3f6212; }
+  .pill-request { background: #e0e7ff; color: #3730a3; }
   .pill-other { background: var(--cream-dim); color: var(--text-dim); }
+  .reserved-badge {
+    background: #ede9fe; color: #5b21b6; padding: 2px 7px;
+    border-radius: 20px; font-size: 0.7rem; font-weight: 600;
+  }
+
+  /* Lanes. The grant lane is visually quieter so the paying board reads first. */
+  .lane { margin-bottom: 28px; }
+  .lane-head { margin-bottom: 12px; }
+  .lane-head h2 {
+    font-size: 0.95rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--forest);
+  }
+  .lane-note { font-size: 0.82rem; color: var(--text-dim); margin-top: 3px; max-width: 60ch; }
+  .lane-grant { border-top: 1px solid var(--border); padding-top: 22px; }
+  .lane-grant .lane-head h2 { color: #92400e; }
+  .lane-grant .kanban-col { background: #fffbeb; border-color: #fde68a; }
+  .lane-empty { font-size: 0.85rem; color: var(--text-dim); padding: 10px 0; }
+  .col-unfiled { border-color: #fca5a5; background: #fef2f2; }
   .job-title { font-size: 0.82rem; color: var(--text-dim); margin-bottom: 4px; }
   .job-addr { font-size: 0.78rem; color: var(--text-dim); }
   .job-meta { margin-top: 8px; display: flex; gap: 6px; flex-wrap: wrap; }
@@ -143,7 +165,22 @@
     <button class="btn btn-primary" onclick="openModal()">+ New Job</button>
   </div>
   <div class="modal-error" id="movePageError" style="margin-bottom:10px"></div>
-  <div class="kanban" id="kanban"></div>
+
+  <div class="lane">
+    <div class="lane-head">
+      <h2>Pipeline</h2>
+      <p class="lane-note">Work a client is paying for.</p>
+    </div>
+    <div class="kanban" id="kanban"></div>
+  </div>
+
+  <div class="lane lane-grant" id="grantLane">
+    <div class="lane-head">
+      <h2>Lawn to Meadow</h2>
+      <p class="lane-note">Depends on state grant money coming through, so these are not counted as guaranteed work.</p>
+    </div>
+    <div class="kanban" id="kanbanGrant"></div>
+  </div>
 </div>
 
 <!-- New Job Modal -->
@@ -169,24 +206,16 @@
       <div class="form-row">
         <div class="form-group">
           <label>Type</label>
-          <select id="nj_type">
-            <option value="meadow_conversion">Meadow Conversion</option>
-            <option value="rain_garden">Rain Garden</option>
-            <option value="ecological_landscaping">Ecological Landscaping</option>
-            <option value="invasive_removal">Invasive Removal</option>
-            <option value="herb_garden">Herb Garden</option>
-            <option value="other">Other</option>
-          </select>
+          <select id="nj_type"></select>
         </div>
         <div class="form-group">
           <label>Status</label>
-          <select id="nj_status">
-            <option value="inquiry">Inquiry</option>
-            <option value="site_visit">Site Visit</option>
-            <option value="proposal">Proposal</option>
-            <option value="active">Active</option>
-          </select>
+          <select id="nj_status"></select>
         </div>
+      </div>
+      <div class="form-group" id="nj_deferred_wrap" hidden>
+        <label>Reserved for</label>
+        <input type="text" id="nj_deferred" placeholder="e.g. Spring 2027">
       </div>
       <div class="form-row">
         <div class="form-group">
@@ -215,55 +244,71 @@
 const esc = DataStore.esc;
 let jobs = [];
 
-const STATUSES = [
-  { key: 'inquiry',    label: 'Inquiry' },
-  { key: 'site_visit', label: 'Site Visit' },
-  { key: 'proposal',   label: 'Proposal' },
-  { key: 'active',     label: 'Active' },
-  { key: 'complete',   label: 'Complete' },
-];
+const STATUSES = EcoPipeline.STATUSES;
 
-const TYPE_MAP = {
-  meadow_conversion: { label: 'Meadow', cls: 'pill-meadow' },
-  rain_garden:       { label: 'Rain Garden', cls: 'pill-rain' },
-  ecological_landscaping: { label: 'Eco Landscaping', cls: 'pill-eco' },
-  invasive_removal:  { label: 'Invasive Removal', cls: 'pill-invasive' },
-  herb_garden:       { label: 'Herb Garden', cls: 'pill-herb' },
-};
+// Which lane a job belongs to is decided by its service type, not by where a
+// staff member last dropped it, so Jordan never has to remember to file a grant
+// job by hand. See assets/pipeline.js.
+const laneOf = (job) => EcoPipeline.isGrantDependent(job) ? 'grant' : 'paying';
+
+function jobCard(j) {
+  const typeInfo = EcoPipeline.typeInfo(j.type);
+  const reserved = EcoPipeline.reservedLabel(j);
+  return `
+    <a href="job-detail.html?id=${j.id}" class="job-card" draggable="true" data-job-id="${j.id}">
+      <div class="job-card-top">
+        <div class="job-client">${esc(j.clientName)}</div>
+        <span class="job-type-pill ${typeInfo.cls}">${esc(typeInfo.label)}</span>
+      </div>
+      <div class="job-title">${esc(j.title)}</div>
+      ${j.address ? `<div class="job-addr">📍 ${esc(j.address)}</div>` : ''}
+      <div class="job-meta">
+        ${reserved ? `<span class="reserved-badge">📅 ${esc(reserved)}</span>` : ''}
+        ${j.grantFunded ? `<span class="grant-badge">🏛 ${esc(j.grantName || 'Grant')}</span>` : ''}
+        ${j.sqft ? `<span class="sqft-badge">${esc(j.sqft)}</span>` : ''}
+        ${j.price ? `<span class="sqft-badge">$${j.price}</span>` : ''}
+      </div>
+    </a>`;
+}
+
+function column(label, colJobs, statusKey, lane, extraCls) {
+  return `
+    <div class="kanban-col ${extraCls || ''}" ${statusKey ? `data-status="${statusKey}"` : ''} data-lane="${lane}">
+      <div class="col-header">
+        <h3>${esc(label)}</h3>
+        <span class="col-count">${colJobs.length}</span>
+      </div>
+      <div class="col-cards">
+        ${colJobs.length === 0
+          ? '<div style="padding:12px;font-size:0.8rem;color:var(--text-dim);text-align:center;">Empty</div>'
+          : colJobs.map(jobCard).join('')}
+      </div>
+    </div>`;
+}
+
+function renderBoard(el, laneJobs, lane) {
+  const { columns, unknown } = EcoPipeline.groupByStatus(laneJobs);
+  let html = STATUSES.map(st => column(st.label, columns[st.key], st.key, lane)).join('');
+  // A job whose status matches no stage used to vanish from this page silently.
+  // It now gets a column of its own so someone can see it and fix it.
+  if (unknown.length) html += column('Unfiled', unknown, null, lane, 'col-unfiled');
+  el.innerHTML = html;
+}
 
 function renderKanban() {
-  const board = document.getElementById('kanban');
-  board.innerHTML = STATUSES.map(st => {
-    const colJobs = jobs.filter(j => j.status === st.key);
-    return `
-      <div class="kanban-col" data-status="${st.key}">
-        <div class="col-header">
-          <h3>${st.label}</h3>
-          <span class="col-count">${colJobs.length}</span>
-        </div>
-        <div class="col-cards">
-          ${colJobs.length === 0
-            ? '<div style="padding:12px;font-size:0.8rem;color:var(--text-dim);text-align:center;">Empty</div>'
-            : colJobs.map(j => {
-              const typeInfo = TYPE_MAP[j.type] || { label: j.type, cls: 'pill-other' };
-              return `
-                <a href="job-detail.html?id=${j.id}" class="job-card" draggable="true" data-job-id="${j.id}">
-                  <div class="job-card-top">
-                    <div class="job-client">${esc(j.clientName)}</div>
-                    <span class="job-type-pill ${typeInfo.cls}">${esc(typeInfo.label)}</span>
-                  </div>
-                  <div class="job-title">${esc(j.title)}</div>
-                  ${j.address ? `<div class="job-addr">📍 ${esc(j.address)}</div>` : ''}
-                  <div class="job-meta">
-                    ${j.grantFunded ? `<span class="grant-badge">🏛 ${esc(j.grantName || 'Grant')}</span>` : ''}
-                    ${j.sqft ? `<span class="sqft-badge">${esc(j.sqft)}</span>` : ''}
-                    ${j.price ? `<span class="sqft-badge">$${j.price}</span>` : ''}
-                  </div>
-                </a>`;
-            }).join('')}
-        </div>
-      </div>`;
-  }).join('');
+  const { paying, grant } = EcoPipeline.splitLanes(jobs);
+  renderBoard(document.getElementById('kanban'), paying, 'paying');
+
+  const grantLane = document.getElementById('grantLane');
+  const grantBoard = document.getElementById('kanbanGrant');
+  renderBoard(grantBoard, grant, 'grant');
+  // The lane stays on the page even when empty, so the category Jordan asked for
+  // is somewhere he can drop a job rather than something that appears by magic.
+  if (!grant.length) {
+    grantBoard.innerHTML = '<p class="lane-empty">No lawn to meadow inquiries right now.</p>';
+  }
+  grantLane.hidden = false;
+
   wireDragAndDrop();
 }
 
@@ -302,7 +347,17 @@ function wireDragAndDrop() {
       const id = draggedJobId || e.dataTransfer.getData('text/plain');
       const newStatus = col.getAttribute('data-status');
       const job = jobs.find(j => j.id === id);
+      const moveErrEl = document.getElementById('movePageError');
+      if (moveErrEl) moveErrEl.textContent = '';
       if (!job || !newStatus || job.status === newStatus) return;
+      // Lane membership follows the service type, so a cross-lane drop would
+      // move the status and then snap the card back to where it started, which
+      // reads as a bug. Refuse it and say what would actually move it.
+      if (laneOf(job) !== col.getAttribute('data-lane')) {
+        if (moveErrEl) moveErrEl.textContent =
+          'Lawn to Meadow jobs stay in their own lane because they depend on grant money. Change the job\u2019s service type if it belongs in the paying pipeline.';
+        return;
+      }
       const oldStatus = job.status;
       const label = (STATUSES.find(s => s.key === newStatus) || {}).label || newStatus;
       // Optimistic move; revert on failure.
@@ -324,10 +379,32 @@ function wireDragAndDrop() {
   });
 }
 
+// Both selects are built from assets/pipeline.js. The original bug on this page
+// was a hand-kept type list that fell five behind what intake writes, so nothing
+// here is hand-kept any more.
+(function populateJobSelects() {
+  const typeSel = document.getElementById('nj_type');
+  typeSel.innerHTML = Object.keys(EcoPipeline.TYPE_MAP)
+    .map(k => `<option value="${k}">${esc(EcoPipeline.TYPE_MAP[k].label)}</option>`).join('');
+  typeSel.value = 'pollinator_garden';
+
+  const statusSel = document.getElementById('nj_status');
+  statusSel.innerHTML = EcoPipeline.STATUSES
+    .filter(st => st.key !== 'complete')
+    .map(st => `<option value="${st.key}">${esc(st.label)}</option>`).join('');
+
+  const wrap = document.getElementById('nj_deferred_wrap');
+  statusSel.addEventListener('change', () => {
+    wrap.hidden = statusSel.value !== 'deferred';
+    if (wrap.hidden) document.getElementById('nj_deferred').value = '';
+  });
+})();
+
 function openModal() { document.getElementById('newJobModal').classList.add('open'); }
 function closeModal() {
   document.getElementById('newJobModal').classList.remove('open');
   document.getElementById('newJobForm').reset();
+  document.getElementById('nj_deferred_wrap').hidden = true;
   document.getElementById('jobSuccess').classList.remove('visible');
   document.getElementById('jobError').textContent = '';
 }
@@ -344,6 +421,7 @@ document.getElementById('newJobForm').addEventListener('submit', async function(
     address: document.getElementById('nj_address').value.trim(),
     type: document.getElementById('nj_type').value,
     status: document.getElementById('nj_status').value,
+    deferredTo: document.getElementById('nj_deferred').value.trim() || null,
     sqft: document.getElementById('nj_sqft').value.trim(),
     price: parseFloat(document.getElementById('nj_price').value) || null,
     notes: document.getElementById('nj_notes').value.trim(),

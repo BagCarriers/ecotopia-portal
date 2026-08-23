@@ -406,6 +406,67 @@
     );
   }
 
+  // ── Wild Ones chapter identity ──────────────────────────────────────────
+  // Jordan (2026-08-23): the chapter board want the community gardens and the
+  // volunteer programme to read as Wild Ones work, not only as Ecotopian
+  // EarthCare work. Everything about that relationship lives here so the wording
+  // and the logo are changed in one place across the whole site.
+  //
+  // WILDONES.logo is the only path to the chapter mark. Drop the official file at
+  // that path and every lockup on the site picks it up; until it exists the
+  // lockups render as text, which is why every <img> below carries an onerror
+  // that hides only the image.
+  const WILDONES = {
+    name: 'Wild Ones Pennsylvania Ridge and Valley',
+    shortName: 'Wild Ones PA Ridge and Valley',
+    chapter: '2751',
+    join: 'https://join.wildones.org/?chapter=2751',
+    site: 'https://parv.wildones.org/',
+    logo: 'assets/img/wildones-chapter.png',
+  };
+
+  // Hides the image and nothing else if the mark is not on disk yet, so a missing
+  // file costs the logo rather than leaving a broken-image icon in the header.
+  const WO_FALLBACK = "this.style.display='none'";
+
+  function wildOnesMark(cls) {
+    return '<img class="' + cls + '" src="' + WILDONES.logo + '" alt="' + esc(WILDONES.shortName) +
+           '" loading="lazy" decoding="async" onerror="' + WO_FALLBACK + '">';
+  }
+
+  // The line that states the relationship. Used in the header, in the footer and
+  // on the pages that are chapter work.
+  function wildOnesLine(text) {
+    return '<a class="wo-line" href="' + WILDONES.join + '" target="_blank" rel="noopener">' +
+             wildOnesMark('wo-line-mark') +
+             '<span>' + esc(text) + '</span>' +
+           '</a>';
+  }
+
+  // The banner for pages that ARE chapter work: community gardens, volunteering.
+  function wildOnesBanner(text) {
+    return '<div class="wo-banner">' +
+             wildOnesMark('wo-banner-mark') +
+             '<div class="wo-banner-text">' +
+               '<p class="wo-banner-lead">' + esc(text) + '</p>' +
+               '<p class="wo-banner-sub">' + esc(WILDONES.name) + ' chapter ' + esc(WILDONES.chapter) + '. ' +
+                 'Membership dues fund this work.</p>' +
+             '</div>' +
+             '<a class="wo-banner-cta" href="' + WILDONES.join + '" target="_blank" rel="noopener">Join Wild Ones</a>' +
+           '</div>';
+  }
+
+  // Fills every [data-wildones] placeholder on the page. The attribute value picks
+  // the treatment, so a page opts in with markup and needs no script of its own.
+  function decorateWildOnes() {
+    document.querySelectorAll('[data-wildones]:not([data-wo-done])').forEach((el) => {
+      const kind = el.getAttribute('data-wildones');
+      const text = el.getAttribute('data-wildones-text') || '';
+      el.innerHTML = kind === 'banner' ? wildOnesBanner(text) : wildOnesLine(text);
+      el.setAttribute('data-wo-done', '1');
+    });
+  }
+
   // ── Nav / chrome rendering (browser only) ───────────────────────────────
   const NAV = [
     { href: 'index.html', label: 'Home', key: 'home' },
@@ -428,10 +489,16 @@
       }).join('');
       header.innerHTML =
         '<a class="announce-bar" href="https://join.wildones.org/?chapter=2751" target="_blank" rel="noopener">' +
-          'Support our nonprofit: join Wild Ones PA Ridge and Valley <span class="announce-arrow" aria-hidden="true">&rarr;</span>' +
+          'Our gardens and volunteer days are Wild Ones PA Ridge and Valley work. Join the chapter <span class="announce-arrow" aria-hidden="true">&rarr;</span>' +
         '</a>' +
         '<div class="nav-inner">' +
-          '<a class="brand" href="index.html"><span class="leaf" aria-hidden="true">❀</span>Ecotopian EarthCare</a>' +
+          '<div class="brand-lockup">' +
+            '<a class="brand" href="index.html"><span class="leaf" aria-hidden="true">❀</span>Ecotopian EarthCare</a>' +
+            '<a class="brand-chapter" href="' + WILDONES.join + '" target="_blank" rel="noopener">' +
+              wildOnesMark('brand-chapter-mark') +
+              '<span>In partnership with ' + esc(WILDONES.shortName) + '</span>' +
+            '</a>' +
+          '</div>' +
           '<button class="nav-toggle" id="navToggle" aria-label="Menu" aria-expanded="false" aria-controls="navLinks">' +
             '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>' +
           '</button>' +
@@ -457,6 +524,7 @@
 
   // Fill willow dividers + wire scroll reveal (idempotent, safe to call once).
   function decorate() {
+    decorateWildOnes();
     document.querySelectorAll('.willow:not([data-done])').forEach((el) => {
       const o = el.getAttribute('data-opacity');
       el.innerHTML = el.hasAttribute('data-white')

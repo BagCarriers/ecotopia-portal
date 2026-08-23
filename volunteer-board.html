@@ -32,6 +32,28 @@
   }
   .pub-logo { font-family: 'Fraunces', serif; font-size: 1.2rem; color: var(--sage); font-weight: 700; }
   .pub-tagline { font-size: 0.8rem; color: rgba(216,243,220,0.7); margin-top: 2px; }
+  .pub-chapter {
+    display: inline-flex; align-items: center; gap: 6px; margin-top: 6px;
+    font-size: 0.75rem; color: rgba(216,243,220,0.85); text-decoration: none;
+  }
+  .pub-chapter:hover { color: #fff; }
+  .pub-chapter img { height: 16px; width: auto; }
+  .wo-banner {
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    background: #fff; border: 1px solid var(--cream-dim);
+    border-left: 4px solid var(--gold);
+    border-radius: 12px; padding: 16px 18px; margin: 0 0 22px;
+  }
+  .wo-banner img.wo-banner-mark { height: 54px; width: auto; flex-shrink: 0; }
+  .wo-banner-text { flex: 1 1 240px; min-width: 0; }
+  .wo-banner-lead { font-weight: 700; font-size: 0.98rem; line-height: 1.45; }
+  .wo-banner-sub { font-size: 0.84rem; line-height: 1.5; color: var(--text-dim); margin-top: 4px; }
+  .wo-banner-cta {
+    background: var(--gold); color: #1C1C1C; font-weight: 700; font-size: 0.86rem;
+    text-decoration: none; padding: 9px 16px; border-radius: 999px;
+    white-space: nowrap; flex-shrink: 0;
+  }
+  @media (max-width: 560px) { .wo-banner-cta { width: 100%; text-align: center; } }
 
   .container { max-width: 860px; margin: 0 auto; padding: 32px 20px; }
   h1 { font-family: 'Fraunces', serif; font-size: 2rem; color: var(--forest); margin-bottom: 8px; }
@@ -113,11 +135,24 @@
   <div>
     <div class="pub-logo">🌿 Ecotopia Earthcare</div>
     <div class="pub-tagline">Community Garden Program</div>
+    <a class="pub-chapter" href="https://join.wildones.org/?chapter=2751" target="_blank" rel="noopener">
+      <img src="assets/img/wildones-chapter.png" alt="" onerror="this.style.display='none'">
+      <span>A Wild Ones PA Ridge and Valley program</span>
+    </a>
   </div>
 </div>
 
 <div class="container">
   <h1>Open Responsibilities</h1>
+  <div class="wo-banner">
+    <img class="wo-banner-mark" src="assets/img/wildones-chapter.png" alt="Wild Ones PA Ridge and Valley" onerror="this.style.display='none'">
+    <div class="wo-banner-text">
+      <p class="wo-banner-lead">Volunteering here is Wild Ones PA Ridge and Valley work.</p>
+      <p class="wo-banner-sub">Wild Ones Pennsylvania Ridge and Valley chapter 2751. Membership dues fund this work.</p>
+    </div>
+    <a class="wo-banner-cta" href="https://join.wildones.org/?chapter=2751" target="_blank" rel="noopener">Join Wild Ones</a>
+  </div>
+
   <p class="intro">These tasks need a regular volunteer. Each one has an estimated time and cadence.
     If something feels right for your schedule, tap "I'll take this" to sign up.</p>
 
