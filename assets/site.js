@@ -423,14 +423,19 @@
     join: 'https://join.wildones.org/?chapter=2751',
     site: 'https://parv.wildones.org/',
     logo: 'assets/img/wildones-chapter.png',
+    // The mark is grey (#636466). On the dark green headers that is about a
+    // 1.9:1 contrast ratio and effectively invisible, so those surfaces use the
+    // white variant instead.
+    logoLight: 'assets/img/wildones-chapter-light.png',
   };
 
   // Hides the image and nothing else if the mark is not on disk yet, so a missing
   // file costs the logo rather than leaving a broken-image icon in the header.
   const WO_FALLBACK = "this.style.display='none'";
 
-  function wildOnesMark(cls) {
-    return '<img class="' + cls + '" src="' + WILDONES.logo + '" alt="' + esc(WILDONES.shortName) +
+  function wildOnesMark(cls, light) {
+    const src = light ? WILDONES.logoLight : WILDONES.logo;
+    return '<img class="' + cls + '" src="' + src + '" alt="' + esc(WILDONES.shortName) +
            '" loading="lazy" decoding="async" onerror="' + WO_FALLBACK + '">';
   }
 
