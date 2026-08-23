@@ -13,6 +13,7 @@
 <script src="assets/config.js"></script>
 <script src="assets/supabase-client.js"></script>
 <script src="assets/mapping.js"></script>
+<script src="assets/services.js"></script>
 <script src="assets/auth.js"></script>
 <script>if (!AuthManager.hasCachedSession()) location.replace('login.html');</script>
 <script src="assets/data.js"></script>
@@ -77,6 +78,19 @@
   #pageError:empty { display: none; }
 
   /* Modal */
+  .svc-thumb {
+    width: 84px; height: 56px; object-fit: cover; border-radius: 8px;
+    border: 1px solid var(--border); display: block; background: var(--cream-dim);
+  }
+  .svc-thumb-none {
+    width: 84px; height: 56px; border-radius: 8px; border: 1px dashed var(--border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.7rem; color: var(--text-dim); text-align: center;
+  }
+  .photo-preview {
+    width: 100%; max-height: 260px; object-fit: cover; border-radius: 12px;
+    border: 1px solid var(--border); display: block; margin-bottom: 12px;
+  }
   .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4);
     z-index: 500; align-items: center; justify-content: center; padding: 20px; }
   .modal-overlay.open { display: flex; }
@@ -124,6 +138,27 @@
 </div>
 
 <!-- Off / edit-message modal -->
+<div class="modal-overlay" id="photoModal">
+  <div class="modal">
+    <h2>Service card photo</h2>
+    <p class="modal-sub" id="photoModalSub"></p>
+    <form id="photoForm" novalidate>
+      <img class="photo-preview" id="ph_preview" alt="" hidden>
+      <div class="form-group">
+        <label>Choose a new photo</label>
+        <input type="file" id="ph_file" accept="image/*">
+        <p class="modal-sub" style="margin:6px 0 0">Large photos are shrunk automatically before upload. Landscape shots work best; the card crops to a wide box.</p>
+      </div>
+      <div class="modal-error" id="photoError"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn-cancel" onclick="closePhoto()">Cancel</button>
+        <button type="button" class="btn-sm" id="ph_revert" onclick="revertPhoto()">Revert to original</button>
+        <button type="submit" class="btn btn-primary" id="ph_save">Save photo</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <div class="modal-overlay" id="offModal">
   <div class="modal">
     <h2 id="offModalTitle">Turn off service</h2>
@@ -194,13 +229,14 @@ function render() {
   if (!settings.length) { el.innerHTML = '<div class="empty">No services found.</div>'; return; }
   el.innerHTML = `
     <table>
-      <thead><tr><th>Service</th><th>Status</th><th>Off message</th><th>Reopen</th><th>Waitlist</th><th>Actions</th></tr></thead>
+      <thead><tr><th>Photo</th><th>Service</th><th>Status</th><th>Off message</th><th>Reopen</th><th>Waitlist</th><th>Actions</th></tr></thead>
       <tbody>
         ${settings.map(s => {
           const count = (waitlistBySlug[s.slug] || []).length;
           const open = !!expanded[s.slug];
           const main = `
             <tr>
+              <td>${photoCell(s)}</td>
               <td><span class="svc-name">${esc(s.name)}</span></td>
               <td><span class="status-pill ${s.active ? 'status-on' : 'status-off'}">${s.active ? 'Active' : 'Off'}</span></td>
               <td class="msg-preview">${s.active ? '<span class="muted">n/a</span>' : (s.offMessage ? esc(s.offMessage) : '<span class="muted">Default message</span>')}</td>
@@ -208,6 +244,7 @@ function render() {
               <td><button class="btn-sm" onclick="toggleWaitlist('${esc(s.slug)}')">${open ? 'Hide' : 'View'} (${count})</button></td>
               <td>
                 <div class="row-actions">
+                  <button class="btn-sm" onclick="openPhoto('${esc(s.slug)}')">Photo</button>
                   ${s.active
                     ? `<button class="btn-sm" onclick="openOff('${esc(s.slug)}')">Turn off</button>`
                     : `<button class="btn-sm" onclick="turnOn('${esc(s.slug)}')">Turn on</button>
@@ -216,7 +253,7 @@ function render() {
               </td>
             </tr>`;
           const panel = open
-            ? `<tr class="wl-row"><td colspan="6">${renderWaitlistPanel(s.slug)}</td></tr>`
+            ? `<tr class="wl-row"><td colspan="7">${renderWaitlistPanel(s.slug)}</td></tr>`
             : '';
           return main + panel;
         }).join('')}
@@ -241,6 +278,122 @@ function toggleWaitlist(slug) {
   expanded[slug] = !expanded[slug];
   render();
 }
+
+// ── Service card photos ──────────────────────────────────────────────────────
+// The photo on each homepage showcase card. Stored on service_settings.photo_path
+// using the same convention as plants and team: 'static:<file>' is the bundled
+// asset the site shipped with, anything else is a key in the gallery bucket.
+const ORIGINAL_PHOTO = {
+  tree_nets: 'static:tree-nets.jpg',
+  lawn_to_meadow: 'static:lawn-to-meadow.jpg',
+  pollinator_garden: 'static:pollinator-garden.jpg',
+  food_forest: 'static:food-forest.jpg',
+  rain_garden: 'static:rain-garden.jpg',
+  annual_food_garden: 'static:annual-food.jpg',
+  living_willow: 'static:living-willow.jpg',
+  garden_maintenance: 'static:maintenance-crew.jpg',
+  medicinal_herb: 'static:medicinal-herb.jpg',
+  forest_restoration: 'static:forest-restoration.jpg',
+  woodland_restoration: 'static:woodland-restoration.jpg',
+};
+
+let phSlug = null, phFile = null;
+
+function servicePhotoSrc(photoPath) {
+  return EcoServices.servicePhotoSrc(photoPath, DataStore.galleryPhotoUrl);
+}
+
+function photoCell(s) {
+  const src = servicePhotoSrc(s.photoPath);
+  return src
+    ? `<img class="svc-thumb" src="${esc(src)}" alt="" loading="lazy">`
+    : '<div class="svc-thumb-none">No photo</div>';
+}
+
+function openPhoto(slug) {
+  const s = settingBySlug(slug);
+  if (!s) return;
+  phSlug = slug; phFile = null;
+  document.getElementById('photoModalSub').textContent =
+    s.name + '. This is the photo behind the card on the home page.';
+  document.getElementById('ph_file').value = '';
+  document.getElementById('photoError').textContent = '';
+  const prev = document.getElementById('ph_preview');
+  const src = servicePhotoSrc(s.photoPath);
+  if (src) { prev.src = src; prev.hidden = false; } else { prev.removeAttribute('src'); prev.hidden = true; }
+  // Reverting is only meaningful when the card is not already on its original.
+  const orig = ORIGINAL_PHOTO[slug] || null;
+  document.getElementById('ph_revert').hidden = !orig || s.photoPath === orig;
+  document.getElementById('photoModal').classList.add('open');
+}
+
+function closePhoto() {
+  document.getElementById('photoModal').classList.remove('open');
+  phSlug = null; phFile = null;
+}
+
+document.getElementById('photoModal').addEventListener('click', function (e) {
+  if (e.target === this) closePhoto();
+});
+
+// Show what was picked before it is saved, so a wrong file is caught here rather
+// than on the live home page.
+document.getElementById('ph_file').addEventListener('change', function () {
+  phFile = this.files && this.files[0] ? this.files[0] : null;
+  const prev = document.getElementById('ph_preview');
+  if (!phFile) return;
+  prev.src = URL.createObjectURL(phFile);
+  prev.hidden = false;
+});
+
+async function savePhotoPath(slug, photoPath, oldPath) {
+  await DataStore.updateServiceSetting(slug, { photoPath: photoPath });
+  // Only after the row points somewhere else, and never a bundled asset.
+  if (oldPath && String(oldPath).slice(0, 7) !== 'static:' && oldPath !== photoPath) {
+    try { await window.ecoSupabase.storage.from('gallery').remove([oldPath]); } catch (e) { /* ignore */ }
+  }
+  await refresh();
+}
+
+async function revertPhoto() {
+  const slug = phSlug, s = settingBySlug(slug);
+  const orig = ORIGINAL_PHOTO[slug];
+  if (!s || !orig) return;
+  const errEl = document.getElementById('photoError');
+  errEl.textContent = '';
+  try {
+    await savePhotoPath(slug, orig, s.photoPath);
+    closePhoto();
+  } catch (err) {
+    errEl.textContent = 'Could not revert the photo. ' + err.message;
+  }
+}
+
+document.getElementById('photoForm').addEventListener('submit', async function (e) {
+  e.preventDefault();
+  const slug = phSlug, s = settingBySlug(slug);
+  const errEl = document.getElementById('photoError');
+  const btn = document.getElementById('ph_save');
+  errEl.textContent = '';
+  if (!s) return;
+  if (!phFile) { errEl.textContent = 'Choose a photo first, or cancel.'; return; }
+  btn.disabled = true;
+  try {
+    // Downscale before upload. A straight-from-the-phone photo is several
+    // megabytes, and this one lands on the home page.
+    const blob = await DataStore.resizeImage(phFile, 1600);
+    const path = `services/${crypto.randomUUID()}.jpg`;
+    const up = await window.ecoSupabase.storage.from('gallery')
+      .upload(path, blob, { contentType: blob.type || 'image/jpeg', upsert: false });
+    if (up.error) throw new Error(up.error.message);
+    await savePhotoPath(slug, path, s.photoPath);
+    closePhoto();
+  } catch (err) {
+    errEl.textContent = 'Could not save the photo. ' + err.message;
+  } finally {
+    btn.disabled = false;
+  }
+});
 
 async function turnOn(slug) {
   const errEl = document.getElementById('pageError');

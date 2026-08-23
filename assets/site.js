@@ -370,6 +370,10 @@
     return map().fromDbAll(data).filter((r) => r.status === 'approved');
   }
 
+  function servicePhotoUrl(photoPath) {
+    return sb().storage.from('gallery').getPublicUrl(photoPath).data.publicUrl;
+  }
+
   // Anon read of service_settings. Fail-soft: caller treats a thrown error as
   // "settings unknown" and falls back to plain intake.html links.
   async function getServiceSettings() {
@@ -886,9 +890,28 @@
       rows.forEach((r) => { m[r.slug] = r; });
       SERVICE_SETTINGS = m;
       SETTINGS_LOADED = true;
+      applyServicePhotos(cards, m);
     } catch (e) {
       SETTINGS_LOADED = false; // cards fall back to intake.html
     }
+  }
+
+  // Swap in Jordan's own card photos, uploaded through manage-services.html.
+  //
+  // The markup keeps the bundled <img src> it shipped with, and this only ever
+  // overwrites it. So a failed fetch, a row with no photo, or a stored value the
+  // guard rejects all leave the original photo on screen rather than blanking the
+  // card, which matters because the showcase is a photo-backdrop layout and a
+  // card with no image is a broken card.
+  function applyServicePhotos(cards, settings) {
+    if (!root.EcoServices) return;
+    cards.forEach((card) => {
+      const row = settings[card.getAttribute('data-service-slug')];
+      const img = card.querySelector('img');
+      if (!row || !img) return;
+      const src = root.EcoServices.servicePhotoSrc(row.photoPath, servicePhotoUrl);
+      if (src) img.setAttribute('src', src);
+    });
   }
 
   root.EcoSite = {

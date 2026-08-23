@@ -353,6 +353,10 @@ const DataStore = (() => {
     // form, which resolves to a local path without touching storage).
     plantPhotoUrl: (photoPath) =>
       sb.storage.from('gallery').getPublicUrl(photoPath).data.publicUrl, // sync
+    // Same lookup, honestly named for callers that are not plants. The bucket is
+    // shared, so this is an alias rather than a second implementation.
+    galleryPhotoUrl: (photoPath) =>
+      sb.storage.from('gallery').getPublicUrl(photoPath).data.publicUrl, // sync
 
     // Team members (staff-editable, rendered on the public about page). Public
     // listing only: a row here grants no portal access. The anon read policy is
