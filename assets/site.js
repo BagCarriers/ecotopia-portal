@@ -435,7 +435,7 @@
 
   function wildOnesMark(cls, light) {
     const src = light ? WILDONES.logoLight : WILDONES.logo;
-    return '<img class="' + cls + '" src="' + src + '" alt="' + esc(WILDONES.shortName) +
+    return '<img class="' + cls + '" src="' + src + '" alt="' + esc(WILDONES.name) +
            '" loading="lazy" decoding="async" onerror="' + WO_FALLBACK + '">';
   }
 
@@ -454,7 +454,7 @@
              wildOnesMark('wo-banner-mark') +
              '<div class="wo-banner-text">' +
                '<p class="wo-banner-lead">' + esc(text) + '</p>' +
-               '<p class="wo-banner-sub">' + esc(WILDONES.name) + ' chapter ' + esc(WILDONES.chapter) + '. ' +
+               '<p class="wo-banner-sub">Chapter ' + esc(WILDONES.chapter) + '. ' +
                  'Membership dues fund this work.</p>' +
              '</div>' +
              '<a class="wo-banner-cta" href="' + WILDONES.join + '" target="_blank" rel="noopener">Join Wild Ones</a>' +

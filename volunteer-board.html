@@ -32,12 +32,9 @@
   }
   .pub-logo { font-family: 'Fraunces', serif; font-size: 1.2rem; color: var(--sage); font-weight: 700; }
   .pub-tagline { font-size: 0.8rem; color: rgba(216,243,220,0.7); margin-top: 2px; }
-  .pub-chapter {
-    display: inline-flex; align-items: center; gap: 6px; margin-top: 6px;
-    font-size: 0.75rem; color: rgba(216,243,220,0.85); text-decoration: none;
-  }
-  .pub-chapter:hover { color: #fff; }
-  .pub-chapter img { height: 32px; width: auto; }
+  .pub-chapter { display: inline-flex; flex-shrink: 0; text-decoration: none; }
+  .pub-chapter img { height: 64px; width: auto; display: block; }
+  @media (max-width: 480px) { .pub-chapter img { height: 48px; } }
   .wo-banner {
     display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
     background: #fff; border: 1px solid var(--cream-dim);
@@ -135,20 +132,18 @@
   <div>
     <div class="pub-logo">🌿 Ecotopia Earthcare</div>
     <div class="pub-tagline">Community Garden Program</div>
-    <a class="pub-chapter" href="https://join.wildones.org/?chapter=2751" target="_blank" rel="noopener">
-      <img src="assets/img/wildones-chapter-light.png" alt="" onerror="this.style.display='none'">
-      <span>A Wild Ones PA Ridge and Valley program</span>
-    </a>
   </div>
+  <a class="pub-chapter" href="https://join.wildones.org/?chapter=2751" target="_blank" rel="noopener">
+    <img src="assets/img/wildones-chapter-light.png" alt="Wild Ones Pennsylvania Ridge and Valley" onerror="this.style.display='none'">
+  </a>
 </div>
 
 <div class="container">
   <h1>Open Responsibilities</h1>
   <div class="wo-banner">
-    <img class="wo-banner-mark" src="assets/img/wildones-chapter.png" alt="Wild Ones PA Ridge and Valley" onerror="this.style.display='none'">
     <div class="wo-banner-text">
       <p class="wo-banner-lead">Volunteering here is Wild Ones PA Ridge and Valley work.</p>
-      <p class="wo-banner-sub">Wild Ones Pennsylvania Ridge and Valley chapter 2751. Membership dues fund this work.</p>
+      <p class="wo-banner-sub">Chapter 2751. Membership dues fund this work.</p>
     </div>
     <a class="wo-banner-cta" href="https://join.wildones.org/?chapter=2751" target="_blank" rel="noopener">Join Wild Ones</a>
   </div>
