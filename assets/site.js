@@ -909,7 +909,9 @@
       const row = settings[card.getAttribute('data-service-slug')];
       const img = card.querySelector('img');
       if (!row || !img) return;
-      const src = root.EcoServices.servicePhotoSrc(row.photoPath, servicePhotoUrl);
+      let src = null;
+      try { src = root.EcoServices.servicePhotoSrc(row.photoPath, servicePhotoUrl); }
+      catch (e) { src = null; }
       if (src) img.setAttribute('src', src);
     });
   }

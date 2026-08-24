@@ -299,8 +299,15 @@ const ORIGINAL_PHOTO = {
 
 let phSlug = null, phFile = null;
 
+// A thumbnail is decoration on a page whose job is turning services on and off.
+// Resolving one must never be able to take the page down, so a failure here
+// degrades that one cell to "No photo" instead of throwing out of render().
 function servicePhotoSrc(photoPath) {
-  return EcoServices.servicePhotoSrc(photoPath, DataStore.galleryPhotoUrl);
+  try {
+    return EcoServices.servicePhotoSrc(photoPath, DataStore.galleryPhotoUrl);
+  } catch (e) {
+    return null;
+  }
 }
 
 function photoCell(s) {
@@ -352,7 +359,15 @@ async function savePhotoPath(slug, photoPath, oldPath) {
   if (oldPath && String(oldPath).slice(0, 7) !== 'static:' && oldPath !== photoPath) {
     try { await window.ecoSupabase.storage.from('gallery').remove([oldPath]); } catch (e) { /* ignore */ }
   }
-  await refresh();
+}
+
+// Redrawing the table is deliberately NOT inside the save's try/catch. The photo
+// is already uploaded and the row already updated by the time this runs, so
+// reporting a render failure as "could not save the photo" would be a lie that
+// invites a retry, and the retry uploads a second copy and orphans the first.
+// If the redraw cannot happen, reload rather than leave a stale table on screen.
+async function refreshAfterSave() {
+  try { await refresh(); } catch (e) { location.reload(); }
 }
 
 async function revertPhoto() {
@@ -363,10 +378,12 @@ async function revertPhoto() {
   errEl.textContent = '';
   try {
     await savePhotoPath(slug, orig, s.photoPath);
-    closePhoto();
   } catch (err) {
     errEl.textContent = 'Could not revert the photo. ' + err.message;
+    return;
   }
+  closePhoto();
+  await refreshAfterSave();
 }
 
 document.getElementById('photoForm').addEventListener('submit', async function (e) {
@@ -387,12 +404,14 @@ document.getElementById('photoForm').addEventListener('submit', async function (
       .upload(path, blob, { contentType: blob.type || 'image/jpeg', upsert: false });
     if (up.error) throw new Error(up.error.message);
     await savePhotoPath(slug, path, s.photoPath);
-    closePhoto();
   } catch (err) {
     errEl.textContent = 'Could not save the photo. ' + err.message;
+    return;
   } finally {
     btn.disabled = false;
   }
+  closePhoto();
+  await refreshAfterSave();
 });
 
 async function turnOn(slug) {
